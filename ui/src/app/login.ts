@@ -51,31 +51,33 @@ export async function login(redirect: string) {
       result.user.getIdToken().then(async function (idToken) {
         fetch(`/auth/login?id_token=${idToken}&redirect_uri=${redirect}`, {
           method: 'POST',
-          redirect: 'follow',
+          // redirect: 'follow',
+          redirect: 'manual',
           credentials: 'include',
           mode: 'cors',
         })
           .then(async (response) => {
             if (response.redirected) {
-              console.log('LOGIN redirect', response.url);
+              console.log('1 LOGIN redirect', response.url);
               // Emit pw-login event before redirect
               window.dispatchEvent(new CustomEvent('pw-login'));
               window.location.href = response.url;
             } else if (!response.ok) {
               // Handle error responses
               const errorText = await response.text();
-              console.error(`Login failed with status ${response.status}: ${errorText}`);
-              throw new Error(`Login failed: ${response.status} ${response.statusText}`);
+              console.error(`2 Login failed with status ${response.status}: ${errorText}`);
+              throw new Error(`2 Login failed: ${response.status} ${response.statusText}`);
             } else {
-              console.log('Login successful but no redirect');
-              // Emit pw-login event for successful login without redirect
-              window.dispatchEvent(new CustomEvent('pw-login'));
+              console.log('3 Login successful but no redirect');
             }
           })
           .catch(function (err) {
-            console.error('Login fetch ERROR', err);
+            console.error('4 Login fetch ERROR', err);
+          })
+          .finally(function () {
+            window.dispatchEvent(new CustomEvent('pw-login'));
           });
-      });
+      })
     })
     .catch((error) => {
       console.error(`login ${redirect}`, error);
@@ -108,5 +110,8 @@ export function logout(redirect: string) {
     })
     .catch(function (err) {
       console.error('Lougout fetch ERROR', err);
+    })
+    .finally(function () {
+      window.dispatchEvent(new CustomEvent('pw-logout'));
     });
 }

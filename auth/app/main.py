@@ -109,22 +109,6 @@ async def session_login(
     """
     try:
         """
-        DO NOT REMOVE THIS BUG REPORT UNTIL THE USER VERIFIES THE BUG HAS BEEN FIXED!
-        BUG: Browser complains:
-            Mixed Content: The page at 'https://dev49.org/ui/' was loaded over HTTPS,
-            but requested an insecure resource 'http://dev49.org/ui'. This request has
-            been blocked; the content must be served over HTTPS.
-        Note that `redirect_uri: str = "/"` redirects to `/ui`.
-        To diagnose the issue, print the X-Forwarded-Proto to the log and check the X-Forwarded-Proto settings in traefik and nginx.
-        Let the user do the testing, declare victory only after user confirms that tests pass.
-        
-        FINDINGS: Auth service is correctly generating HTTPS redirects. Logs show:
-        - request.url.scheme='https'
-        - asgi_scope_scheme='https'
-        - response location header='https://dev49.org/ui'
-        The mixed content error may be coming from something else on the /ui/ page after redirect.
-        """
-        """
         Prepare response.
 
         Per https://stackoverflow.com/questions/79352184/why-does-my-fastapi-application-redirect-to-http-and-not-https
@@ -133,6 +117,8 @@ async def session_login(
         Hence it is important that the reverse proxies (traefik and nginx) in front of the auth service are 
         configured to set X-Forwarded-Proto correctly.
         Furthermore uvicorn must be invoked with `--forwarded-allow-ips *`.
+
+        Problem seems with ui/src/app/login.ts.
         """
         response = RedirectResponse(url=redirect_uri, status_code=302)
         logger.warning(
