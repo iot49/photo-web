@@ -1,0 +1,25 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install dependencies including test dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir pytest pytest-asyncio httpx
+
+# Copy the entire project structure
+COPY . .
+
+# Set PYTHONPATH to include the app directory so tests can import modules
+ENV PYTHONPATH=/app/app:/app
+
+# Create data directory for SQLite database
+RUN mkdir -p /app/data
+
+# Set environment variable for database location
+ENV DATABASE_URL=sqlite:///./data/auth.db
+
+# Default command to run tests
+CMD ["python", "-m", "pytest", "tests/", "-v"]

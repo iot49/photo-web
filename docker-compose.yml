@@ -1,0 +1,120 @@
+volumes:
+  traefik-certs:
+    driver: local
+  auth-data:
+    driver: local
+  nginx-cache:
+    driver: local
+
+networks:
+  ingress:
+    name: ingress   # traefik to proxied apps
+  tunnel:
+    name: tunnel    # cf tunnel to traefik
+
+services:
+  traefik:
+    image: traefik:v3.1.5
+    container_name: traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    env_file:
+      - .env
+    environment:
+      - CLOUDFLARE_DNS_API_TOKEN=${CF_API_TOKEN}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/traefik-dynamic.yml:/etc/traefik/traefik-dynamic.yml:ro
+      - traefik-certs:/var/traefik/certs
+    labels:
+      - traefik.enable=true
+      # Dashboard router (for UI)
+      - traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${ROOT_DOMAIN}`) && PathPrefix(`/`)
+      - traefik.http.routers.traefik-dashboard.tls=true
+      - traefik.http.routers.traefik-dashboard.tls.certresolver=cloudflare
+      - traefik.http.routers.traefik-dashboard.entrypoints=websecure
+      - traefik.http.routers.traefik-dashboard.service=dashboard@internal
+      - traefik.http.routers.traefik-dashboard.priority=1
+      # API router (for data endpoints)
+      - traefik.http.routers.traefik-api.rule=Host(`traefik.${ROOT_DOMAIN}`) && PathPrefix(`/api`)
+      - traefik.http.routers.traefik-api.tls=true
+      - traefik.http.routers.traefik-api.tls.certresolver=cloudflare
+      - traefik.http.routers.traefik-api.entrypoints=websecure
+      - traefik.http.routers.traefik-api.service=api@internal
+      - traefik.http.routers.traefik-api.priority=2
+    networks:
+      - ingress
+      - tunnel
+
+  echo:
+    image: mendhak/http-https-echo
+    container_name: echo
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.echo.rule=Host(`${ROOT_DOMAIN}`) && Path(`/echo`)"
+      - "traefik.http.routers.echo.entrypoints=websecure"
+      - "traefik.http.routers.echo.tls=true"
+      - "traefik.http.routers.echo.tls.certresolver=cloudflare"
+      - "traefik.http.routers.echo.middlewares=authorize@file"
+      - "traefik.http.services.echo.loadbalancer.server.port=8080" # Default port for mendhak/http-https-echo
+    networks:
+      - ingress
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./nginx/nginx-proxy.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/html:/usr/share/nginx/html:ro # static content
+      - nginx-cache:/var/cache/nginx # cache volume
+    # command: ["/bin/bash", "/entrypoint.sh"]
+    labels:
+      - "traefik.enable=true"
+      # Route root domain and photos/auth paths through nginx
+      - "traefik.http.routers.nginx.rule=Host(`${ROOT_DOMAIN}`)"
+      - "traefik.http.routers.nginx.entrypoints=websecure"
+      - "traefik.http.routers.nginx.tls=true"
+      - "traefik.http.routers.nginx.tls.certresolver=cloudflare"
+      - "traefik.http.routers.nginx.priority=20"
+      - "traefik.http.routers.nginx.middlewares=authorize@file"
+      - "traefik.http.services.nginx.loadbalancer.server.port=80" # Default nginx port
+    networks:
+      - ingress
+    depends_on:
+      - photos
+      - auth
+
+  auth:
+    build: ./auth
+    image: auth-service:latest
+    container_name: auth
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - auth-data:/app/data # SQLite database storage
+    # No direct Traefik labels - accessed through nginx proxy
+    networks:
+      - ingress
+      
+  photos:
+    build: ./photos/app
+    image: photos-service:latest
+    container_name: photos
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # IMPORTANT: give Docker and Terminal "Full Disk Access" in System Preferences/Privacy & Security
+      - ${PHOTOS_LIBRARY}:${PHOTOS_LIBRARY_MOUNT}:ro
+    # No direct Traefik labels - accessed through nginx proxy
+    networks:
+      - ingress
+      

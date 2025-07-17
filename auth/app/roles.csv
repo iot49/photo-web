@@ -1,0 +1,20 @@
+allow, /, public, main entry point
+allow, /ui*, public, user interface
+allow, */health, public, Health checks (auth, photos, nginx)
+allow, /static/*, public, Static assets
+allow, /favicon.ico, public, make browser happy
+
+allow, /auth/firebase-config, public
+allow, /auth/login*, public, Login page
+allow, /auth/logout*, public, Logout endpoint
+allow, /auth/me, public, User info endpoint
+allow, /auth/docs, public, Swagger docs for auth
+allow, /auth/users*, admin, User management
+
+allow, /photos/api/albums, public, Public album list
+allow, /photos/api/photos/srcset, public, Srcset for images
+allow, /photos/api/albums/*, !photos:8000, Delegate album access to photos service
+allow, /photos/api/photos/*, !photos:8000, Delegate photo access to photos service
+allow, */docs, admin, Swagger docs for all services
+allow, /photos/api/reload-db, admin, Reload photos database
+allow, /photos/api/me-test, public, Testing

@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+sqlmodel
+firebase-admin
+python-jose[cryptography]
+python-multipart
+itsdangerous
+httpx

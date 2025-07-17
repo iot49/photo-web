@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Static Content</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .image-container {
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        h1 {
+            color: #333;
+        }
+        h2 {
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <h1>Static Content</h1>
+    <p>This page serves static content from the nginx server.</p>
+    
+    <div class="image-container">
+        <h2>Sample Image</h2>
+        <img src="test-image.jpg" alt="Sample Image">
+    </div>
+    
+    <div class="image-container">
+        <h2>About</h2>
+        <p>This is a simple static page served by nginx.</p>
+        <p>You can access static files through the /static/ location.</p>
+    </div>
+</body>
+</html>
