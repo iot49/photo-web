@@ -90,6 +90,7 @@ services:
     depends_on:
       - photos
       - auth
+      - doc
 
   auth:
     build: ./auth
@@ -114,6 +115,19 @@ services:
     volumes:
       # IMPORTANT: give Docker and Terminal "Full Disk Access" in System Preferences/Privacy & Security
       - ${PHOTOS_LIBRARY}:${PHOTOS_LIBRARY_MOUNT}:ro
+    # No direct Traefik labels - accessed through nginx proxy
+    networks:
+      - ingress
+
+  doc:
+    build: ./doc/app
+    image: doc-service:latest
+    container_name: doc
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ${DOCS}:/docs:ro
     # No direct Traefik labels - accessed through nginx proxy
     networks:
       - ingress

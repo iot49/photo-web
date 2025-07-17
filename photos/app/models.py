@@ -1,43 +1,13 @@
-from enum import Enum
 from typing import Annotated, Dict, List, Optional
 
 from pydantic import BaseModel, Field
-
-
-class Realm(int, Enum):
-    """
-    Access levels for photos and albums.
-    PUBLIC = 1
-    PROTECTED = 2
-    PRIVATE = 3
-    """
-
-    PUBLIC = 1
-    PROTECTED = 2
-    PRIVATE = 3
-
-    @classmethod
-    def _missing_(cls, value: object):
-        if isinstance(value, str):
-            value = value.upper()
-            if value == "PUBLIC":
-                return cls.PUBLIC
-            elif value == "PROTECTED":
-                return cls.PROTECTED
-            elif value == "PRIVATE":
-                return cls.PRIVATE
-        # Fallback for integer values or if string doesn't match
-        for member in cls:
-            if member.value == value:
-                return member
-        return super()._missing_(value)
 
 
 class PhotoModel(BaseModel):
     uuid: str
     date: str
     realm: Annotated[
-        Realm, Field(description="Access level for the photo", default=Realm.PRIVATE)
+        str, Field(description="Access level for the photo", default="private")
     ]
     mime_type: str
     title: Optional[str] = None
@@ -77,7 +47,7 @@ class AlbumModel(BaseModel):
         ),
     ]
     realm: Annotated[
-        Realm, Field(description="Access level for the album", default=Realm.PRIVATE)
+        str, Field(description="Access level for the photo", default="private")
     ]
     date: Optional[AlbumDateRange] = None
     location: Optional[AlbumLocation] = None

@@ -10,7 +10,7 @@ SQLModel.metadata.clear()
 class UserBase(SQLModel):
     """Base model with common user fields and their definitions."""
 
-    name: str = Field(default=None, description="User's full name")
+    name: Optional[str] = Field(default=None, description="User's full name")
     # Accept None for users that are not logged in; in database, email != None
     email: Optional[str] = Field(
         default=None,
@@ -20,7 +20,7 @@ class UserBase(SQLModel):
     )
     roles: str = Field(
         default="public",
-        description="Comma-separated roles (e.g., 'public,admin,photos')",
+        description="Comma-separated roles (e.g., 'public,admin,private,personal,family')",
     )
     enabled: bool = Field(
         default=True, description="Whether the user account is enabled"
@@ -49,7 +49,7 @@ class User(UserBase, table=True, extend_existing=True):
             "example": {
                 "name": "John Doe",
                 "email": "john.doe@example.com",
-                "roles": "public,photos",
+                "roles": "public,protected",
                 "last_login": "2025-07-06T14:30:00Z",
                 "enabled": True,
                 "logged_in": True,

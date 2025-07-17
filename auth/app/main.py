@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 from authorization import get_authorization_manager
 from database import DatabaseManager, get_database_manager, init_database
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from firebase_util import create_session_token, verify_cookie, verify_user
@@ -253,7 +253,9 @@ async def get_current_user(request: Request):
 
 
 @app.get("/authorize")
-async def authorize(request: Request, db: DatabaseManager = Depends(get_db)):
+async def authorize(
+    request: Request, response: Response, db: DatabaseManager = Depends(get_db)
+):
     """Traefik forwardAuth endpoint for authorization checking.
 
     This endpoint is used by Traefik to verify if a user is authorized to access
@@ -266,47 +268,32 @@ async def authorize(request: Request, db: DatabaseManager = Depends(get_db)):
         - 302 (Redirect) to login if authentication is needed
     """
     try:
-        # Get the original URI from Traefik headers
-        original_uri = request.headers.get("X-Forwarded-Uri", "/")
-
-        auth_manager = get_authorization_manager()
-
-        # Step 1: Check if public access is allowed
-        public_roles = ["public"]
-        if auth_manager.is_authorized(original_uri, public_roles, request):
-            return {"status": "authorized", "roles": "public"}
-
-        # Step 2: Check if user is logged in
-        session_token = request.cookies.get("session")
-        if not session_token:
-            # Return 401 to let Traefik handle the redirect
-            raise HTTPException(status_code=401, detail="Authentication required")
-
-        # Verify session token
+        # Get roles, defaults to "public" if user is not logged in
+        # This also stores the user_info in the session for peruse by proxied services, e.g. photos
         user_info = verify_user(request)
-        if not user_info or not user_info.email:
-            logger.warning(
-                f"Invalid session token, returning 401 for URI: {original_uri}"
-            )
-            # Return 401 to let Traefik handle the redirect
-            raise HTTPException(status_code=401, detail="Authentication required")
 
-        # Step 3: Parse user roles
         user_roles = [
             role.strip()
             for role in (user_info.roles or "public").split(",")
             if role.strip()
         ]
 
-        # Step 4: Check authorization with actual user roles
-        if auth_manager.is_authorized(original_uri, user_roles, request):
+        # Get the original URI from Traefik headers
+        original_uri = request.headers.get("X-Forwarded-Uri", "/")
+
+        # Check authorization against user roles
+        if get_authorization_manager().is_authorized(original_uri, user_roles, request):
+            response.headers["X-Forwarded-Roles"] = user_info.roles or "public"
+            logger.debug(
+                f"AUTHORIZED {original_uri} for {user_roles}, response = {response}"
+            )
             return {
                 "status": "authorized",
                 "user": user_info.email,
                 "roles": user_info.roles,
             }
         else:
-            logger.warning(
+            logger.info(
                 f"Access denied for user {user_info.email} with roles {user_roles} to URI: {original_uri}"
             )
             raise HTTPException(status_code=403, detail="Access denied")
@@ -314,5 +301,7 @@ async def authorize(request: Request, db: DatabaseManager = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error in authorization check: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.error(f"Error in authorization check: {e}", e)
+        raise HTTPException(
+            status_code=500, detail=f"Internal server error in authorize: {e}"
+        )

@@ -1,0 +1,80 @@
+# Traefik Configuration File
+# Static configuration for Traefik reverse proxy
+
+# Global configuration
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+# API and Dashboard configuration
+api:
+  dashboard: true
+  insecure: true
+  debug: true
+
+# Entry points configuration
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"
+
+# Providers configuration
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: ingress
+  file:
+    filename: /etc/traefik/traefik-dynamic.yml
+    watch: true
+
+# Certificate resolvers configuration
+certificatesResolvers:
+  cloudflare:
+    acme:
+      email: bernhard.e.boser@gmail.com
+      storage: /var/traefik/certs/cloudflare-acme.json
+      caServer: "https://acme-v02.api.letsencrypt.org/directory"
+      # keyType: EC256
+      dnsChallenge:
+        provider: cloudflare
+        delayBeforeCheck: "5"
+        resolvers:
+          # Warning: don't use Adguard DNS, it blocks using other DNS servers!
+          - "1.1.1.1:53"
+          - "8.8.8.8:53"
+  cloudflare-wildcard:
+    acme:
+      email: bernhard.e.boser@gmail.com
+      storage: /var/traefik/certs/cloudflare-wildcard-acme.json
+      caServer: "https://acme-v02.api.letsencrypt.org/directory"
+      # keyType: EC256
+      dnsChallenge:
+        provider: cloudflare
+        delayBeforeCheck: "5"
+        resolvers:
+          - "1.1.1.1:53"
+          - "8.8.8.8:53"
+  letsencrypt:
+    acme:
+      email: bernhard.e.boser@gmail.com
+      storage: /var/traefik/certs/letsencrypt-acme.json
+      caServer: "https://acme-v02.api.letsencrypt.org/directory"
+      httpChallenge:
+        entryPoint: web
+
+# Logging configuration
+log:
+  level: WARN
+  format: json
+
+# Access logs
+accessLog:
+  format: json

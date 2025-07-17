@@ -1,6 +1,5 @@
 fastapi
+sqlmodel
 uvicorn
 pydantic
 osxphotos
-Pillow 
-pillow-heif

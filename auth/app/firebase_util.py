@@ -42,8 +42,8 @@ def verify_cookie(session_cookie: str) -> UserBase:
         user = db.get_user_by_email(email)
 
         if not user:
-            # default role for logged-in user is 'protected'
-            user = UserBase(**user_info, roles="protected")
+            # default roles for logged-in user is 'public,protected'
+            user = UserBase(**user_info, roles="public,protected")
             db.create_user(UserCreate(user))
 
         return user

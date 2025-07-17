@@ -109,6 +109,9 @@ class AuthorizationManager:
                 if rule.action == "allow":
                     if rule.is_delegated:
                         # Delegate authorization to another service
+                        logger.debug(
+                            f"DELEGATE: {rule.action} {rule.uri_pattern} {rule.role} for URI {uri} with roles {user_roles}"
+                        )
                         return self._delegate_authorization(
                             rule, uri, user_roles, request
                         )
@@ -179,16 +182,16 @@ class AuthorizationManager:
 
         except httpx.TimeoutException:
             logger.error(
-                f"Timeout when delegating authorization to {rule.delegation_url}"
+                f"Timeout when delegating authorization to {rule.delegation_url}", e
             )
             return False
         except httpx.RequestError as e:
             logger.error(
-                f"Error delegating authorization to {rule.delegation_url}: {e}"
+                f"Error delegating authorization to {rule.delegation_url}: {e}", e
             )
             return False
         except Exception as e:
-            logger.error(f"Unexpected error during delegation: {e}")
+            logger.error(f"Unexpected error during delegation: {e}", e)
             return False
 
 

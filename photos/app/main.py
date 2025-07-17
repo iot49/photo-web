@@ -5,11 +5,10 @@ import re
 from contextlib import asynccontextmanager
 from typing import Dict, List, Optional
 
-import httpx
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
-from models import DB, AlbumModel, PhotoModel, Realm
+from models import DB, AlbumModel, PhotoModel
 from PIL import Image
 from pillow_heif import register_heif_opener
 from read_db import read_db
@@ -39,31 +38,6 @@ register_heif_opener()
 
 # In-memory database (populated from Apple Photos library)
 db: DB = DB(albums={}, photos={})
-
-
-async def get_user_info(request: Request) -> dict:
-    """Get user information from auth service."""
-    auth_service_url = os.getenv("AUTH_SERVICE_URL", "http://auth:8000") + "/me"
-    session_cookie = request.cookies.get("session")
-
-    if not session_cookie:
-        # No session cookie, so user is not logged in.
-        # Return public role.
-        return {"roles": "public"}
-
-    # Forward session cookie to auth service
-    headers = {"Cookie": f"session={session_cookie}"}
-
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(auth_service_url, headers=headers, timeout=5.0)
-            response.raise_for_status()  # Raise an exception for bad status codes
-            user_info = response.json()
-            logger.debug(f"Auth service returned user_info: {user_info}")
-            return user_info
-    except Exception as e:
-        logger.error(f"An unexpected error occurred while fetching user info: {e}", e)
-        return {"roles": "public"}  # Fallback
 
 
 async def get_db() -> DB:
@@ -127,11 +101,10 @@ async def health_check():
 @app.get("/api/test-me")
 async def get_me(request: Request):
     """
-    Get user information from auth service.
-
-    This endpoint is a proxy to the auth service's /me endpoint.
+    Get user roles. Testing only.
     """
-    return await get_user_info(request)
+    roles = request.headers.get("X-Forwarded-Roles", "public")
+    return roles
 
 
 @app.get("/authorize")
@@ -177,103 +150,51 @@ async def authorize_access(request: Request, db: DB = Depends(get_db)):
         # Handle srcset URI
         srcset_match = re.match(r"/photos/api/photos/srcset/?$", original_uri)
 
+        user_roles = request.headers.get("X-Forwarded-Roles", "public")
+        roles_list = [role.strip().lower() for role in user_roles.split(",")]
+
         if photo_match:
-            # Handle photo URI
-            photo_id = photo_match.group(1)
-
-            # Get the photo from database
-            photo = db.photos.get(photo_id)
+            photo = db.photos.get(photo_match.group(1))
             if not photo:
-                logger.warning(f"Photo not found: {original_uri}")
-                raise HTTPException(status_code=404, detail="Photo not found")
-
-            realm = photo.realm
+                raise HTTPException(
+                    status_code=404, detail=f"Photo {original_uri} not found"
+                )
+            if photo.realm in roles_list:
+                return {"status": "authorized"}
+            logger.debug(
+                f"Access denied for photo {original_uri} roles={user_roles} realm={photo.realm}"
+            )
 
         elif album_match:
-            # Handle album URI
-            album_id = album_match.group(1)
-
-            # Get the album from database
-            album = db.albums.get(album_id)
+            album = db.albums.get(album_match.group(1))
             if not album:
-                logger.warning(f"Album not found: {original_uri}")
-                raise HTTPException(status_code=404, detail="Album not found")
-
-            realm = album.realm
+                raise HTTPException(
+                    status_code=404, detail="Album {original_uri} not found"
+                )
+            if album.realm in roles_list:
+                return {"status": "authorized"}
 
         elif album_list_match or srcset_match:
             # These endpoints don't require specific resource authorization
             # They handle their own authorization logic in their respective handlers
             # For delegation purposes, we'll allow public access and let the endpoint handle it
-            realm = Realm.PUBLIC
+            return {"status": "authorized"}
 
         else:
-            raise HTTPException(status_code=400, detail="Invalid URI format")
+            raise HTTPException(status_code=400, detail=f"Invalid URI {original_uri}")
 
-        # If the resource is public, allow access immediately without checking user info
-        if realm == Realm.PUBLIC:
-            resource_id = (
-                photo_id
-                if "photo_id" in locals()
-                else (album_id if "album_id" in locals() else "unknown")
-            )
-            logger.debug(f"Access granted to public resource {resource_id}")
-            return {"status": "authorized", "realm": "public"}
-
-        resource_id = (
-            photo_id
-            if "photo_id" in locals()
-            else (album_id if "album_id" in locals() else "unknown")
+        raise HTTPException(
+            status_code=403,
+            detail=f"Access denied for {original_uri} roles {user_roles}",
         )
-        logger.debug(f"AUTH 1: {original_uri} id: {resource_id} realm {realm}")
-
-        # For non-public resources, get user information from forwarded header
-        user_roles = request.headers.get("X-Forwarded-Roles", "public")
-        roles_list = [role.strip().lower() for role in user_roles.split(",")]
-
-        logger.debug(f"AUTH 2: {original_uri} realm {realm} user_info {user_roles}")
-
-        if realm == Realm.PROTECTED:
-            # Protected resources require 'protected' or 'private' role
-            if "protected" in roles_list or "private" in roles_list:
-                logger.debug(
-                    f"AUTH 2: Access granted to protected resource {resource_id}"
-                )
-                return {"status": "authorized", "realm": "protected"}
-            else:
-                logger.debug(
-                    f"AUTH 3: Access denied to protected resource {original_uri} for roles: {user_roles}"
-                )
-                raise HTTPException(
-                    status_code=403,
-                    detail="Insufficient permissions for protected resource",
-                )
-
-        elif realm == Realm.PRIVATE:
-            # Private resources require 'private' role
-            if "private" in roles_list:
-                logger.debug(
-                    f"AUTH 4: Access granted to private resource {original_uri}"
-                )
-                return {"status": "authorized", "realm": "private"}
-            else:
-                logger.debug(
-                    f"AUTH 5: Access denied to private resource {original_uri} for roles: {user_roles}"
-                )
-                raise HTTPException(
-                    status_code=403,
-                    detail="Insufficient privileges for private resource",
-                )
-
-        else:
-            logger.debug(f"AUTH 6: Unknown realm: {realm}")
-            raise HTTPException(status_code=500, detail="Unknown resource realm")
 
     except HTTPException:
         raise
     except Exception as e:
         logger.debug(f"AUTH 7: Unexpected error: {e}")
-        raise HTTPException(status_code=500, detail="Authorization check failed")
+        raise HTTPException(
+            status_code=500, detail=f"Authorization check failed for {original_uri}"
+        )
 
 
 @app.get("/api/albums/{album_uuid}")
@@ -309,32 +230,16 @@ async def list_albums(
     - Protected role: albums with realm 'public' or 'protected'
     - Private role: all albums
     """
-    # Get user information from auth service
-    user_info = await get_user_info(request)
-    user_roles = user_info.get("roles", "public")
-
-    # Parse roles (comma-separated string)
+    user_roles = request.headers.get("X-Forwarded-Roles", "public")
     roles_list = [role.strip().lower() for role in user_roles.split(",")]
 
     # Filter albums based on user roles
     filtered_albums = {}
 
     for uuid, album in db.albums.items():
-        album_realm = album.realm  # Realm enum value
-
-        # Check access permissions
-        if album_realm == Realm.PUBLIC:
-            # Public albums are accessible to everyone
+        if album.realm in roles_list:
             filtered_albums[uuid] = AlbumModel.model_validate(album)
-        elif album_realm == Realm.PROTECTED and (
-            "protected" in roles_list or "private" in roles_list
-        ):
-            # Protected albums require protected or private role
-            filtered_albums[uuid] = AlbumModel.model_validate(album)
-        elif album_realm == Realm.PRIVATE and "private" in roles_list:
-            # Private albums require private role
-            filtered_albums[uuid] = AlbumModel.model_validate(album)
-        # If none of the conditions match, album is not included
+        # If role matches, the album is not included in the response
 
     logger.debug(
         f"User roles: {user_roles}, returning {len(filtered_albums)} albums out of {len(db.albums)} total"

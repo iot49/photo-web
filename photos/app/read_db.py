@@ -6,7 +6,6 @@ from models import (
     AlbumLocation,
     AlbumModelWithPhotos,
     PhotoModelWithPath,
-    Realm,
 )
 from osxphotos import PhotosDB
 
@@ -112,8 +111,6 @@ def read_db(db_path: str, filters: str) -> DB:
             # print(f"SKIP album {album.title} ({realm}) and filter {filter}")
             continue
 
-        # determine realm (permissions)
-        realm = Realm(realm)
         # skip first part of path (usually one of public, protected, or private)
         album_path = "/".join(album.folder_names[1:])
 
