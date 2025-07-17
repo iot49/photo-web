@@ -51,36 +51,33 @@ export async function login(redirect: string) {
       result.user.getIdToken().then(async function (idToken) {
         fetch(`/auth/login?id_token=${idToken}&redirect_uri=${redirect}`, {
           method: 'POST',
-          // redirect: 'follow',
-          redirect: 'manual',
+          redirect: 'follow',
           credentials: 'include',
           mode: 'cors',
         })
           .then(async (response) => {
             if (response.redirected) {
-              console.log('1 LOGIN redirect', response.url);
+              console.log('Login redirect', response.url);
               // Emit pw-login event before redirect
               window.dispatchEvent(new CustomEvent('pw-login'));
               window.location.href = response.url;
             } else if (!response.ok) {
               // Handle error responses
-              const errorText = await response.text();
-              console.error(`2 Login failed with status ${response.status}: ${errorText}`);
-              throw new Error(`2 Login failed: ${response.status} ${response.statusText}`);
+              console.error(`Login failed with status ${response.status}: ${response.text()}`);
             } else {
-              console.log('3 Login successful but no redirect');
+              console.log('Logout successful but no redirect');
             }
           })
-          .catch(function (err) {
-            console.error('4 Login fetch ERROR', err);
+          .catch(function (_err) {
+            // console.error(`Login fetch error "${err}"`, err);
           })
           .finally(function () {
             window.dispatchEvent(new CustomEvent('pw-login'));
           });
-      })
+      });
     })
     .catch((error) => {
-      console.error(`login ${redirect}`, error);
+      console.error(`login signInWithPopup ${redirect}`, error);
     });
 }
 
@@ -99,17 +96,14 @@ export function logout(redirect: string) {
         window.location.href = response.url;
       } else if (!response.ok) {
         // Handle error responses
-        const errorText = await response.text();
-        console.error(`Logout failed with status ${response.status}: ${errorText}`);
-        throw new Error(`Logout failed: ${response.status} ${response.statusText}`);
+        console.error(`Logout failed with status ${response.status}: ${response.text()}`);
       } else {
         console.log('Logout successful but no redirect');
-        // Emit pw-logout event for successful logout without redirect
-        window.dispatchEvent(new CustomEvent('pw-logout'));
       }
     })
-    .catch(function (err) {
-      console.error('Lougout fetch ERROR', err);
+    .catch(function (_err) {
+      // Logout fetch ERROR "TypeError: Failed to fetch"
+      // console.error(`Logout fetch error "${err}"`, err);
     })
     .finally(function () {
       window.dispatchEvent(new CustomEvent('pw-logout'));
