@@ -1,12 +1,10 @@
 import io
 import logging
 import os
-import re
 from contextlib import asynccontextmanager
 from typing import Dict, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from models import DB, AlbumModel, PhotoModel
 from PIL import Image
@@ -83,15 +81,6 @@ app = FastAPI(
     root_path="/photos",
 )
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
-    allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
-)
-
 
 @app.get("/api/health")
 async def health_check():
@@ -112,8 +101,10 @@ async def authorize_access(request: Request, db: DB = Depends(get_db)):
     """
     Authorization endpoint for delegated authorization from auth service.
 
-    This endpoint is called by the auth service when authorization rules
-    delegate to the photos service (e.g., for /photos/api/albums/* or /photos/api/photos/*).
+    Recognized uri's: (access is determined based on realm)
+        - /photos/api/photos/{photo_id}...
+        - /photos/api/albums/{album_id}...
+
 
     The endpoint extracts the original URI from X-Forwarded-Uri header,
     parses the resource ID (album_id or photo_id), and checks if the user
@@ -126,74 +117,43 @@ async def authorize_access(request: Request, db: DB = Depends(get_db)):
         - 400 (Bad Request) if URI format is invalid
     """
     try:
-        original_uri = request.headers.get("X-Forwarded-Uri", "")
-        if not original_uri:
+        uri = request.headers.get("X-Forwarded-Uri", "")
+        if not uri:
             raise HTTPException(
                 status_code=400, detail="X-Forwarded-Uri header required"
             )
 
-        # Parse the URI to extract resource type and ID
-        # Handle various URI formats:
-        # - /photos/api/photos/{photo_id}/img{size_suffix}
-        # - /photos/api/photos/{photo_id}
-        # - /photos/api/albums/{album_id}/img{size_suffix}
-        # - /photos/api/albums/{album_id}
-        # - /photos/api/albums (list all albums)
-        # - /photos/api/photos/srcset
+        roles = [
+            role.strip().lower()
+            for role in request.headers.get("X-Forwarded-Roles", "public").split(",")
+        ]
 
-        # Handle photo URIs (both with and without /img)
-        photo_match = re.match(r"/photos/api/photos/([^/]+)(?:/img.*)?", original_uri)
-        # Handle album URIs (both with and without /img)
-        album_match = re.match(r"/photos/api/albums/([^/]+)(?:/img.*)?", original_uri)
-        # Handle album list URI
-        album_list_match = re.match(r"/photos/api/albums/?$", original_uri)
-        # Handle srcset URI
-        srcset_match = re.match(r"/photos/api/photos/srcset/?$", original_uri)
+        path = os.path.normpath(uri).split(os.sep)
+        kind = path[3]
+        uuid = path[4]
 
-        user_roles = request.headers.get("X-Forwarded-Roles", "public")
-        roles_list = [role.strip().lower() for role in user_roles.split(",")]
+        logger.debug(f"uri={uri} path={path} roles={roles}")
 
-        if photo_match:
-            photo = db.photos.get(photo_match.group(1))
-            if not photo:
-                raise HTTPException(
-                    status_code=404, detail=f"Photo {original_uri} not found"
-                )
-            if photo.realm in roles_list:
+        if kind == "photos":
+            item = db.photos.get(uuid)
+            if item.realm in roles:
                 return {"status": "authorized"}
-            logger.debug(
-                f"Access denied for photo {original_uri} roles={user_roles} realm={photo.realm}"
-            )
-
-        elif album_match:
-            album = db.albums.get(album_match.group(1))
-            if not album:
-                raise HTTPException(
-                    status_code=404, detail="Album {original_uri} not found"
-                )
-            if album.realm in roles_list:
+        if kind == "albums":
+            item = db.albums.get(uuid)
+            if item.realm in roles:
                 return {"status": "authorized"}
-
-        elif album_list_match or srcset_match:
-            # These endpoints don't require specific resource authorization
-            # They handle their own authorization logic in their respective handlers
-            # For delegation purposes, we'll allow public access and let the endpoint handle it
-            return {"status": "authorized"}
-
-        else:
-            raise HTTPException(status_code=400, detail=f"Invalid URI {original_uri}")
 
         raise HTTPException(
             status_code=403,
-            detail=f"Access denied for {original_uri} roles {user_roles}",
+            detail=f"Access denied for {uri} roles {roles}",
         )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.debug(f"AUTH 7: Unexpected error: {e}")
+        logger.error(f"Authorization check failed for {uri}: {e}", e)
         raise HTTPException(
-            status_code=500, detail=f"Authorization check failed for {original_uri}"
+            status_code=500, detail=f"Authorization check failed for {uri}: {e}"
         )
 
 

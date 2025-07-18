@@ -243,6 +243,7 @@ export class PwNavPage extends LitElement {
           <a href="https://traefik.${location.host}" class="pulldown-menu-item">Traefik Dashboard ...</a>
           <a href="${location.origin}/auth/docs" class="pulldown-menu-item">Auth API ...</a>
           <a href="${location.origin}/photos/docs" class="pulldown-menu-item">Photos API ...</a>
+          <a href="${location.origin}/doc/docs" class="pulldown-menu-item">Doc API ...</a>
           <div class="pulldown-menu-item" @click=${this.reloadDb}>Reload DB</div>
         </div>
       </div>

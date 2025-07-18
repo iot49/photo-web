@@ -1,5 +1,4 @@
 fastapi
-sqlmodel
 uvicorn
 pydantic
-osxphotos
+

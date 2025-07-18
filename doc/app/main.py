@@ -1,117 +1,119 @@
-import hashlib
 import logging
-from contextlib import asynccontextmanager
-from typing import Optional
+import os
+from fnmatch import fnmatch
+from typing import List
 
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import ConfigDict
-from sqlmodel import Field, SQLModel
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, DirectoryPath, Field
 
-# available in container (copied from auth)
-# from user_info import UserBase, user_info  # type: ignore
+# excludes (may use * and ? wildcards)
+EXCLUDE_FILES = [".DS_Store"]
+EXCLUDE_FOLDERS = []
 
-logging.basicConfig(level=logging.INFO)
+# set working directory to documents location
+os.chdir("/docs")
+
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 
-class UserBase(SQLModel):
-    """Base model with common user fields and their definitions."""
-
-    name: Optional[str] = Field(default=None, description="User's full name")
-    # Accept None for users that are not logged in; in database, email != None
-    email: Optional[str] = Field(
-        default=None,
-        unique=True,
-        index=True,
-        description="User's email address (unique)",
-    )
-    roles: str = Field(
-        default="public",
-        description="Comma-separated roles (e.g., 'public,admin,private,personal,family')",
-    )
-    enabled: bool = Field(
-        default=True, description="Whether the user account is enabled"
-    )
-    picture: str = Field(default="", description="URL to user's profile picture")
-
-    model_config = ConfigDict(extra="ignore")
-
-    @property
-    def logged_in(self) -> bool:
-        return self.email is not None
-
-
-def user_info(request: Request) -> UserBase:
-    """
-    Return user info based on session cache.
-    """
-    try:
-        session_cookie = request.cookies.get("session")
-
-        logger.warning(f"USER_INFO 1 {session_cookie}")
-
-        if not session_cookie or session_cookie.strip() == "":
-            # non-authenticated user
-            return UserBase(roles="public")
-
-        # Create cache key based on session token hash for security
-        cache_key = (
-            f"user_info_{hashlib.sha256(session_cookie.encode()).hexdigest()[:16]}"
-        )
-
-        # Check if we have cached user info in session
-        if hasattr(request, "session") and cache_key in request.session:
-            cached_info = request.session[cache_key]
-            logger.warning(f"USER_INFO 2 {cached_info}")
-            return UserBase(**cached_info)
-
-        logger.warning(f"USER_INFO 3 {cache_key}")
-
-        # authenticated, but user_info not in session
-        return UserBase(roles="public")
-    except Exception as e:
-        logger.error(f"user_info {e}", e)
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    logger.info("Starting docs server ...")
-    yield
-    # No cleanup needed since we're not using a global HTTP client
+class FolderModel(BaseModel):
+    path: DirectoryPath = Field(description="path relative to /docs")
+    folders: List[str] = Field(description="names of sub-folders of path", default=[])
+    files: List[str] = Field(description="names of files at path", default=[])
 
 
 app = FastAPI(
     title="Photo Web Docs Service",
     description="Docs service for Photo Web application",
     version="1.0.0",
-    lifespan=lifespan,
     root_path="/doc",
-)
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
-    allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
 )
 
 
 @app.get("/api/health")
-async def health_check():
+async def health_check(response_model=str):
     return {"status": "Docs service is healthy"}
 
 
-@app.get("/api/test-me")
-async def get_me(request: Request) -> str:
+@app.get("/api/roots")
+async def get_roots(request: Request, response_model=FolderModel):
     """
-    Get user information from auth service.
+    Get folders users has access to based on roles
+    """
+    roles = [
+        role.strip()
+        for role in request.headers.get("X-Forwarded-Roles", "public").split(",")
+    ]
+    roots = [folder for folder in roles if os.path.isdir(folder)]
+    return FolderModel(path="", folders=sorted(roots))
 
-    This endpoint is a proxy to the auth service's /me endpoint.
+
+@app.get("/api/file/{path:path}")
+async def get_file(path: str):
+    return FileResponse(path)
+
+
+@app.get("/api/folder/{path:path}")
+async def get_folder(path: str, response_model=FolderModel):
+    folders = [
+        folder
+        for folder in os.listdir(path)
+        if os.path.isdir(os.path.join(path, folder))
+        if not any(fnmatch(folder, p) for p in EXCLUDE_FOLDERS)
+    ]
+    files = [
+        file
+        for file in os.listdir(path)
+        if os.path.isfile(os.path.join(path, file))
+        if not any(fnmatch(file, p) for p in EXCLUDE_FILES)
+    ]
+    return FolderModel(path=path, folders=sorted(folders), files=sorted(files))
+
+
+@app.get("/authorize")
+async def authorize_access(request: Request):
     """
-    roles = request.headers.get("X-Forwarded-Roles", "public")
-    logger.info(f"test-me {roles}")
-    return roles
+    Authorization endpoint for delegated authorization from auth service.
+
+    Recognized uri's: (access is determined based on realm)
+        - /doc/api/folder/{realm}/{path}
+        - /doc/api/file/{realm}/{path}
+
+    Returns:
+        - 200 (OK) if authorized
+        - 403 (Forbidden) if not authorized
+        - 400 (Bad Request) if URI format is invalid
+    """
+    try:
+        uri = request.headers.get("X-Forwarded-Uri", "")
+        if not uri:
+            raise HTTPException(
+                status_code=400, detail="X-Forwarded-Uri header required"
+            )
+
+        roles = [
+            role.strip().lower()
+            for role in request.headers.get("X-Forwarded-Roles", "public").split(",")
+        ]
+
+        realm = os.path.normpath(uri).split(os.sep)[4]
+
+        logger.debug(
+            f"uri={uri} realm={realm} roles={roles} authorize={realm in roles}"
+        )
+        if realm in roles:
+            return {"status": f"authorized {uri} {realm} in {roles}"}
+
+        raise HTTPException(
+            status_code=403, detail=f"Access denied for {uri} and roles={roles}"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Authorization check failed for {uri}: {e}", e)
+        raise HTTPException(
+            status_code=500, detail=f"Authorization check failed for {uri}: {e}"
+        )

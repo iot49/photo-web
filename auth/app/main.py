@@ -1,13 +1,13 @@
 import json
 import logging
 import os
+import secrets
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 
 from authorization import get_authorization_manager
 from database import DatabaseManager, get_database_manager, init_database
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from firebase_util import create_session_token, verify_cookie, verify_user
 from models import UserCreate, UserResponse
@@ -38,19 +38,10 @@ app = FastAPI(
     root_path="/auth",
 )
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=["*"],  # Allows all origins
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
-)
-
 # Add Session middleware for session caching
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.getenv("SESSION_SECRET_KEY", "your-secret-key-change-in-production"),
+    secret_key=os.getenv("SESSION_SECRET_KEY", secrets.token_urlsafe(64)),
     session_cookie="session_cache",  # Use different cookie name to avoid conflict with Firebase session cookie
 )
 
@@ -164,6 +155,7 @@ async def session_login(
             value=session_token,
             httponly=True,
             secure=True,
+            samesite="strict",
             expires=datetime.now(timezone.utc) + timedelta(days=expiration_days),
             domain=os.getenv("ROOT_DOMAIN", "dev49.org"),
         )
