@@ -4,6 +4,7 @@ import { Me } from './app/interfaces.js';
 import { consume } from '@lit/context';
 import { meContext } from './app/context.js';
 import { login, logout } from './app/login.js';
+import { ThemeManager } from './shoelace-config.js';
 
 /**
  * Album browser component that shows available photo albums.
@@ -207,6 +208,8 @@ export class PwNavPage extends LitElement {
   @property({ attribute: false })
   private me!: Me;
 
+  private themeManager = ThemeManager.getInstance();
+
   override render() {
     return html`
       <div class="app-container">
@@ -238,6 +241,9 @@ export class PwNavPage extends LitElement {
           <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path>
         </svg>
         <div class="pulldown-menu ${this.showPulldownMenu ? 'show' : ''}">
+          <div class="pulldown-menu-item" @click=${this.toggleTheme}>
+            🌙 Toggle Theme (${this.themeManager.getCurrentTheme()})
+          </div>
           <a href="users" class="pulldown-menu-item">Users ...</a>
           <a href="tests" class="pulldown-menu-item">Tests ...</a>
           <a href="https://traefik.${location.host}" class="pulldown-menu-item">Traefik Dashboard ...</a>
@@ -301,6 +307,13 @@ export class PwNavPage extends LitElement {
     if (this.showPulldownMenu) {
       this.showPulldownMenu = false;
     }
+  }
+
+  private toggleTheme() {
+    this.themeManager.toggleTheme();
+    this.hidePulldownMenu();
+    // Force a re-render to update the theme display in the menu
+    this.requestUpdate();
   }
 
   private async reloadDb() {

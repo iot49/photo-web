@@ -8,14 +8,33 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, DirectoryPath, Field
 
 # excludes (may use * and ? wildcards)
-EXCLUDE_FILES = [".DS_Store", "*.doc", "*.docx", "*.ppt", "*.pptx"]
-EXCLUDE_FOLDERS = []
+EXCLUDE_FILES = [".DS_Store"]
+EXCLUDE_FOLDERS = ["__pycache__", ".venv", ".git", ".*cache"]
 
 # set working directory to documents location
 os.chdir("/docs")
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+
+def is_folder_empty(folder_path: str) -> bool:
+    """Check if a folder is empty (contains no accessible files or folders)"""
+    try:
+        for item in os.listdir(folder_path):
+            item_path = os.path.join(folder_path, item)
+            if os.path.isfile(item_path):
+                # Check if file should be excluded
+                if not any(fnmatch(item, p) for p in EXCLUDE_FILES):
+                    return False
+            elif os.path.isdir(item_path):
+                # Check if folder should be excluded
+                if not any(fnmatch(item, p) for p in EXCLUDE_FOLDERS):
+                    return False
+        return True
+    except (OSError, PermissionError):
+        # If we can't access the folder, consider it empty
+        return True
 
 
 class FolderModel(BaseModel):
@@ -54,7 +73,11 @@ async def get_roots(request: Request, response_model=FolderModel):
         role.strip()
         for role in request.headers.get("X-Forwarded-Roles", "public").split(",")
     ]
-    roots = [folder for folder in roles if os.path.isdir(folder)]
+    roots = [
+        folder
+        for folder in roles
+        if os.path.isdir(folder) and not is_folder_empty(folder)
+    ]
     return FolderModel(path="", folders=sorted(roots))
 
 
@@ -71,6 +94,7 @@ async def get_folder(path: str, response_model=FolderModel):
         for folder in os.listdir(path)
         if os.path.isdir(os.path.join(path, folder))
         if not any(fnmatch(folder, p) for p in EXCLUDE_FOLDERS)
+        if not is_folder_empty(os.path.join(path, folder))
     ]
     files = [
         file

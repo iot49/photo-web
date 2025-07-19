@@ -41,7 +41,7 @@ app = FastAPI(
 # Add Session middleware for session caching
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.getenv("SESSION_SECRET_KEY", secrets.token_urlsafe(64)),
+    secret_key=secrets.token_urlsafe(64),
     session_cookie="session_cache",  # Use different cookie name to avoid conflict with Firebase session cookie
 )
 

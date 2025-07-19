@@ -1,8 +1,11 @@
 // css
-import './assets/css/themes/dark.css';
-import './assets/css/themes/light.css';
 import '../index.css';
 
+// Set document title from environment variable
+document.title = import.meta.env.VITE_TITLE || 'Photo Web';
+
+// Shoelace configuration - import before components that use it
+import './shoelace-config';
 
 import './pw-main'
 import './pw-nav-page'

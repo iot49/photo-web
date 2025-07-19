@@ -5,6 +5,11 @@ export class FileRenderer {
 
   constructor(filePane: HTMLDivElement) {
     this.filePane = filePane;
+
+    // Listen for theme changes to update markdown rendering
+    window.addEventListener('theme-changed', () => {
+      this.updateMarkdownTheme();
+    });
   }
 
   async showFile(path: string | null) {
@@ -25,15 +30,11 @@ export class FileRenderer {
       switch (extension) {
         case 'md':
         case 'qmd':
-          /* BUG:
-          @/ui/src/file-renderer.ts is used by @/ui/src/pw-doc-browser.ts to render markdown 
-          content into this.filePane. 
-          Markdown links are rendered as html anchors with href e.g. https://dev49.org/doc/api/file/public/b.md. 
-          These fail in the lit router @/ui/src/pw-main.ts  in catchall path.
-          What's the best way to fix this issue? Could the /doc/api/file/* path be intercepted in the lit router
-          and used to update the filePane in @/ui/src/pw-doc-browser.ts? What's a clean way to accomplish this?
-          */
-          this.filePane.innerHTML = `<zero-md src=${path}></zero-md>`;
+          this.filePane.innerHTML = `
+            <zero-md src=${path}>
+
+            </zero-md>
+          `;
           return;
 
         // Image file cases
@@ -51,10 +52,10 @@ export class FileRenderer {
         case 'pdf':
           // Render PDF using iframe instead of embed to avoid fullscreen permissions policy violations
           this.filePane.innerHTML = `
-            <div style="display: flex; flex-direction: column; height: 100%;">
-              <iframe src="${path}" type="application/pdf" width="100%" style="flex: 1; min-height: 0; border: none;"></iframe>
-              <p style="flex-shrink: 0; margin: 0; padding: 8px 0; text-align: center; font-size: 0.9em; background-color: lightgray;">
-                If PDF doesn't display, <a href="${path}" target="_blank">click here to open in new tab</a>
+            <div style="display: flex; flex-direction: column; height: 100%; background-color: var(--sl-color-neutral-0);">
+              <iframe src="${path}" type="application/pdf" width="100%" style="flex: 1; min-height: 0; border: none; background-color: var(--sl-color-neutral-0);"></iframe>
+              <p style="flex-shrink: 0; margin: 0; padding: 8px 0; text-align: center; font-size: 0.9em; background-color: var(--sl-color-neutral-100); color: var(--sl-color-neutral-700);">
+                If PDF doesn't display, <a href="${path}" target="_blank" style="color: var(--sl-color-primary-600);">click here to open in new tab</a>
               </p>
             </div>
           `;
@@ -136,6 +137,7 @@ export class FileRenderer {
           const escapedContent = this.escapeHtml(content);
           this.filePane.innerHTML = `
             <zero-md>
+
               <script type="text/markdown">
 \`\`\`${language}
 ${escapedContent}
@@ -144,7 +146,6 @@ ${escapedContent}
             </zero-md>
           `;
           return;
-
       }
 
       // Fallback for unhandled file types - render as plain text
@@ -211,5 +212,17 @@ ${escapedContent}
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  private updateMarkdownTheme(): void {
+    // Find all zero-md elements in the file pane and update their theme
+    const zeroMdElements = this.filePane.querySelectorAll('zero-md');
+    zeroMdElements.forEach((element) => {
+      // Remove existing theme template
+      const existingTemplate = element.querySelector('template');
+      if (existingTemplate) {
+        existingTemplate.remove();
+      }
+    });
   }
 }

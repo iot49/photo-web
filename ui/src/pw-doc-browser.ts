@@ -1,8 +1,9 @@
 import { LitElement, PropertyValues, css, html } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 import { get_json } from './app/api';
-import { SlTreeItem } from '@shoelace-style/shoelace';
+import { SlTreeItem } from './shoelace-config';
 import { FileRenderer } from './file-renderer';
+import { iconForFilename } from './file-icons';
 
 interface FolderModelInterface {
   path: string;
@@ -51,20 +52,16 @@ export class PwDocBrowser extends LitElement {
       overflow: auto;
     }
 
+    sl-tree-item {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     #filePane {
       background-color: white;
     }
-
-    .folder-item {
-      --sl-color-neutral-700: red;
-      --sl-color-neutral-800: red;
-      --sl-color-neutral-900: red;
-    .file-item {
-      --sl-color-neutral-700: blue;
-      --sl-color-neutral-800: blue;
-      --sl-color-neutral-900: blue;
-    }
-
+    
   `;
 
   @state() root!: FolderModel;
@@ -78,20 +75,18 @@ export class PwDocBrowser extends LitElement {
     await super.connectedCallback();
     const rj = await get_json('/doc/api/root');
     this.root = new FolderModel(rj.path, rj.folders, rj.files);
-    // console.log(`root = ${this.root}`, rj);
   }
 
   protected firstUpdated(_changedProperties: PropertyValues): void {
     super.firstUpdated(_changedProperties);
     this.fileRenderer = new FileRenderer(this.filePane);
-    
+
     // If a file path was provided via routing, show it immediately
     if (this.selectedFilePath) {
       this.fileRenderer.showFile(this.selectedFilePath);
     }
-    
+
     this.treePane.addEventListener('sl-lazy-load', async (event) => {
-      // console.log('sl-lazy-load', event.target);
       const target = event.target as SlTreeItem;
       const path = target.getAttribute('data-path');
       const name = target.getAttribute('data-folder');
@@ -104,11 +99,18 @@ export class PwDocBrowser extends LitElement {
         treeItem.setAttribute('data-path', `${path}/${name}`);
         treeItem.setAttribute('data-folder', `${folderName}`);
         target.append(treeItem);
-        // console.log('add', treeItem, 'name', folderName);
       }
       for (const fileName of folder.files) {
         const treeItem = document.createElement('sl-tree-item') as SlTreeItem;
-        treeItem.innerText = fileName; // TODO: add css to set text color: blue: note it's in a shadow root
+        
+        // Create icon element
+        const icon = document.createElement('sl-icon');
+        icon.setAttribute('name', iconForFilename(fileName));
+        
+        // Add icon and filename to tree item
+        treeItem.appendChild(icon);
+        treeItem.appendChild(document.createTextNode(fileName));
+        
         treeItem.className = 'file-item';
         treeItem.setAttribute('data-path', `/doc/api/file/${path}/${name}/${fileName}`);
         treeItem.addEventListener('click', (event) => {
@@ -124,7 +126,7 @@ export class PwDocBrowser extends LitElement {
 
   protected updated(changedProperties: PropertyValues): void {
     super.updated(changedProperties);
-    
+
     // If selectedFilePath changed, show the new file
     if (changedProperties.has('selectedFilePath') && this.selectedFilePath && this.fileRenderer) {
       this.fileRenderer.showFile(this.selectedFilePath);
@@ -136,26 +138,24 @@ export class PwDocBrowser extends LitElement {
       <pw-nav-page>
         <sl-split-panel position-in-pixels="250">
           <div id="treePane" slot="start">
-            ${this.root == null
-              ? html`Loading ... <sl-spinner></sl-spinner>`
-              : html` <sl-tree class="tree-with-icons"> ${this.folderTemplate(this.root)}</sl-tree>`}
+            ${this.root == null ? html`Loading ... <sl-spinner></sl-spinner>` : html` ${this.treeTemplate(this.root)}`}
           </div>
-          <div id="filePane" slot="end">file ...</div>
+          <div id="filePane" slot="end">Choose file to display ...</div>
         </sl-split-panel>
       </pw-nav-page>
     `;
   }
 
-  private folderTemplate(folder: FolderModel) {
-    return html`
+  private treeTemplate(folder: FolderModel) {
+    return html` <sl-tree class="tree-with-icons custom-icons">
+      <sl-icon name="plus-square" slot="expand-icon"></sl-icon>
+      <sl-icon name="dash-square" slot="collapse-icon"></sl-icon>
       ${folder.folders.map(
         (folderName: string) =>
-          html` <sl-tree-item class="folder-item" data-path=${folder.path} data-folder=${folderName} lazy>
-            <sl-icon name="folder"> </sl-icon>
-            ${folderName}
-          </sl-tree-item>`
+          html` <sl-tree-item class="folder-item" data-path=${folder.path} data-folder=${folderName} lazy> ${folderName} </sl-tree-item>`
       )}
-    `;
+    </sl-tree>`;
   }
+
 
 }
