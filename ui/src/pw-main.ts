@@ -4,6 +4,7 @@ import { Router } from '@lit-labs/router';
 import { Albums, Me, SrcsetInfo } from './app/interfaces';
 import { provide } from '@lit/context';
 import { albumsContext, meContext, srcsetInfoContext } from './app/context';
+import { get_json } from './app/api';
 
 /**
  * Main application component for Photo Web.
@@ -24,67 +25,20 @@ export class PwMain extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
-    await this.fetchAlbums();
-    await this.fetchMe();
-    await this.fetchSrcsetInfo();
+    this.albums = await get_json('/photos/api/albums');
+    this.me = await get_json('/auth/me');
+    this.srcsetInfo = await get_json('/photos/api/photos/srcset');
 
     // Add event listeners for login/logout events
     this.handleLoginLogoutEvents();
   }
 
-  private async fetchAlbums() {
-    try {
-      let response: Response;
-      try {
-        response = await fetch(`/photos/api/albums`);
-      } catch (error) {
-        throw new Error('Failed loading list of albums', { cause: error });
-      }
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      this.albums = await response.json();
-      // console.log('fetch albums', this.albums);
-    } catch (error) {
-      console.error('Error fetching albums', { cause: error });
-    }
-  }
-
-  private async fetchMe() {
-    fetch(`/auth/me`, { method: 'GET', credentials: 'include', mode: 'cors' })
-      .then((response) => {
-        return response.json();
-      })
-      .then((me) => {
-        this.me = me;
-        // console.log('fetch me =', me);
-      })
-      .catch((err) => {
-        console.error(`me fetch error: ${err}`);
-      });
-  }
-
-  private async fetchSrcsetInfo() {
-    fetch(`/photos/api/photos/srcset`, { method: 'GET', credentials: 'include', mode: 'cors' })
-      .then((response) => {
-        return response.json();
-      })
-      .then((srcset) => {
-        this.srcsetInfo = srcset;
-        // console.log('fetch srcset =', srcset);
-      })
-      .catch((err) => {
-        console.error(`srcset fetch error: ${err}`);
-      });
-  }
-
   private handleLoginLogoutEvents() {
     const refreshData = async () => {
       console.log('Auth state changed, refreshing albums and me');
-      await this.fetchAlbums();
-      await this.fetchMe();
-      // Force a re-render to ensure context consumers update
-      this.requestUpdate();
+      this.albums = await get_json('/photos/api/albums');
+      this.me = await get_json('/auth/me');     
+      this.requestUpdate();  // Force a re-render to ensure context consumers update
     };
 
     // Listen for both login and logout events with the same handler
@@ -93,6 +47,7 @@ export class PwMain extends LitElement {
   }
 
   private router = new Router(this, [
+    { path: `/ui/doc`, render: () => html`<pw-doc-browser></pw-doc-browser>` },
     { path: `/ui/album`, render: () => html`<pw-album-browser></pw-album-browser>` },
     { path: `/ui/users`, render: () => html`<pw-users></pw-users>` },
     { path: `/ui/login`, render: () => html`<pw-login></pw-login>` },

@@ -7,7 +7,6 @@ allow, /auth/firebase-config, public
 allow, /auth/login*, public, Login page
 allow, /auth/logout*, public, Logout endpoint
 allow, /auth/me, public, User info endpoint
-allow, /auth/docs, public, Swagger docs for auth
 allow, /auth/users*, admin, User management
 
 allow, /photos/api/albums, public, Public album list
@@ -16,15 +15,11 @@ allow, /photos/api/albums/*, !photos:8000, Delegate album access to photos servi
 allow, /photos/api/photos/*, !photos:8000, Delegate photo access to photos service
 allow, /photos/api/reload-db, admin, Reload photos database
 
-# define folders and roles for access
-allow, /doc/api/roots, public, List of folders user is permitted to view
+allow, /doc/api/root, public, List of folders user is permitted to view
 allow, /doc/api/folder/*, !doc:8000, Delegate folder listing to doc service
 allow, /doc/api/file/*, !doc:8000, Delegate file access to doc service
 
-allow, */health, public, Health checks (auth, photos, nginx)
+allow, */health, public, Health checks (auth, doc, photos, nginx)
 allow, */docs, public, Swagger docs for all services
 allow, *openapi.json, public, OpenAPI schema for all services
 allow, /echo, admin
-
-allow, /auth*, public, TESTING - remove!!!
-allow, */test-me, public, Testing

@@ -3,6 +3,7 @@ import { customElement, property, query, state } from 'lit/decorators.js';
 import { srcsetInfoContext } from './app/context';
 import { consume } from '@lit/context';
 import { PhotoModel, SrcsetInfo, ImageSize } from './app/interfaces';
+import { get_json } from './app/api';
 
 const TITLE_MS = 1000; // time the title is shown in [ms]
 const TRANSITION_MS = 1500; // duration of slide transition in [ms]
@@ -26,7 +27,7 @@ export class PwKenBurns extends LitElement {
 
   override async connectedCallback(): Promise<void> {
     await super.connectedCallback();
-    await this.fetchPhotos();
+    this.photos = await get_json(`/photos/api/albums/${this.uuid}`);
   }
 
   private start = () => {
@@ -336,23 +337,6 @@ export class PwKenBurns extends LitElement {
     }
   }
 
-  private async fetchPhotos() {
-    try {
-      let response: Response;
-      try {
-        response = await fetch(`/photos/api/albums/${this.uuid}`);
-      } catch (error) {
-        throw new Error('Failed loading list of photos', { cause: error });
-      }
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      this.photos = await response.json();
-      this.requestUpdate();
-    } catch (error) {
-      throw new Error('Error fetching photos', { cause: error });
-    }
-  }
 
   static styles = [
     css`

@@ -4,11 +4,38 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
     <title>Photo Web</title>
+
     <script type="module" src="/src/index.ts"></script>
     <style src="/index.css"></style>
+
+    <!-- zoro-md markdown formatter -->
+    <script type="module" src="https://cdn.jsdelivr.net/npm/zero-md@3?register"></script>
+
+    <!-- shoelace autoloader - does not work in shadow dom -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css" />
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
+
+    <script type="module">
+      // BUG: have not figured out how to make the lazy loader work:
+      // https://github.com/shoelace-style/shoelace/discussions/2443
+
+      // This loads everything (vite complains about chunk size)
+      import '@shoelace-style/shoelace/dist/shoelace.js';
+      // Or just a few components (does not work)
+      import '@shoelace-style/shoelace/dist/themes/light.css';
+      import '@shoelace-style/shoelace/dist/components/icon/icon.js';
+      import '@shoelace-style/shoelace/dist/components/button/button.js';
+      import '@shoelace-style/shoelace/dist/components/tree/tree.js';
+      import '@shoelace-style/shoelace/dist/components/split-panel/split-panel.js';
+      // import { setBasePath } from '@shoelace-style/shoelace/dist/utilities/base-path.js';
+      // not sure how to use this
+      // setBasePath('/path/to/shoelace/dist');
+    </script>
   </head>
-  <body style="margin: 0; padding: 0;">
+
+  <body style="margin: 0; padding: 0">
     <pw-main></pw-main>
   </body>
 </html>

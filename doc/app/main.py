@@ -23,6 +23,14 @@ class FolderModel(BaseModel):
     folders: List[str] = Field(description="names of sub-folders of path", default=[])
     files: List[str] = Field(description="names of files at path", default=[])
 
+    @property
+    def realm(self) -> str:
+        os.path.normpath(self.path).split(os.sep)[0]
+
+    @property
+    def name(self) -> str:
+        os.path.normpath(self.path).split(os.sep)[-1]
+
 
 app = FastAPI(
     title="Photo Web Docs Service",
@@ -37,7 +45,7 @@ async def health_check(response_model=str):
     return {"status": "Docs service is healthy"}
 
 
-@app.get("/api/roots")
+@app.get("/api/root")
 async def get_roots(request: Request, response_model=FolderModel):
     """
     Get folders users has access to based on roles
@@ -52,11 +60,12 @@ async def get_roots(request: Request, response_model=FolderModel):
 
 @app.get("/api/file/{path:path}")
 async def get_file(path: str):
-    return FileResponse(path)
+    return FileResponse(os.path.normpath(path))
 
 
 @app.get("/api/folder/{path:path}")
 async def get_folder(path: str, response_model=FolderModel):
+    path = os.path.normpath(path)
     folders = [
         folder
         for folder in os.listdir(path)
