@@ -6,7 +6,6 @@ import '../index.css';
 
 import './pw-main'
 import './pw-nav-page'
-import './pw-login'
 import './pw-users'
 import './pw-album-browser'
 import './pw-doc-browser'

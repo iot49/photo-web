@@ -7,6 +7,8 @@ volumes:
     driver: local
 
 networks:
+  nginx:
+    name: nginx     # nxinx to auth, docs, photos
   ingress:
     name: ingress   # traefik to proxied apps
   tunnel:
@@ -87,6 +89,7 @@ services:
       - "traefik.http.services.nginx.loadbalancer.server.port=80" # Default nginx port
     networks:
       - ingress
+      - nginx
     depends_on:
       - photos
       - auth
@@ -103,7 +106,8 @@ services:
       - auth-data:/app/data # SQLite database storage
     # No direct Traefik labels - accessed through nginx proxy
     networks:
-      - ingress
+      - nginx
+      - ingress  # Added for traefik middleware access
       
   photos:
     build: ./photos/app
@@ -117,7 +121,7 @@ services:
       - ${PHOTOS_LIBRARY}:${PHOTOS_LIBRARY_MOUNT}:ro
     # No direct Traefik labels - accessed through nginx proxy
     networks:
-      - ingress
+      - nginx
 
   doc:
     build: ./doc/app
@@ -130,5 +134,5 @@ services:
       - ${DOCS}:/docs:ro
     # No direct Traefik labels - accessed through nginx proxy
     networks:
-      - ingress
+      - nginx
       

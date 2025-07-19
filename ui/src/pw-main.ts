@@ -12,7 +12,7 @@ import { get_json } from './app/api';
  */
 @customElement('pw-main')
 export class PwMain extends LitElement {
-  // TODO: verify reload of albums, me after user login/logout
+  // Albums and me data automatically reload on login/logout via handleLoginLogoutEvents()
   @provide({ context: albumsContext })
   @state()
   albums: Albums = {};
@@ -37,8 +37,8 @@ export class PwMain extends LitElement {
     const refreshData = async () => {
       console.log('Auth state changed, refreshing albums and me');
       this.albums = await get_json('/photos/api/albums');
-      this.me = await get_json('/auth/me');     
-      this.requestUpdate();  // Force a re-render to ensure context consumers update
+      this.me = await get_json('/auth/me');
+      this.requestUpdate(); // Force a re-render to ensure context consumers update
     };
 
     // Listen for both login and logout events with the same handler
@@ -50,17 +50,32 @@ export class PwMain extends LitElement {
     { path: `/ui/doc`, render: () => html`<pw-doc-browser></pw-doc-browser>` },
     { path: `/ui/album`, render: () => html`<pw-album-browser></pw-album-browser>` },
     { path: `/ui/users`, render: () => html`<pw-users></pw-users>` },
-    { path: `/ui/login`, render: () => html`<pw-login></pw-login>` },
     { path: `/ui/tests`, render: () => html`<pw-tests></pw-tests>` },
-    { path: `/ui/logged-in`, render: () => html`<p>Logged in: ${JSON.stringify(this.me)}</p>` },
-    { path: `/ui/logged-out`, render: () => html`<p>Logged out: ${JSON.stringify(this.me)}</p>` },
-    { path: `/ui/ken-burns`, render: () => html`<pw-ken-burns></pw-ken-burns>` },
     {
       path: `/ui/slideshow/:uuid`,
       render: ({ uuid }) => html`<pw-ken-burns .uuid=${uuid ?? ''}></pw-ken-burns>`,
     },
-    { path: `/ui/`, render: () => html`<pw-album-browser></pw-album-browser>` },
-    { path: '*', render: () => html`<p>Catchall path</p>` },
+    {
+      // handle markdown file-links in pw-doc-browser and file-renderer.ts
+      path: `/doc/api/file/*`,
+      render: (params) => {
+        // Extract the full file path from the wildcard match
+        const filePath = params[0];
+        // Navigate to doc browser and show the specific file
+        return html`<pw-doc-browser .selectedFilePath=${`/doc/api/file/${filePath}`}></pw-doc-browser>`;
+      },
+    },
+    {
+      // main ui entry-point
+      path: `/ui/`,
+      render: () => html`<pw-album-browser></pw-album-browser>`,
+    },
+    {
+      path: '*',
+      render: (params) => {
+        return html`<p>Catchall path for ${params[0]}</p>`;
+      },
+    },
   ]);
 
   public render() {

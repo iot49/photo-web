@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, DirectoryPath, Field
 
 # excludes (may use * and ? wildcards)
-EXCLUDE_FILES = [".DS_Store"]
+EXCLUDE_FILES = [".DS_Store", "*.doc", "*.docx", "*.ppt", "*.pptx"]
 EXCLUDE_FOLDERS = []
 
 # set working directory to documents location
