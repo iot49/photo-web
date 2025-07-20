@@ -55,13 +55,12 @@ export class PwDocBrowser extends LitElement {
     #filePane {
       overflow: auto;
     }
-    
+
     sl-tree-item {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
-
   `;
 
   @state() root!: FolderModel;
@@ -102,26 +101,32 @@ export class PwDocBrowser extends LitElement {
       }
       for (const fileName of folder.files) {
         const treeItem = document.createElement('sl-tree-item') as SlTreeItem;
-        
+        const dataPath = `/doc/api/file/${path}/${name}/${fileName}`;
         // Create icon element
         const icon = document.createElement('sl-icon');
         icon.setAttribute('name', iconForFilename(fileName));
-        
+
         // Add icon and filename to tree item
         treeItem.appendChild(icon);
         treeItem.appendChild(document.createTextNode(fileName));
-        
+
         treeItem.className = 'file-item';
-        treeItem.setAttribute('data-path', `/doc/api/file/${path}/${name}/${fileName}`);
+        treeItem.setAttribute('data-path', dataPath);
         treeItem.addEventListener('click', (event) => {
           const target = event.target as HTMLElement;
           const path = target?.getAttribute('data-path');
           this.fileRenderer.showFile(path);
         });
         target.append(treeItem);
+        if (fileName === 'index.md') {
+          console.log('showing index.md', dataPath);
+          this.fileRenderer.showFile(dataPath);
+        }
       }
       target.lazy = false;
     });
+
+    this.fileRenderer.showFile(`/doc/api/file/public/index.md`);
   }
 
   protected updated(changedProperties: PropertyValues): void {
@@ -135,7 +140,7 @@ export class PwDocBrowser extends LitElement {
 
   override render() {
     return html`
-      <pw-nav-page>
+      <pw-nav-page parentIsDoc>
         <sl-split-panel position-in-pixels="250">
           <div id="treePane" slot="start">
             ${this.root == null ? html`Loading ... <sl-spinner></sl-spinner>` : html` ${this.treeTemplate(this.root)}`}
@@ -154,6 +159,4 @@ export class PwDocBrowser extends LitElement {
       )}
     </sl-tree>`;
   }
-
-
 }

@@ -34,7 +34,7 @@ export class PwNavPage extends LitElement {
       height: 60px;
       background: #2c3e50;
       color: white;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       z-index: 1000;
     }
 
@@ -56,24 +56,38 @@ export class PwNavPage extends LitElement {
       gap: 15px;
     }
 
-
     /* Shoelace component overrides for navbar */
-    .navbar sl-button[slot="trigger"] {
+    .navbar sl-button[slot='trigger'] {
       color: white;
     }
 
-    .navbar sl-button[slot="trigger"]::part(base) {
+    .navbar sl-button[slot='trigger']::part(base) {
       color: white;
       border: none;
       background: transparent;
     }
 
-    .navbar sl-button[slot="trigger"]:hover::part(base) {
+    .navbar sl-button[slot='trigger']:hover::part(base) {
       background: rgba(255, 255, 255, 0.1);
     }
 
     .navbar sl-icon {
       color: white;
+    }
+
+    /* Icon hover effects */
+    .nav-user a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      border-radius: 4px;
+      transition: background-color 0.3s;
+      text-decoration: none;
+    }
+
+    .nav-user a:hover {
+      background: rgba(255, 255, 255, 0.1);
     }
 
     /* Main Content Area */
@@ -82,9 +96,9 @@ export class PwNavPage extends LitElement {
       height: calc(100vh - 60px);
       overflow: hidden;
     }
-
   `;
 
+  @property({ type: Boolean }) parentIsDoc = false;
 
   @consume({ context: meContext, subscribe: true })
   @property({ attribute: false })
@@ -99,10 +113,11 @@ export class PwNavPage extends LitElement {
         <nav class="navbar">
           <div class="nav-title" @click="${this.handleTitleClick}">${import.meta.env.VITE_TITLE || 'Photo Web'}</div>
           <div class="nav-user">
-            ${this.isAdmin() ? this.renderPulldown() : ''}
-            ${this.me?.email
-              ? this.renderUserAvatar()
-              : this.renderLoginButton()}
+            <!-- TODO: pulldown shows square when hovered; apply this effect also to the icons rendered below -->
+            ${this.parentIsDoc
+              ? html`<a href="/ui/album"><sl-icon name="images"></sl-icon></a>`
+              : html`<a href="/ui/doc"><sl-icon name="file-text"></sl-icon></a>`}
+            ${this.isAdmin() ? this.renderPulldown() : ''} ${this.me?.email ? this.renderUserAvatar() : this.renderLoginButton()}
           </div>
         </nav>
 
@@ -121,9 +136,7 @@ export class PwNavPage extends LitElement {
           <sl-icon name="three-dots-vertical"></sl-icon>
         </sl-button>
         <sl-menu>
-          <sl-menu-item @click=${this.toggleTheme}>
-            🌙 Toggle Theme (${this.themeManager.getCurrentTheme()})
-          </sl-menu-item>
+          <sl-menu-item @click=${this.toggleTheme}> 🌙 Toggle Theme (${this.themeManager.getCurrentTheme()}) </sl-menu-item>
           <sl-menu-item>
             <a href="users" style="text-decoration: none; color: inherit;">Users ...</a>
           </sl-menu-item>
@@ -155,7 +168,8 @@ export class PwNavPage extends LitElement {
           slot="trigger"
           image="${this.me?.picture || '/default-avatar.png'}"
           label="${this.me?.name || 'User Avatar'}"
-          style="cursor: pointer; --size: 40px;">
+          style="cursor: pointer; --size: 40px;"
+        >
         </sl-avatar>
         <sl-menu>
           <sl-menu-item style="pointer-events: none;">
@@ -165,9 +179,7 @@ export class PwNavPage extends LitElement {
             </div>
           </sl-menu-item>
           <sl-menu-item>
-            <sl-button variant="danger" size="small" @click="${this.handleLogout}" style="width: 100%;">
-              Logout
-            </sl-button>
+            <sl-button variant="danger" size="small" @click="${this.handleLogout}" style="width: 100%;"> Logout </sl-button>
           </sl-menu-item>
         </sl-menu>
       </sl-dropdown>
@@ -182,7 +194,6 @@ export class PwNavPage extends LitElement {
       </sl-button>
     `;
   }
-
 
   private isAdmin(): boolean {
     return this.me?.roles?.includes('admin') || false;
@@ -218,6 +229,4 @@ export class PwNavPage extends LitElement {
   private handleTitleClick() {
     window.location.href = '/';
   }
-
 }
-
