@@ -73,9 +73,7 @@ export class PwCarousel extends LitElement {
         align-items: center;
         justify-content: center;
         width: 100%;
-        height: 100vh;
-        min-height: 100vh;
-        padding: 2rem;
+        height: calc(100vh - 20px);;
         box-sizing: border-box;
       }
 
