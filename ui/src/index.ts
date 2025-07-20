@@ -13,5 +13,6 @@ import './pw-users'
 import './pw-album-browser'
 import './pw-doc-browser'
 import './pw-ken-burns'
+import './pw-carousel'
 import './pw-tests'
 

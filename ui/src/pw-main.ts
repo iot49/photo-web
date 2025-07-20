@@ -53,7 +53,8 @@ export class PwMain extends LitElement {
     { path: `/ui/tests`, render: () => html`<pw-tests></pw-tests>` },
     {
       path: `/ui/slideshow/:uuid`,
-      render: ({ uuid }) => html`<pw-ken-burns .uuid=${uuid ?? ''}></pw-ken-burns>`,
+      // render: ({ uuid }) => html`<pw-ken-burns .uuid=${uuid ?? ''}></pw-ken-burns>`,
+      render: ({ uuid }) => html`<pw-carousel .uuid=${uuid ?? ''}></pw-carousel>`,
     },
     {
       // handle markdown file-links in pw-doc-browser and file-renderer.ts
