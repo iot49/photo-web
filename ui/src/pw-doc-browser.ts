@@ -147,9 +147,7 @@ export class PwDocBrowser extends LitElement {
   }
 
   private treeTemplate(folder: FolderModel) {
-    return html` <sl-tree class="tree-with-icons custom-icons">
-      <sl-icon name="plus-square" slot="expand-icon"></sl-icon>
-      <sl-icon name="dash-square" slot="collapse-icon"></sl-icon>
+    return html` <sl-tree>
       ${folder.folders.map(
         (folderName: string) =>
           html` <sl-tree-item class="folder-item" data-path=${folder.path} data-folder=${folderName} lazy> ${folderName} </sl-tree-item>`
