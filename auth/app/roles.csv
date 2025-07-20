@@ -22,4 +22,14 @@ allow, /doc/api/file/*, !doc:8000, Delegate file access to doc service
 allow, */health, public, Health checks (auth, doc, photos, nginx)
 allow, */docs, public, Swagger docs for all services
 allow, *openapi.json, public, OpenAPI schema for all services
-allow, /echo, admin
+
+# HACK: traefik dashboard is served at traefik subdomain.
+# A better solution would be a separate /authorization endpoint for the traefik subdomain that verifies the admin role.
+# But this works and the routes are sufficiently specific to not pose a great security risk.
+# (the root domain serves nothing on these routes).
+allow, /assets/*, admin, Traefik dashboard
+allow, /icons/*, admin, Traefik dashboard
+allow, /app-*, admin, Traefik dashboard
+allow, /api/*, admin, Traefik dashboard
+allow, /providers/*, admin, Traefik dashboard
+

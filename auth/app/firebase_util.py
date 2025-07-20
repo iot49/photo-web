@@ -81,8 +81,15 @@ def verify_user(request: Request) -> UserBase:
             # Return cached info without the internal cache timestamp
             return UserBase(**cached_info)
 
-    # get user info rom session_cookie
+    # get user info from session_cookie
     user_info = verify_cookie(session_cookie)
+
+    # ensure default roles are set
+    roles = set([role.strip() for role in user_info.roles.split(",")])
+    roles.add("public")  # ensure 'public' role is always present
+    if user_info.email == os.getenv("ADMIN_EMAIL", ""):
+        roles.add("admin")
+    user_info.roles = ",".join(sorted(roles))
 
     # update cache
     cached_result = user_info.model_dump()
