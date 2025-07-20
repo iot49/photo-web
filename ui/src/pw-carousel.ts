@@ -59,13 +59,6 @@ export class PwCarousel extends LitElement {
                 alt="${photo.title || 'Photo'}"
                 loading="lazy"
               />
-              ${photo.title || photo.description
-                ? html`
-                    <div class="photo-info">
-                      ${photo.title ? html`<h3>${photo.title}</h3>` : ''} ${photo.description ? html`<p>${photo.description}</p>` : ''}
-                    </div>
-                  `
-                : ''}
             </sl-carousel-item>
           `
         )}
@@ -106,29 +99,6 @@ export class PwCarousel extends LitElement {
         flex-shrink: 0;
       }
 
-      .photo-info {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
-        color: white;
-        padding: 2rem 1rem 1rem;
-        border-radius: 0 0 var(--sl-border-radius-medium) var(--sl-border-radius-medium);
-      }
-
-      .photo-info h3 {
-        margin: 0 0 0.5rem 0;
-        font-size: 1.2rem;
-        font-weight: 600;
-      }
-
-      .photo-info p {
-        margin: 0;
-        font-size: 0.9rem;
-        opacity: 0.9;
-      }
-
       /* Dark theme adjustments */
       :host([theme='dark']) sl-carousel-item {
         background: var(--sl-color-neutral-900);
@@ -136,18 +106,3 @@ export class PwCarousel extends LitElement {
     `,
   ];
 }
-
-/*
-<img 
-    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 70vw" 
-    loading="lazy" 
-    src="/photos/api/photos/AB5676CD-20B6-4D22-A8D0-B8FD5A71244F/img" 
-    srcset="
-        /photos/api/photos/AB5676CD-20B6-4D22-A8D0-B8FD5A71244F/img-thumb 200w, 
-        /photos/api/photos/AB5676CD-20B6-4D22-A8D0-B8FD5A71244F/img-sm 480w, 
-        /photos/api/photos/AB5676CD-20B6-4D22-A8D0-B8FD5A71244F/img-md 768w, 
-        /photos/api/photos/AB5676CD-20B6-4D22-A8D0-B8FD5A71244F/img-lg 1024w, 
-        /photos/api/photos/AB5676CD-20B6-4D22-A8D0-B8FD5A71244F/img-xl 1440w, 
-        /photos/api/photos/AB5676CD-20B6-4D22-A8D0-B8FD5A71244F/img-xxl 1920w" 
-alt="Photo">
-*/

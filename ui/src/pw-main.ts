@@ -53,7 +53,10 @@ export class PwMain extends LitElement {
     { path: `/ui/tests`, render: () => html`<pw-tests></pw-tests>` },
     {
       path: `/ui/slideshow/:uuid`,
-      // render: ({ uuid }) => html`<pw-ken-burns .uuid=${uuid ?? ''}></pw-ken-burns>`,
+      render: ({ uuid }) => html`<pw-ken-burns .uuid=${uuid ?? ''}></pw-ken-burns>`,
+    },
+    {
+      path: `/ui/carousel/:uuid`,
       render: ({ uuid }) => html`<pw-carousel .uuid=${uuid ?? ''}></pw-carousel>`,
     },
     {

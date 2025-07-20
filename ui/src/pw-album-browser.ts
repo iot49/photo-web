@@ -21,6 +21,15 @@ export class PwAlbumBrowser extends LitElement {
       height: 100%;
     }
 
+    sl-icon {
+      font-size: 1rem;
+      width: 1rem;
+      height: 1rem;
+      display: inline-block;
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+
     .left-pane {
       overflow: auto;
     }
@@ -33,13 +42,16 @@ export class PwAlbumBrowser extends LitElement {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      display: flex;
+      align-items: center;
     }
 
     .album-link {
       text-decoration: none;
       color: inherit;
-      display: block;
-      width: 100%;
+      display: inline-block;
+      vertical-align: middle;
+      margin-left: 0.5rem;
     }
 
     .album-link:hover {
@@ -98,12 +110,45 @@ export class PwAlbumBrowser extends LitElement {
       color: #dee2e6;
     }
 
-    .album-card .album-title {
-      padding: 15px;
-      font-weight: 500;
-      color: #495057;
-      text-align: center;
+    .album-card .album-info {
+      padding: 1px;
       border-top: 1px solid #f8f9fa;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .album-card .album-title {
+      color: #495057;
+      text-align: left;
+      flex: 1;
+      margin-left: 3px;
+      margin-right: 10px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .album-title {
+      font-size: var(--sl-font-size-small);
+    }
+
+    .album-icons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .album-icon-link {
+      color: #6c757d;
+      text-decoration: none;
+      padding: 4px;
+      border-radius: 4px;
+      transition: color 0.2s, background-color 0.2s;
+    }
+
+    .album-icon-link:hover {
+      color: var(--sl-color-primary-600);
+      background-color: #f8f9fa;
     }
   `;
   @consume({ context: albumsContext, subscribe: true })
@@ -186,14 +231,21 @@ export class PwAlbumBrowser extends LitElement {
       ${sortedAlbums.map(
         (album) => html`
           <div class="album-card">
-            <a href="${import.meta.env.BASE_URL}slideshow/${album.uuid}" class="album-card-link">
+            <a href="${import.meta.env.BASE_URL}slideshow/${album.uuid}" class="album-card-link" title="Ken Burns Slideshow">
               <div class="album-thumbnail">
                 ${album.thumbnail
                   ? html` <img src="/photos/api/photos/${album.thumbnail}/img-sm" alt="${album.title}" loading="lazy" /> `
                   : html` <div class="no-thumbnail">📷</div> `}
               </div>
-              <div class="album-title">${album.title}</div>
             </a>
+            <div class="album-info">
+              <div class="album-title">${album.title}</div>
+              <div class="album-icons">
+                <a href="${import.meta.env.BASE_URL}carousel/${album.uuid}" class="album-icon-link" title="Carousel">
+                  <sl-icon name="play"></sl-icon>
+                </a>
+              </div>
+            </div>
           </div>
         `
       )}

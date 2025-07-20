@@ -261,28 +261,34 @@ export class PwKenBurns extends LitElement {
     this.currentIndex = nextIndex;
 
     if (this.autoPlay) {
-      if (this.currentIndex + 1 >= N) {
-        // Emit custom event when slideshow finishes
-        console.log('pw-ken-burns: EMIT pw-finished');
-        document.dispatchEvent(
-          new CustomEvent('pw-finished', {
-            bubbles: true,
-            composed: true,
-            detail: { message: 'Slideshow finished playing all photos' },
-          })
-        );
-        this.autoPlay = false;
-      } else {
-        this.fetchSlide(this.currentIndex + 1);
-        if (this.autoplayTimeout) {
-          clearTimeout(this.autoplayTimeout);
-        }
-        // Start next slide `TRANSITION_MS` before current animation ends.
-        // This way the transform of slide currentIndex continues through the transition.
-        // Ensure timeout value is never negative.
-        const timeoutDuration = Math.round(Math.max(1000, slide_ms - TRANSITION_MS));
-        this.autoplayTimeout = setTimeout(() => this.goto(this.currentIndex + 1), timeoutDuration);
+      if (this.autoplayTimeout) {
+        clearTimeout(this.autoplayTimeout);
       }
+      // Start next slide `TRANSITION_MS` before current animation ends.
+      // This way the transform of slide currentIndex continues through the transition.
+      // Ensure timeout value is never negative.
+      const timeoutDuration = Math.round(Math.max(1000, slide_ms - TRANSITION_MS));
+      this.autoplayTimeout = setTimeout(() => {
+        if (this.currentIndex + 1 >= N) {
+          // Emit custom event when slideshow finishes
+          console.log('pw-ken-burns: EMIT pw-finished');
+          document.dispatchEvent(
+            new CustomEvent('pw-finished', {
+              bubbles: true,
+              composed: true,
+              detail: { message: 'Slideshow finished playing all photos' },
+            })
+          );
+          this.autoPlay = false;
+          // Navigate back to main album browser
+          // ISSUE: resets state of album browser (e.g. tree all collapsed)
+          history.back();
+        } else {
+          this.fetchSlide(this.currentIndex + 1);
+          // Show next slide
+          this.goto(this.currentIndex + 1);
+        }
+      }, timeoutDuration);
     }
   };
 
@@ -336,7 +342,6 @@ export class PwKenBurns extends LitElement {
       img.src = `/photos/api/photos/${photo.uuid}/img${suffix}`;
     }
   }
-
 
   static styles = [
     css`
