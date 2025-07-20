@@ -52,16 +52,16 @@ export class PwDocBrowser extends LitElement {
       overflow: auto;
     }
 
+    #filePane {
+      overflow: auto;
+    }
+    
     sl-tree-item {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
-    #filePane {
-      background-color: white;
-    }
-    
   `;
 
   @state() root!: FolderModel;

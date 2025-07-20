@@ -21,6 +21,7 @@ allow, /doc/api/file/*, !doc:8000, Delegate file access to doc service
 
 allow, */health, public, Health checks (auth, doc, photos, nginx)
 allow, */docs, public, Swagger docs for all services
+allow, */redoc, public, openapi docs for all services
 allow, *openapi.json, public, OpenAPI schema for all services
 
 # HACK: traefik dashboard is served at traefik subdomain.
