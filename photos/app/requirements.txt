@@ -2,5 +2,6 @@ fastapi
 uvicorn
 pydantic
 osxphotos
-Pillow 
+Pillow
 pillow-heif
+apscheduler

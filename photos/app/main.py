@@ -4,6 +4,7 @@ import os
 from contextlib import asynccontextmanager
 from typing import Dict, List, Optional
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from models import DB, AlbumModel, PhotoModel
@@ -33,6 +34,8 @@ SCREEN_SIZES = {
 # Register the HEIF opener to allow Pillow to read HEIC files
 register_heif_opener()
 
+# Initialize the scheduler
+scheduler = AsyncIOScheduler()
 
 # In-memory database (populated from Apple Photos library)
 db: DB = DB(albums={}, photos={})
@@ -67,10 +70,28 @@ async def load_db() -> DB:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Load database on startup
     await load_db()
-    logger.info("Starting server ...")
+
+    # Start the scheduler
+    scheduler.start()
+
+    # Schedule daily database reload at 2am
+    scheduler.add_job(
+        load_db,
+        "cron",
+        hour=2,
+        minute=0,
+        id="daily_db_reload",
+        name="Daily database reload at 2am",
+        replace_existing=True,
+    )
+
+    logger.info("Starting server with scheduled daily database reload at 2am...")
     yield
-    # No cleanup needed since we're not using a global HTTP client
+
+    # Shutdown the scheduler
+    scheduler.shutdown()
 
 
 app = FastAPI(
@@ -370,7 +391,7 @@ async def get_photos_srcset():
 
 
 # Keep other endpoints from original file...
-@app.get("/api/reload_db")
+@app.get("/api/reload-db")
 async def reload_db():
     """Reload the database from the Apple Photos library."""
     try:

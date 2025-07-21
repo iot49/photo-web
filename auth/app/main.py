@@ -1,3 +1,22 @@
+"""
+Photo Web Authentication Service
+
+This module provides the main FastAPI application for the Photo Web authentication
+and authorization service. It handles user login/logout, session management,
+Firebase integration, and authorization checking for the entire application.
+
+Key Features:
+- Firebase-based authentication with session cookies
+- User management and database integration
+- Traefik forwardAuth integration for microservice authorization
+- Session caching for improved performance
+- Health monitoring and configuration endpoints
+
+Environment Variables:
+- AUTH_COOKIE_EXPIRATION_DAYS: Session cookie expiration (default: 14 days)
+- ROOT_DOMAIN: Domain for session cookies (default: dev49.org)
+"""
+
 import json
 import logging
 import os
@@ -17,11 +36,22 @@ from users_api import router as users_router
 logging.basicConfig(level=logging.WARNING)
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.DEBUG)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """
+    Application lifespan manager for startup and shutdown tasks.
+
+    Handles database initialization on startup and cleanup on shutdown.
+
+    Args:
+        app: FastAPI application instance
+
+    Yields:
+        None: Control back to the application during runtime
+    """
     logger.debug("Starting Auth server ...")
     # Initialize database
     init_database()
@@ -50,7 +80,12 @@ app.include_router(users_router)
 
 
 def get_db() -> DatabaseManager:
-    """Dependency to get database manager."""
+    """
+    FastAPI dependency to get database manager instance.
+
+    Returns:
+        DatabaseManager: Singleton database manager for user operations
+    """
     return get_database_manager()
 
 
@@ -59,32 +94,13 @@ def get_db() -> DatabaseManager:
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
+    """
+    Health check endpoint for service monitoring.
+
+    Returns:
+        dict: Service status information
+    """
     return {"status": "Auth service is healthy"}
-
-
-@app.get("/firebase-config")
-async def firebase_config():
-    """Return Firebase configuration for frontend initialization."""
-    try:
-        with open("app/firebase-config.json", "r") as f:
-            config = json.load(f)
-        return config
-    except FileNotFoundError:
-        logger.error("Firebase config file not found at firebase-config.json")
-        raise HTTPException(
-            status_code=500, detail="Firebase configuration not available"
-        )
-    except json.JSONDecodeError as e:
-        logger.error(f"Invalid JSON in firebase-config.json: {e}")
-        raise HTTPException(
-            status_code=500, detail="Invalid Firebase configuration format"
-        )
-    except Exception as e:
-        logger.error(f"Error reading Firebase config: {e}")
-        raise HTTPException(
-            status_code=500, detail="Error loading Firebase configuration"
-        )
 
 
 @app.post("/login", response_class=RedirectResponse)
@@ -94,9 +110,28 @@ async def session_login(
     redirect_uri: str = "/",
     db: DatabaseManager = Depends(get_db),
 ) -> RedirectResponse:
-    """Handle user login with Firebase ID token.
+    """
+    Handle user login with Firebase ID token and create session.
 
-    Creates a session cookie and stores/updates user information in the database.
+    Validates the Firebase ID token, creates a secure session cookie,
+    and stores/updates user information in the database. Handles both
+    new user registration and existing user login.
+
+    Args:
+        request: FastAPI request object containing cookies and headers
+        id_token: Firebase ID token from frontend authentication
+        redirect_uri: URI to redirect to after successful login (default: "/")
+        db: Database manager dependency for user operations
+
+    Returns:
+        RedirectResponse: Redirect to specified URI with session cookie set
+
+    Raises:
+        HTTPException: 500 if login process fails or token is invalid
+
+    Note:
+        Sets secure session cookie with configurable expiration.
+        Handles X-Forwarded-Proto header for proper HTTPS redirects.
     """
     try:
         """
@@ -167,9 +202,24 @@ async def session_login(
 
 @app.post("/logout", response_class=RedirectResponse)
 async def logout(request: Request, redirect_uri: str = "/") -> RedirectResponse:
-    """Handle user logout by clearing the session cookie and invalidating session cache.
+    """
+    Handle user logout by clearing session data and cookies.
 
-    Clears the session cookie, invalidates any cached session data, and redirects to the specified URI.
+    Invalidates the user session by clearing the session cookie and
+    removing any cached session data from the server-side session store.
+
+    Args:
+        request: FastAPI request object containing session data
+        redirect_uri: URI to redirect to after logout (default: "/")
+
+    Returns:
+        RedirectResponse: Redirect to specified URI with cleared session cookie
+
+    Raises:
+        HTTPException: 500 if logout process encounters an error
+
+    Note:
+        Expires session cookie immediately and clears server-side cache.
     """
     try:
         # Clear session cache before logout
@@ -209,9 +259,24 @@ async def logout(request: Request, redirect_uri: str = "/") -> RedirectResponse:
 
 @app.get("/me", response_model=UserResponse)
 async def get_current_user(request: Request):
-    """Get current user information from session cookie.
+    """
+    Get current authenticated user information from session.
 
-    Returns empty dict if user is not logged in (no cookie found).
+    Extracts and validates the session cookie to return user details
+    including email, name, picture, and roles. Falls back to public
+    role if no valid session exists.
+
+    Args:
+        request: FastAPI request object containing session cookie
+
+    Returns:
+        UserResponse: User information with roles, or public role if not authenticated
+
+    Raises:
+        HTTPException: If session validation fails with specific error
+
+    Note:
+        Returns {"roles": "public"} for unauthenticated users instead of errors.
     """
     try:
         # Get session cookie from request
@@ -234,16 +299,31 @@ async def get_current_user(request: Request):
 async def authorize(
     request: Request, response: Response, db: DatabaseManager = Depends(get_db)
 ):
-    """Traefik forwardAuth endpoint for authorization checking.
+    """
+    Traefik forwardAuth endpoint for microservice authorization.
 
-    This endpoint is used by Traefik to verify if a user is authorized to access
-    a specific resource based on the rules defined in roles.csv.
+    This endpoint integrates with Traefik's forwardAuth middleware to provide
+    centralized authorization for all services in the Photo Web application.
+    It validates user sessions and checks permissions against role-based rules.
+
+    Args:
+        request: FastAPI request with Traefik headers (X-Forwarded-Uri, etc.)
+        response: FastAPI response object for setting forwarded headers
+        db: Database manager dependency (currently unused but available)
 
     Returns:
-        - 200 (OK) if authorized
-        - 401 (Unauthorized) if not logged in and login is required
-        - 403 (Forbidden) if logged in but not authorized
-        - 302 (Redirect) to login if authentication is needed
+        dict: Authorization status with user info if successful
+
+    Raises:
+        HTTPException:
+            - 401 if authentication required but user not logged in
+            - 403 if user authenticated but lacks required permissions
+            - 500 if authorization check encounters an error
+
+    Note:
+        Sets X-Forwarded-Roles header for downstream services.
+        Uses X-Forwarded-Uri header to determine requested resource.
+        Integrates with authorization manager for role-based access control.
     """
     try:
         # Get roles, defaults to "public" if user is not logged in
@@ -283,3 +363,64 @@ async def authorize(
         raise HTTPException(
             status_code=500, detail=f"Internal server error in authorize: {e}"
         )
+
+
+@app.get("/firebase-config")
+async def firebase_config():
+    """
+    Provide Firebase configuration for frontend client initialization.
+
+    Reads and returns the Firebase configuration from firebase-config.json
+    file, which contains the necessary settings for frontend Firebase SDK.
+
+    Returns:
+        dict: Firebase configuration object with API keys and project settings
+
+    Raises:
+        HTTPException: 500 if config file is missing, invalid, or unreadable
+    """
+    try:
+        with open("app/firebase-config.json", "r") as f:
+            config = json.load(f)
+        return config
+    except FileNotFoundError:
+        logger.error("Firebase config file not found at firebase-config.json")
+        raise HTTPException(
+            status_code=500, detail="Firebase configuration not available"
+        )
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in firebase-config.json: {e}")
+        raise HTTPException(
+            status_code=500, detail="Invalid Firebase configuration format"
+        )
+    except Exception as e:
+        logger.error(f"Error reading Firebase config: {e}")
+        raise HTTPException(
+            status_code=500, detail="Error loading Firebase configuration"
+        )
+
+
+@app.get("/roles-csv")
+async def get_roles_csv():
+    """
+    Return the roles.csv configuration for authorization rules.
+
+    Reads and returns the roles.csv file content which contains the
+    authorization rules used by the authorization manager for access control.
+
+    Returns:
+        Response: Raw CSV content with proper content type
+
+    Raises:
+        HTTPException: 500 if roles.csv file is missing or unreadable
+    """
+    try:
+        with open("app/roles.csv", "r") as f:
+            content = f.read()
+        return Response(content=content, media_type="text/csv")
+    except FileNotFoundError:
+        logger.error("Roles file not found at app/roles.csv")
+        raise HTTPException(status_code=500, detail="Roles configuration not available")
+    except Exception as e:
+        logger.error(f"Error reading roles file: {e}")
+        raise HTTPException(status_code=500, detail="Error loading roles configuration")

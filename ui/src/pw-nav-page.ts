@@ -53,7 +53,7 @@ export class PwNavPage extends LitElement {
       position: relative;
       display: flex;
       align-items: center;
-      gap: 15px;
+      gap: 1px;
     }
 
     /* Shoelace component overrides for navbar */
@@ -126,6 +126,7 @@ export class PwNavPage extends LitElement {
         <!-- Navigation Bar -->
         <nav class="navbar">
           <div class="nav-title" @click="${this.handleTitleClick}">${import.meta.env.VITE_TITLE || 'Photo Web'}</div>
+          <slot name="nav-controls"></slot>
           <div class="nav-user">
             ${this.parentIsDoc
               ? html`<sl-button
@@ -155,7 +156,8 @@ export class PwNavPage extends LitElement {
             >
               <sl-icon name="${this.themeManager.getCurrentTheme() === 'dark' ? 'sun' : 'moon'}"></sl-icon>
             </sl-button>
-            ${this.isAdmin() ? this.renderPulldown() : ''} ${this.me?.email ? this.renderUserAvatar() : this.renderLoginButton()}
+            ${this.isAdmin() ? this.renderPulldown() : ''} 
+            ${this.me?.email ? this.renderUserAvatar() : this.renderLoginButton()}
           </div>
         </nav>
 

@@ -7,7 +7,8 @@ export default defineConfig(({ mode }) => {
   return {
     base: '/ui/',
     define: {
-      'import.meta.env.VITE_TITLE': JSON.stringify(env.TITLE)
+      'import.meta.env.VITE_TITLE': JSON.stringify(env.TITLE),
+      'import.meta.env.VITE_SUPER_USER_EMAIL': JSON.stringify(env.SUPER_USER_EMAIL)
     },
     build: {
       outDir: '../nginx/html/ui',
