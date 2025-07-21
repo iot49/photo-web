@@ -8,8 +8,18 @@ http:
         address: "http://auth:8000/authorize"
         # These can easily be spoofed
         # Setting this to false tells traefik to set the correct headers
-        # X-forwarded-for-* headers submitted by the client are discarded 
+        # X-forwarded-for-* headers submitted by the client are discarded
         trustForwardHeader: false
         authResponseHeaders:
           - X-Forwarded-User
           - X-Forwarded-Roles
+    
+    # Rate limiting middleware for Cloudflared requests
+    cloudflared-throttle:
+      rateLimit:
+        average: 40
+        period: "60s"
+        burst: 40
+        sourceCriterion:
+          ipStrategy:
+            depth: 1

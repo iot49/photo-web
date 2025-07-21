@@ -24,6 +24,9 @@ entryPoints:
           permanent: true
   websecure:
     address: ":443"
+  # Internal unencrypted entry point for cloudflared
+  webinternal:
+    address: ":81"
 
 # Providers configuration
 providers:

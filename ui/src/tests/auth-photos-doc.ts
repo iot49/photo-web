@@ -38,7 +38,7 @@ export async function test_photos_doc(msg: PwTests) {
   for (const [realm, {uuid}] of Object.entries(albumsByRealm)) {
     const albumUri = `/photos/api/albums/${uuid}`;
     test_uri.push({uri: albumUri, realm});
-    // msg.out(`Added album URI: ${albumUri} (realm: ${realm})`);
+    
 
     try {
       // Load album details to get photo IDs
@@ -49,7 +49,6 @@ export async function test_photos_doc(msg: PwTests) {
         const photoId = albumDetails[0].uuid;
         const photoUri = `/photos/api/photos/${photoId}/img`;
         test_uri.push({uri: photoUri, realm});
-        // msg.out(`Added photo URI: ${photoUri} (realm: ${realm})`);
       }
     } catch (error) {
       msg.err(`Failed to load album details for ${uuid}: ${error instanceof Error ? error.message : String(error)}`);
@@ -60,10 +59,7 @@ export async function test_photos_doc(msg: PwTests) {
   const doc_root = await get_json('/doc/api/root');
   const doc_realms = doc_root.folders;
 
-  // BUG:
-  // e.g. doc_realms =  ["admin","family","iot","personal","private","protected","public"]
-  // get 2 files for **each** entry of doc_realms (provided there exist - e.g. for family they do, for admin they do not)
-  // not just 2 files total.
+
 
   msg.out(`Found doc realms: ${doc_realms.join(', ')}`);
 
@@ -73,7 +69,7 @@ export async function test_photos_doc(msg: PwTests) {
     try {
       const folderUri = `/doc/api/folder/${realm}`;
       test_uri.push({uri: folderUri, realm});
-      // msg.out(`Added folder URI: ${folderUri} (realm: ${realm})`);
+
       
       const folderData = await get_json(folderUri);
       
@@ -82,7 +78,6 @@ export async function test_photos_doc(msg: PwTests) {
         for (const fileName of folderData.files.slice(0, 2 - filesFound)) {
           const fileUri = `/doc/api/file/${realm}/${fileName}`;
           test_uri.push({uri: fileUri, realm});
-          // msg.out(`Added file URI: ${fileUri} (realm: ${realm})`);
           filesFound++;
           if (filesFound >= 2) break; // Stop after 2 files for this realm
         }
@@ -97,7 +92,6 @@ export async function test_photos_doc(msg: PwTests) {
             const subFolderPath = `${realm}/${subFolder}`;
             const subFolderUri = `/doc/api/folder/${subFolderPath}`;
             test_uri.push({uri: subFolderUri, realm});
-            // msg.out(`Added subfolder URI: ${subFolderUri} (realm: ${realm})`);
             
             const subFolderData = await get_json(subFolderUri);
             
@@ -105,7 +99,6 @@ export async function test_photos_doc(msg: PwTests) {
               for (const fileName of subFolderData.files.slice(0, 2 - filesFound)) {
                 const fileUri = `/doc/api/file/${subFolderPath}/${fileName}`;
                 test_uri.push({uri: fileUri, realm});
-                // msg.out(`Added file URI: ${fileUri} (realm: ${realm})`);
                 filesFound++;
                 if (filesFound >= 2) break; // Stop after 2 files for this realm
               }

@@ -20,6 +20,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      # Internal port 81 for cloudflared (not exposed to host)
     env_file:
       - .env
     environment:
@@ -65,13 +66,18 @@ services:
       - nginx-cache:/var/cache/nginx # cache volume
     labels:
       - "traefik.enable=true"
-      # Route root domain and photos/auth paths through nginx
+      # Route root domain and photos/auth paths through nginx (HTTPS)
       - "traefik.http.routers.nginx.rule=Host(`${ROOT_DOMAIN}`)"
       - "traefik.http.routers.nginx.entrypoints=websecure"
       - "traefik.http.routers.nginx.tls=true"
       - "traefik.http.routers.nginx.tls.certresolver=cloudflare"
       - "traefik.http.routers.nginx.priority=20"
       - "traefik.http.routers.nginx.middlewares=authorize@file"
+      # Internal unencrypted router for cloudflared
+      - "traefik.http.routers.nginx-internal.rule=Host(`${ROOT_DOMAIN}`)"
+      - "traefik.http.routers.nginx-internal.entrypoints=webinternal"
+      - "traefik.http.routers.nginx-internal.priority=20"
+      - "traefik.http.routers.nginx-internal.middlewares=cloudflared-throttle@file,authorize@file"
       - "traefik.http.services.nginx.loadbalancer.server.port=80" # Default nginx port
     networks:
       - ingress
@@ -120,6 +126,21 @@ services:
     networks:
       - ingress
       
-  # TODO: create a cloudflared service that
-  # 1) adds DNS entries for ${BASE_URL} and traefik.${BASE_URL} on Cloudflare (if they do not exist)
-  # 2) forwards all requests to ${BASE_URL} and traefik.${BASE_URL} to the traefik service (unencrypted) via the tunnel network
+  cloudflared:
+    # Setup:
+    # - Set CF_TUNNEL_TOKEN in .env
+    # - Configure cloudflare to forward requests to http://traefik:81 (not 80!)
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN}
+    networks:
+      - tunnel
+    depends_on:
+      - traefik
+    labels:
+      - "traefik.enable=false"  # This service doesn't need traefik routing

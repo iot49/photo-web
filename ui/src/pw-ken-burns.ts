@@ -106,6 +106,11 @@ export class PwKenBurns extends LitElement {
   }
 
   override render() {
+    /*
+    TODO:
+    - move "fetchSlide" to render: will "<img lazy ..." have the same effect?
+    - support for video, error for unsupported formats
+    */
     return html`
       <div id="slideshow">
         <div class="slide-wrapper active">
@@ -134,7 +139,6 @@ export class PwKenBurns extends LitElement {
           opacity slowly increases from 0 to 1, ultimately obsuring the slide at this.currentIndex. 
         2) If autoPlay is enabled, schedule a new transition to slide `nextIndex+1` after `slide_ms - transition_ms` [ms].
     */
-    console.log(`goto slide_ms=${slide_ms}ms transition_ms=${transition_ms}`);
     const slides = this.slideshow.children;
     const N = slides.length;
     nextIndex = ((nextIndex % N) + N) % N;
@@ -152,11 +156,12 @@ export class PwKenBurns extends LitElement {
       this.fetchSlide(nextIndex);
       if (!this.isImageLoaded(img)) {
         // Image not yet available, try again later
+        // BUG: this occurs for every image, is preloading not working?
         console.log(`goto ${nextIndex}: waiting for image to load`);
         if (this.autoplayTimeout) {
           clearTimeout(this.autoplayTimeout);
         }
-        this.autoplayTimeout = setTimeout(() => this.goto(nextIndex), 100);
+        this.autoplayTimeout = setTimeout(() => this.goto(nextIndex), 300);
         return;
       }
 
@@ -285,6 +290,8 @@ export class PwKenBurns extends LitElement {
   /*
     Load slide[index].
     Incremental image loading improves initial response time, reduces unnecessary downloads and server overload. 
+    VERIFY: may not be working correctly.
+    ALSO: can this be moved to render with "<img lazy ..."?
   */
   private fetchSlide(index: number) {
     const slides = this.slideshow.children;

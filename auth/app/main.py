@@ -36,7 +36,7 @@ from users_api import router as users_router
 logging.basicConfig(level=logging.WARNING)
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARNING)
 
 
 @asynccontextmanager
