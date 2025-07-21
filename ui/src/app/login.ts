@@ -81,31 +81,30 @@ export async function login(redirect: string) {
     });
 }
 
-export function logout(redirect: string) {
-  fetch(`/auth/logout?redirect_uri=${redirect}`, {
-    method: 'POST',
-    redirect: 'follow',
-    credentials: 'include',
-    mode: 'cors',
-  })
-    .then(async (response) => {
-      if (response.redirected) {
-        console.log('LOGOUT redirect', response.url);
-        // Emit pw-logout event before redirect
-        window.dispatchEvent(new CustomEvent('pw-logout'));
-        window.location.href = response.url;
-      } else if (!response.ok) {
-        // Handle error responses
-        console.error(`Logout failed with status ${response.status}: ${response.text()}`);
-      } else {
-        console.log('Logout successful but no redirect');
-      }
-    })
-    .catch(function (_err) {
-      // Logout fetch ERROR "TypeError: Failed to fetch"
-      // console.error(`Logout fetch error "${err}"`, err);
-    })
-    .finally(function () {
-      window.dispatchEvent(new CustomEvent('pw-logout'));
+export async function logout(redirect: string) {
+  try {
+    const response = await fetch(`/auth/logout?redirect_uri=${redirect}`, {
+      method: 'POST',
+      redirect: 'follow',
+      credentials: 'include',
+      mode: 'cors',
     });
+
+    if (response.redirected) {
+      console.log('LOGOUT redirect', response.url);
+      // Emit pw-logout event before redirect
+      window.dispatchEvent(new CustomEvent('pw-logout'));
+      window.location.href = response.url;
+    } else if (!response.ok) {
+      // Handle error responses
+      console.error(`Logout failed with status ${response.status}: ${response.text()}`);
+    } else {
+      console.log('Logout successful but no redirect');
+    }
+  } catch (_err) {
+    // Logout fetch ERROR "TypeError: Failed to fetch"
+    // console.error(`Logout fetch error "${err}"`, err);
+  } finally {
+    window.dispatchEvent(new CustomEvent('pw-logout'));
+  }
 }

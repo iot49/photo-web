@@ -262,8 +262,8 @@ export class PwNavPage extends LitElement {
     login('/ui');
   }
 
-  private handleLogout() {
-    logout('/ui');
+  private async handleLogout() {
+    await logout('/ui');
   }
 
   private handleTitleClick() {

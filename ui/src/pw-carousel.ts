@@ -47,6 +47,12 @@ export class PwCarousel extends LitElement {
       `;
     }
 
+    /*
+    TODO:
+    Add support for movies. Determine the correct mime-time from photo.mime_type.
+    Keep it simple: supprt only images and movies, no other types.
+    */
+
     return html`
       <sl-carousel pagination navigation mouse-dragging loop>
         ${this.photos.map(

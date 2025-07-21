@@ -1,17 +1,24 @@
 import { get_json, get_text } from '../app/api';
+import { logout } from '../app/login';
 import { PwTests } from '../pw-tests';
 
 export async function test_authorize(msg: PwTests) {
-  /* TODO:
-  verify (with me.roles) that the user is logged in with role "admin".
-  Then 
-  1) run the test a first time, 
-  2) log out (keep the values of variable roles downloaded before) and fetch me again to get the new user roles.
-  3) run the test again.
-  */
   msg.header('Testing /authorize endpoint...');
+  
+  // Initial user check and roles fetch
   const me = await get_json('/auth/me');
   const roles = await get_text('/auth/roles-csv');
+  
+  // Verify user is logged in with admin role
+  const userRoles = (me.roles || 'public').split(',').map((r: string) => r.trim());
+  msg.out(`Current user roles: ${JSON.stringify(userRoles)}`);
+  
+  if (!userRoles.includes('admin')) {
+    msg.err('❌ User must be logged in with "admin" role to run this test');
+    return;
+  }
+  
+  msg.out('✓ User has admin role, proceeding with authorization tests');
 
   const services = [ 'auth', 'doc', 'photos' ];
   let openapi: { [key: string]: any } = {};
@@ -65,79 +72,115 @@ export async function test_authorize(msg: PwTests) {
     return 403;
   }
   
-  const userRoles = (me.roles || 'public').split(',').map((r: string) => r.trim());
-  msg.out(`Current user roles: ${JSON.stringify(userRoles)}`);
-  
-  let totalTests = 0;
-  let passedTests = 0;
-  let failedTests = 0;
+  // Helper function to run authorization tests
+  async function runAuthorizationTests(testRun: string, currentUserRoles: string[], rolesData: string) {
+    msg.header(`${testRun} - Testing authorization with roles: ${JSON.stringify(currentUserRoles)}`);
+    
+    let totalTests = 0;
+    let passedTests = 0;
+    let failedTests = 0;
 
-  for (const service of services) {
-    const spec = openapi[service];
-    const routes = extractGetRoutesFromOpenAPI(spec);
-    
-    msg.header(`Testing "${service}" service GET endpoints (${routes.length} routes)...`);
-    
-    for (const route of routes) {
-      const fullUri = `/${service}${route.path}`;
+    for (const service of services) {
+      const spec = openapi[service];
+      const routes = extractGetRoutesFromOpenAPI(spec);
       
-      // Skip endpoints that are handled by delegation (role starts with !)
-      const lines = (roles || '').split('\n');
-      let isDelegated = false;
-      for (const line of lines) {
-        if (line.trim().startsWith('#') || !line.trim()) continue;
-        const parts = line.split(',').map(p => p.trim());
-        if (parts.length >= 3) {
-          const [_action, pattern, role] = parts;
-          const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
-          if (regex.test(fullUri) && role.startsWith('!')) {
-            isDelegated = true;
-            break;
+      msg.header(`Testing "${service}" service GET endpoints (${routes.length} routes)...`);
+      
+      for (const route of routes) {
+        const fullUri = `/${service}${route.path}`;
+        
+        // Skip endpoints that are handled by delegation (role starts with !)
+        const lines = (rolesData || '').split('\n');
+        let isDelegated = false;
+        for (const line of lines) {
+          if (line.trim().startsWith('#') || !line.trim()) continue;
+          const parts = line.split(',').map(p => p.trim());
+          if (parts.length >= 3) {
+            const [_action, pattern, role] = parts;
+            const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+            if (regex.test(fullUri) && role.startsWith('!')) {
+              isDelegated = true;
+              break;
+            }
           }
         }
-      }
-      
-      if (isDelegated) {
-        msg.out(`⏭ GET ${fullUri}: Skipped (handled by delegation)`);
-        continue;
-      }
-      
-      const expectedStatus = getExpectedStatus(fullUri, userRoles, roles || '');
-      
-      try {
-        // Test the GET endpoint
-        const response = await fetch(fullUri, {
-          method: 'GET',
-          credentials: 'include'
-        });
         
-        console.log(`Testing GET ${fullUri} returns ${response.status} expected ${expectedStatus} `);
-        const actualStatus = response.status;
-        totalTests++;
-        
-        if (actualStatus === expectedStatus) {
-          passedTests++;
-          msg.out(`✓ GET ${fullUri}: ${actualStatus} (expected ${expectedStatus})`);
-        } else {
-          failedTests++;
-          msg.err(`✗ GET ${fullUri}: ${actualStatus} (expected ${expectedStatus})`);
+        if (isDelegated) {
+          msg.out(`⏭ GET ${fullUri}: Skipped (handled by delegation)`);
+          continue;
         }
         
-      } catch (error) {
-        failedTests++;
-        totalTests++;
-        msg.err(`✗ GET ${fullUri}: Error - ${error instanceof Error ? error.message : String(error)}`);
+        const expectedStatus = getExpectedStatus(fullUri, currentUserRoles, rolesData || '');
+        
+        try {
+          // Test the GET endpoint
+          const response = await fetch(fullUri, {
+            method: 'GET',
+            credentials: 'include'
+          });
+          
+          console.log(`Testing GET ${fullUri} returns ${response.status} expected ${expectedStatus} `);
+          const actualStatus = response.status;
+          totalTests++;
+          
+          if (actualStatus === expectedStatus) {
+            passedTests++;
+            msg.out(`✓ GET ${fullUri}: ${actualStatus} (expected ${expectedStatus})`);
+          } else {
+            failedTests++;
+            msg.err(`✗ GET ${fullUri}: ${actualStatus} (expected ${expectedStatus})`);
+          }
+          
+        } catch (error) {
+          failedTests++;
+          totalTests++;
+          msg.err(`✗ GET ${fullUri}: Error - ${error instanceof Error ? error.message : String(error)}`);
+        }
       }
     }
+    
+    // Test run summary
+    msg.header(`${testRun} Summary:`);
+    msg.out(`Total tests: ${totalTests}`);
+    msg.out(`Passed: ${passedTests}`);
+    msg.out(`Failed: ${failedTests}`);
+    msg.out(`Success rate: ${totalTests > 0 ? Math.round((passedTests / totalTests) * 100) : 0}%`);
+    
+    return { totalTests, passedTests, failedTests };
   }
   
-  // Summary
-  msg.header(`Authorization Test Summary:`);
-  msg.out(`Total tests: ${totalTests}`);
-  msg.out(`Passed: ${passedTests}`);
-  msg.out(`Failed: ${failedTests}`);
-  msg.out(`Success rate: ${totalTests > 0 ? Math.round((passedTests / totalTests) * 100) : 0}%`);
+  // 1) Run the test first time (as admin)
+  const firstRunResults = await runAuthorizationTests('First Run (Admin)', userRoles, roles || '');
   
-
+  // 2) Log out and fetch me again to get new user roles
+  msg.header('Logging out user...');
+  try {
+    await logout('/');
+    msg.out('✓ Successfully logged out');
+  } catch (error) {
+    msg.err(`⚠ Logout error: ${error instanceof Error ? error.message : String(error)}`);
+    // Continue with test even if logout fails - we can still check the current user state
+    msg.out('Continuing with test despite logout error...');
+  }
+  
+  // Fetch user data after logout
+  const meAfterLogout = await get_json('/auth/me');
+  const userRolesAfterLogout = (meAfterLogout.roles || 'public').split(',').map((r: string) => r.trim());
+  msg.out(`User roles after logout: ${JSON.stringify(userRolesAfterLogout)}`);
+  
+  // 3) Run the test again (as logged out user)
+  const secondRunResults = await runAuthorizationTests('Second Run (After Logout)', userRolesAfterLogout, roles || '');
+  
+  // Overall summary
+  msg.header(`Overall Authorization Test Summary:`);
+  msg.out(`First run (Admin) - Total: ${firstRunResults.totalTests}, Passed: ${firstRunResults.passedTests}, Failed: ${firstRunResults.failedTests}`);
+  msg.out(`Second run (Logged out) - Total: ${secondRunResults.totalTests}, Passed: ${secondRunResults.passedTests}, Failed: ${secondRunResults.failedTests}`);
+  
+  const totalOverallTests = firstRunResults.totalTests + secondRunResults.totalTests;
+  const totalOverallPassed = firstRunResults.passedTests + secondRunResults.passedTests;
+  const totalOverallFailed = firstRunResults.failedTests + secondRunResults.failedTests;
+  
+  msg.out(`Combined totals - Tests: ${totalOverallTests}, Passed: ${totalOverallPassed}, Failed: ${totalOverallFailed}`);
+  msg.out(`Overall success rate: ${totalOverallTests > 0 ? Math.round((totalOverallPassed / totalOverallTests) * 100) : 0}%`);
 }
 
