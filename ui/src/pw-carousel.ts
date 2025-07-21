@@ -37,6 +37,10 @@ export class PwCarousel extends LitElement {
     return scaledSources.join(', ');
   }
 
+  private isVideo(mimeType: string): boolean {
+    return mimeType.startsWith('video/');
+  }
+
   override render() {
     if (this.photos.length == null) {
       return html`
@@ -47,24 +51,34 @@ export class PwCarousel extends LitElement {
       `;
     }
 
-    /*
-    TODO:
-    Add support for movies. Determine the correct mime-time from photo.mime_type.
-    Keep it simple: supprt only images and movies, no other types.
-    */
-
     return html`
       <sl-carousel pagination navigation mouse-dragging loop>
         ${this.photos.map(
           (photo) => html`
             <sl-carousel-item>
-              <img
-                src=${`/photos/api/photos/${photo.uuid}/img`}
-                srcset=${this.generateSrcset(photo.uuid)}
-                sizes="100vw"
-                alt="${photo.title || 'Photo'}"
-                loading="lazy"
-              />
+              ${this.isVideo(photo.mime_type)
+                ? html`
+                    <!-- optionally add muted -->
+                    <video
+                      src=${`/photos/api/photos/${photo.uuid}/img`}
+                      controls
+                      autoplay
+                      muted
+                      preload="metadata"
+                      title="${photo.title || 'Video'}"
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                  `
+                : html`
+                    <img
+                      src=${`/photos/api/photos/${photo.uuid}/img`}
+                      srcset=${this.generateSrcset(photo.uuid)}
+                      sizes="100vw"
+                      alt="${photo.title || 'Photo'}"
+                      loading="lazy"
+                    />
+                  `}
             </sl-carousel-item>
           `
         )}
@@ -101,6 +115,14 @@ export class PwCarousel extends LitElement {
         max-width: calc(100vw - 4rem);
         display: block;
         flex-shrink: 0;
+      }
+
+      sl-carousel-item img,
+      sl-carousel-item video {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: block;
       }
 
       /* Dark theme adjustments */
