@@ -75,6 +75,20 @@ export class PwNavPage extends LitElement {
       color: white;
     }
 
+    /* Theme toggle button */
+    .theme-toggle::part(base) {
+      color: white;
+      border: none;
+      background: transparent;
+      padding: 12px;
+      border-radius: 4px;
+      transition: background-color 0.3s;
+    }
+
+    .theme-toggle:hover::part(base) {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
     /* Icon hover effects */
     .nav-user a {
       display: inline-flex;
@@ -113,10 +127,34 @@ export class PwNavPage extends LitElement {
         <nav class="navbar">
           <div class="nav-title" @click="${this.handleTitleClick}">${import.meta.env.VITE_TITLE || 'Photo Web'}</div>
           <div class="nav-user">
-            <!-- TODO: pulldown shows square when hovered; apply this effect also to the icons rendered below -->
             ${this.parentIsDoc
-              ? html`<a href="/ui/album"><sl-icon name="images"></sl-icon></a>`
-              : html`<a href="/ui/doc"><sl-icon name="file-text"></sl-icon></a>`}
+              ? html`<sl-button
+                  variant="text"
+                  size="medium"
+                  @click="${this.handleAlbumClick}"
+                  title="Go to Albums"
+                  class="theme-toggle"
+                >
+                  <sl-icon name="images"></sl-icon>
+                </sl-button>`
+              : html`<sl-button
+                  variant="text"
+                  size="medium"
+                  @click="${this.handleDocClick}"
+                  title="Go to Documents"
+                  class="theme-toggle"
+                >
+                  <sl-icon name="file-text"></sl-icon>
+                </sl-button>`}
+            <sl-button
+              variant="text"
+              size="medium"
+              @click="${this.toggleTheme}"
+              title="Toggle theme"
+              class="theme-toggle"
+            >
+              <sl-icon name="${this.themeManager.getCurrentTheme() === 'dark' ? 'sun' : 'moon'}"></sl-icon>
+            </sl-button>
             ${this.isAdmin() ? this.renderPulldown() : ''} ${this.me?.email ? this.renderUserAvatar() : this.renderLoginButton()}
           </div>
         </nav>
@@ -228,5 +266,13 @@ export class PwNavPage extends LitElement {
 
   private handleTitleClick() {
     window.location.href = '/';
+  }
+
+  private handleAlbumClick() {
+    window.location.href = '/ui/album';
+  }
+
+  private handleDocClick() {
+    window.location.href = '/ui/doc';
   }
 }

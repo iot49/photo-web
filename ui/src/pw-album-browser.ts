@@ -266,20 +266,4 @@ export class PwAlbumBrowser extends LitElement {
     return albums;
   }
 
-  override firstUpdated() {
-    // Listen for pw-finished events from slideshow components on document level
-    console.log('pw-album-browser: Adding event listener for pw-finished');
-    document.addEventListener('pw-finished', this.handleSlideshowFinished);
-  }
-
-  private handleSlideshowFinished = (event: Event) => {
-    console.log('pw-album-browser: Event handler called!');
-    const customEvent = event as CustomEvent;
-    console.log('pw-album-browser: Slideshow finished:', customEvent.detail?.message || 'No additional details');
-  };
-
-  override disconnectedCallback() {
-    super.disconnectedCallback();
-    document.removeEventListener('pw-finished', this.handleSlideshowFinished);
-  }
 }

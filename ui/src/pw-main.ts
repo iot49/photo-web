@@ -46,6 +46,7 @@ export class PwMain extends LitElement {
     window.addEventListener('pw-logout', refreshData);
   }
 
+  /* BUG: /ui/doc/ and /ui/album/ do not retain state between navigations. */
   private router = new Router(this, [
     { path: `/ui/doc`, render: () => html`<pw-doc-browser></pw-doc-browser>` },
     { path: `/ui/album`, render: () => html`<pw-album-browser></pw-album-browser>` },

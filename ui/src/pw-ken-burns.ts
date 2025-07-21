@@ -270,19 +270,9 @@ export class PwKenBurns extends LitElement {
       const timeoutDuration = Math.round(Math.max(1000, slide_ms - TRANSITION_MS));
       this.autoplayTimeout = setTimeout(() => {
         if (this.currentIndex + 1 >= N) {
-          // Emit custom event when slideshow finishes
-          console.log('pw-ken-burns: EMIT pw-finished');
-          document.dispatchEvent(
-            new CustomEvent('pw-finished', {
-              bubbles: true,
-              composed: true,
-              detail: { message: 'Slideshow finished playing all photos' },
-            })
-          );
           this.autoPlay = false;
           // Navigate back to main album browser
-          // ISSUE: resets state of album browser (e.g. tree all collapsed)
-          history.back();
+          window.location.href = '/ui/album';
         } else {
           this.fetchSlide(this.currentIndex + 1);
           // Show next slide
