@@ -17,8 +17,6 @@ export async function test_authorize(msg: PwTests) {
     msg.err('❌ User must be logged in with "admin" role to run this test');
     return;
   }
-  
-  msg.out('✓ User has admin role, proceeding with authorization tests');
 
   const services = [ 'auth', 'doc', 'photos' ];
   let openapi: { [key: string]: any } = {};

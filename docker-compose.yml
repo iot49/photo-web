@@ -120,3 +120,6 @@ services:
     networks:
       - ingress
       
+  # TODO: create a cloudflared service that
+  # 1) adds DNS entries for ${BASE_URL} and traefik.${BASE_URL} on Cloudflare (if they do not exist)
+  # 2) forwards all requests to ${BASE_URL} and traefik.${BASE_URL} to the traefik service (unencrypted) via the tunnel network

@@ -1,6 +1,7 @@
 import { css, html, LitElement } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { test_authorize } from './tests/authorize.js';
+import { test_photos_doc } from './tests/auth-photos-doc.js';
 
 @customElement('pw-tests')
 export class PwTests extends LitElement {
@@ -93,6 +94,14 @@ export class PwTests extends LitElement {
     }
   }
 
+  private async runPhotosDocTest() {
+    try {
+      await test_photos_doc(this);
+    } catch (error) {
+      this.err(`Error running photos/doc authorization test: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   override render() {
     return html`
       <pw-nav-page>
@@ -103,6 +112,9 @@ export class PwTests extends LitElement {
           <sl-menu>
             <sl-menu-item @click=${this.runAuthorizeTest}>
               Run Authorization Test
+            </sl-menu-item>
+            <sl-menu-item @click=${this.runPhotosDocTest}>
+              Run Photos/Doc Authorization Test
             </sl-menu-item>
           </sl-menu>
         </sl-dropdown>
