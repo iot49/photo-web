@@ -1,6 +1,9 @@
 // css
 import '../index.css';
 
+// URLPattern polyfill for Safari compatibility
+import 'urlpattern-polyfill';
+
 // Set document title from environment variable
 document.title = import.meta.env.VITE_TITLE || 'Photo Web';
 
