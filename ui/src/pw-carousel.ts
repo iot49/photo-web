@@ -70,7 +70,7 @@ export class PwCarousel extends LitElement {
     }
 
     return html`
-      <sl-carousel pagination navigation mouse-dragging loop>
+      <sl-carousel navigation mouse-dragging loop ?pagination=${this.photos.length<20}>
         ${this.photos.map(
           (photo) => html`
             <sl-carousel-item>
