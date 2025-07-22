@@ -6,7 +6,6 @@ import { provide } from '@lit/context';
 import { albumsContext, meContext, srcsetInfoContext } from './app/context';
 import { get_json } from './app/api';
 
-const DEBUG_NAV = false;
 const DEBUG = false;
 
 // Type declarations for Navigation API
@@ -105,7 +104,7 @@ export class PwMain extends LitElement {
     const handleUrlChange = (source: string, newUrl?: string) => {
       const url = newUrl || window.location.href;
       if (url !== currentUrl) {
-        if (DEBUG_NAV)
+        if (DEBUG)
           console.log(`URL changed via ${source}:`, {
             from: currentUrl,
             to: url,
@@ -118,8 +117,6 @@ export class PwMain extends LitElement {
 
         // Handle the navigation if it's within our app
         if (this.shouldInterceptNavigation(url)) {
-          if (DEBUG_NAV) console.log('Processing navigation to:', url);
-
           // Update URI and playlist from the new URL
           const urlObj = new URL(url);
           this.uri = urlObj.pathname;
@@ -129,7 +126,6 @@ export class PwMain extends LitElement {
           const playlistParam = urlParams.get('playlist');
           if (playlistParam) {
             this.playlist = playlistParam;
-            if (DEBUG_NAV) console.log('playlist updated', this.playlist);
           }
 
           this.requestUpdate(); // Force re-render for URL changes
@@ -140,7 +136,7 @@ export class PwMain extends LitElement {
     // 1. Navigation API for modern browsers (programmatic navigation)
     if ('navigation' in window && window.navigation) {
       window.navigation.addEventListener('navigate', (event: NavigateEvent) => {
-        if (DEBUG_NAV)
+        if (false)
           console.log('Navigation API event:', {
             url: event.destination.url,
             canIntercept: event.canIntercept,
@@ -153,7 +149,7 @@ export class PwMain extends LitElement {
 
         // Only intercept navigations that can be intercepted and are within our app
         if (event.canIntercept && this.shouldInterceptNavigation(event.destination.url)) {
-          if (DEBUG_NAV) console.log('Intercepting navigation to:', event.destination.url);
+          // console.log('Intercepting navigation to:', event.destination.url);
 
           // Let the router handle the navigation
           event.intercept({
@@ -185,12 +181,10 @@ export class PwMain extends LitElement {
     });
 
     // 5. Hashchange event for hash-only changes
-    window.addEventListener('hashchange', (event) => {
-      if (DEBUG_NAV) console.log('Hashchange event:', { oldURL: event.oldURL, newURL: event.newURL });
+    window.addEventListener('hashchange', (_event) => {
       handleUrlChange('hashchange');
     });
 
-    if (DEBUG_NAV) console.log('Navigation interception', window.location.pathname, window.location.search);
     this.uri = window.location.pathname;
 
     // Parse playlist from URL search parameters

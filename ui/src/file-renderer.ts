@@ -35,6 +35,8 @@ export class FileRenderer {
 
             </zero-md>
           `;
+          // Add link click handler after zero-md is rendered
+          this.setupLinkClickHandler();
           return;
 
         // Image file cases
@@ -145,6 +147,8 @@ ${escapedContent}
               </script>
             </zero-md>
           `;
+          // Add link click handler after zero-md is rendered
+          this.setupLinkClickHandler();
           return;
       }
 
@@ -225,4 +229,101 @@ ${escapedContent}
       }
     });
   }
+
+  private setupLinkClickHandler(): void {
+    const zeroMdElements = this.filePane.querySelectorAll('zero-md');
+    zeroMdElements.forEach((zeroMd) => {
+      // Listen for the zero-md-rendered event to ensure content is loaded
+      zeroMd.addEventListener('zero-md-rendered', () => {
+        this.attachLinkListeners(zeroMd);
+      });
+      
+      // Also check if it's already rendered
+      if (zeroMd.shadowRoot) {
+        this.attachLinkListeners(zeroMd);
+      }
+      
+      // Add a mutation observer to watch for changes in the shadow DOM
+      this.observeShadowDOMChanges(zeroMd);
+    });
+  }
+
+  private attachLinkListeners(zeroMd: Element): void {
+    const shadowRoot = zeroMd.shadowRoot;
+    if (!shadowRoot) return;
+
+    // Find all links in the shadow DOM
+    const links = shadowRoot.querySelectorAll('a[href]');
+    console.log(`Found ${links.length} links in zero-md shadow DOM`);
+    
+    links.forEach((link) => {
+      const anchorLink = link as HTMLAnchorElement;
+      // Remove existing listeners to avoid duplicates
+      anchorLink.removeEventListener('click', this.handleLinkClick);
+      // Add click listener
+      anchorLink.addEventListener('click', this.handleLinkClick);
+      console.log('Attached click listener to link:', anchorLink.href);
+    });
+  }
+
+  private observeShadowDOMChanges(zeroMd: Element): void {
+    const shadowRoot = zeroMd.shadowRoot;
+    if (!shadowRoot) return;
+
+    // Create a mutation observer to watch for changes in the shadow DOM
+    const observer = new MutationObserver((mutations) => {
+      let shouldReattach = false;
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+          // Check if any added nodes contain links
+          mutation.addedNodes.forEach((node) => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const element = node as Element;
+              if (element.tagName === 'A' || element.querySelectorAll('a[href]').length > 0) {
+                shouldReattach = true;
+              }
+            }
+          });
+        }
+      });
+      
+      if (shouldReattach) {
+        console.log('Shadow DOM changed, reattaching link listeners');
+        this.attachLinkListeners(zeroMd);
+      }
+    });
+
+    // Start observing
+    observer.observe(shadowRoot, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  private handleLinkClick = (event: Event): void => {
+    const link = event.target as HTMLAnchorElement;
+    if (link && link.href) {
+      console.log('Link clicked:', {
+        href: link.href,
+        text: link.textContent?.trim(),
+        target: link.target,
+        element: link
+      });
+      
+      // Check if this is a link to a document file that we should handle internally
+      const url = new URL(link.href);
+      if (url.pathname.startsWith('/doc/api/file/')) {
+        // Prevent default navigation
+        event.preventDefault();
+        
+        // Show the linked file in the current file pane
+        console.log("SHOW", url.pathname);
+        this.showFile(url.pathname);
+        
+        // Update the browser URL to reflect the navigation
+        // Keep the /doc/api/file/ format as that's what the router expects
+        window.history.pushState(null, '', url.pathname);
+      }
+    }
+  };
 }
