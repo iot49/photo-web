@@ -20,6 +20,7 @@ import '@shoelace-style/shoelace/dist/components/avatar/avatar.js';
 import '@shoelace-style/shoelace/dist/components/button/button.js';
 import '@shoelace-style/shoelace/dist/components/carousel/carousel.js';
 import '@shoelace-style/shoelace/dist/components/carousel-item/carousel-item.js';
+import '@shoelace-style/shoelace/dist/components/dialog/dialog.js';
 
 // Set the base path for Shoelace assets
 import { setBasePath } from '@shoelace-style/shoelace/dist/utilities/base-path.js';

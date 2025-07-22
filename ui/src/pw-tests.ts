@@ -52,7 +52,9 @@ export class PwTests extends LitElement {
   `;
 
   @property({ type: Array })
-  private allMessages: { type: 'out' | 'err'; message: string }[] = [];
+  private allMessages: { type: 'out' | 'err'; message: string }[] = [
+    { type: 'out', message: '**Choose the test to run from the navbar**' }
+  ];
 
   public out(msg: string) {
     this.allMessages = [...this.allMessages, { type: 'out', message: msg }];
@@ -93,6 +95,7 @@ export class PwTests extends LitElement {
       <pw-nav-page>
         <sl-dropdown slot="nav-controls" close-on-select class="test-controls">
           <sl-button slot="trigger" variant="text" size="medium" title="Test Controls">
+            Test
             <sl-icon name="play-circle"></sl-icon>
           </sl-button>
           <sl-menu>

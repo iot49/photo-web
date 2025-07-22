@@ -223,19 +223,24 @@ export class PwMain extends LitElement {
     Components are only created when their route is first accessed, then reused on subsequent visits.
     This prevents issues like pw-users trying to fetch data when user lacks admin permissions.
     */
-    const { routes, hasActiveRoute } = this.getRouteInfo();
+    const { hasActiveRoute, routeDefinitions } = this.getRouteInfo();
 
     return html`
       <main>
         <div class="fallback-message" style="display: ${hasActiveRoute ? 'none' : 'block'}">
           <p>no route to ${this.uri} (playlist = ${this.playlist})</p>
         </div>
-        ${this.renderLazyComponent('album', routes.album, () => html`<pw-album-browser></pw-album-browser>`)}
-        ${this.renderLazyComponent('doc', routes.doc, () => html`<pw-doc-browser .selectedFilePath=${routes.doc.selectedFilePath}></pw-doc-browser>`)}
-        ${this.renderLazyComponent('users', routes.users, () => html`<pw-users></pw-users>`)}
-        ${this.renderLazyComponent('tests', routes.tests, () => html`<pw-tests></pw-tests>`)}
-        ${this.renderLazyComponent('slideshow', routes.slideshow, () => html`<pw-ken-burns uuid=${this.playlist}></pw-ken-burns>`)}
-        ${this.renderLazyComponent('carousel', routes.carousel, () => html`<pw-carousel uuid=${this.playlist}></pw-carousel>`)}
+        ${routeDefinitions.map(route =>
+          this.renderLazyComponent(
+            route.key,
+            {
+              isActive: route.isActive,
+              display: route.isActive ? 'block' : 'none',
+              ...(route.selectedFilePath !== undefined && { selectedFilePath: route.selectedFilePath })
+            },
+            route.componentFactory
+          )
+        )}
       </main>
     `;
   }
@@ -259,7 +264,9 @@ export class PwMain extends LitElement {
 
     // For components that depend on dynamic properties (playlist), always re-render
     // to ensure they get the latest values
-    if (componentKey === 'slideshow' || componentKey === 'carousel') {
+    const routeDefinitions = this.getRouteDefinitions();
+    const routeDefinition = routeDefinitions.find(r => r.key === componentKey);
+    if (routeDefinition?.isDynamic) {
       if (DEBUG) console.log(`Re-rendering dynamic component for route: ${componentKey}`);
       const component = componentFactory();
       return html`<div style="display: ${route.display}">${component}</div>`;
@@ -281,30 +288,93 @@ export class PwMain extends LitElement {
     return html`<div style="display: ${route.display}">${cachedComponent}</div>`;
   }
 
-  private getRouteInfo() {
+  private getRouteDefinitions() {
     const filePath = this.getFilePathFromUri();
     const selectedFilePath = filePath ? `/doc/api/file/${filePath}` : undefined;
 
-    // Helper function to create route with computed display
-    const createRoute = (isActive: boolean, selectedFilePath?: string) => ({
-      isActive,
-      display: isActive ? 'block' : 'none',
-      ...(selectedFilePath !== undefined && { selectedFilePath })
+    return [
+      {
+        key: 'album',
+        isActive: this.uri === '/ui/album' || this.uri === '/ui' || this.uri === '/ui/',
+        componentFactory: () => html`<pw-album-browser></pw-album-browser>`,
+        isDynamic: false
+      },
+      {
+        key: 'doc',
+        isActive: this.uri === '/ui/doc' || this.getFilePathFromUri() !== null,
+        componentFactory: () => html`<pw-doc-browser .selectedFilePath=${selectedFilePath}></pw-doc-browser>`,
+        isDynamic: false,
+        selectedFilePath
+      },
+      {
+        key: 'users',
+        isActive: this.uri === '/ui/users',
+        componentFactory: () => html`<pw-users></pw-users>`,
+        isDynamic: false
+      },
+      {
+        key: 'tests',
+        isActive: this.uri === '/ui/tests',
+        componentFactory: () => html`<pw-tests></pw-tests>`,
+        isDynamic: false
+      },
+      
+      {
+        key: 'traefik-dashboard',
+        isActive: this.uri === '/ui/traefik-dashboard',
+        componentFactory: () => html`<pw-nav-page><iframe src="https://traefik.${location.host}" style="width: 100%; height: 100%; border: none;"></iframe></pw-nav-page>`,
+        isDynamic: false
+      },
+      {
+        key: 'auth-api',
+        isActive: this.uri === '/ui/auth-api',
+        componentFactory: () => html`<pw-nav-page><iframe src="/auth/docs" style="width: 100%; height: 100%; border: none;"></iframe></pw-nav-page>`,
+        isDynamic: false
+      },
+      {
+        key: 'photos-api',
+        isActive: this.uri === '/ui/photos-api',
+        componentFactory: () => html`<pw-nav-page><iframe src="/photos/docs" style="width: 100%; height: 100%; border: none;"></iframe></pw-nav-page>`,
+        isDynamic: false
+      },
+      {
+        key: 'doc-api',
+        isActive: this.uri === '/ui/doc-api',
+        componentFactory: () => html`<pw-nav-page><iframe src="/doc/docs" style="width: 100%; height: 100%; border: none;"></iframe></pw-nav-page>`,
+        isDynamic: false
+      },
+      {
+        key: 'slideshow',
+        isActive: this.uri === '/ui/slideshow',
+        componentFactory: () => html`<pw-ken-burns uuid=${this.playlist}></pw-ken-burns>`,
+        isDynamic: true
+      },
+      {
+        key: 'carousel',
+        isActive: this.uri === '/ui/carousel',
+        componentFactory: () => html`<pw-carousel uuid=${this.playlist}></pw-carousel>`,
+        isDynamic: true
+      }
+    ];
+  }
+
+  private getRouteInfo() {
+    const routeDefinitions = this.getRouteDefinitions();
+    
+    // Convert route definitions to the legacy format for backward compatibility
+    const routes: Record<string, any> = {};
+    routeDefinitions.forEach(route => {
+      routes[route.key.replace('-', '_')] = {
+        isActive: route.isActive,
+        display: route.isActive ? 'block' : 'none',
+        ...(route.selectedFilePath !== undefined && { selectedFilePath: route.selectedFilePath })
+      };
     });
 
-    const routes = {
-      album: createRoute(this.uri === '/ui/album' || this.uri === '/ui' || this.uri === '/ui/', undefined),
-      doc: createRoute(this.uri === '/ui/doc' || this.getFilePathFromUri() !== null, selectedFilePath),
-      users: createRoute(this.uri === '/ui/users'),
-      tests: createRoute(this.uri === '/ui/tests'),
-      slideshow: createRoute(this.uri === '/ui/slideshow'),
-      carousel: createRoute(this.uri === '/ui/carousel')
-    };
-
     // Check if any route is active
-    const hasActiveRoute = Object.values(routes).some(route => route.isActive);
+    const hasActiveRoute = routeDefinitions.some(route => route.isActive);
 
-    return { routes, hasActiveRoute };
+    return { routes, hasActiveRoute, routeDefinitions };
   }
 
   /**

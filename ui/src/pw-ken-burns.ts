@@ -166,6 +166,7 @@ export class PwKenBurns extends LitElement {
         return;
       }
 
+      // CHECK: can this be moved to render?
       // Get container dimensions
       const containerRect = this.slideshow.getBoundingClientRect();
       const containerWidth = containerRect.width;
@@ -238,6 +239,7 @@ export class PwKenBurns extends LitElement {
           translateY = containerHeight - scaledImageHeight;
       }
 
+      // CHECK: can we set style when creating <img> in render?
       // Set initial position
       img.style.setProperty('--slide-initial-x', `${initialX}px`);
       img.style.setProperty('--slide-initial-y', `${initialY}px`);
@@ -291,7 +293,6 @@ export class PwKenBurns extends LitElement {
   /*
     Load slide[index].
     Incremental image loading improves initial response time, reduces unnecessary downloads and server overload. 
-    VERIFY: may not be working correctly.
     ALSO: can this be moved to render with "<img lazy ..."?
   */
   private fetchSlide(index: number) {

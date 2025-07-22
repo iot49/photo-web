@@ -1,10 +1,11 @@
 import { LitElement, css, html } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, query } from 'lit/decorators.js';
 import { Me } from './app/interfaces.js';
 import { consume } from '@lit/context';
 import { meContext } from './app/context.js';
 import { login, logout } from './app/login.js';
 import { ThemeManager } from './shoelace-config.js';
+import { SlDialog } from '@shoelace-style/shoelace';
 
 /**
  * Album browser component that shows available photo albums.
@@ -110,6 +111,21 @@ export class PwNavPage extends LitElement {
       height: calc(100vh - 60px);
       overflow: hidden;
     }
+
+    /* Common styles for dropdown menu items */
+    sl-menu sl-menu-item {
+      --sl-spacing-medium: 8px;
+    }
+
+    sl-menu sl-menu-item::part(base) {
+      padding: 8px 16px;
+      min-height: auto;
+    }
+
+    sl-menu sl-menu-item a {
+      text-decoration: none;
+      color: inherit;
+    }
   `;
 
   @property({ type: Boolean }) parentIsDoc = false;
@@ -117,6 +133,9 @@ export class PwNavPage extends LitElement {
   @consume({ context: meContext, subscribe: true })
   @property({ attribute: false })
   private me!: Me;
+
+  @query('#reload-dialog')
+  private reload_dialog!: SlDialog;
 
   private themeManager = ThemeManager.getInstance();
 
@@ -129,35 +148,16 @@ export class PwNavPage extends LitElement {
           <slot name="nav-controls"></slot>
           <div class="nav-user">
             ${this.parentIsDoc
-              ? html`<sl-button
-                  variant="text"
-                  size="medium"
-                  @click="${this.handleAlbumClick}"
-                  title="Go to Albums"
-                  class="theme-toggle"
-                >
+              ? html`<sl-button variant="text" size="medium" @click="${this.handleAlbumClick}" title="Go to Albums" class="theme-toggle">
                   <sl-icon name="images"></sl-icon>
                 </sl-button>`
-              : html`<sl-button
-                  variant="text"
-                  size="medium"
-                  @click="${this.handleDocClick}"
-                  title="Go to Documents"
-                  class="theme-toggle"
-                >
+              : html`<sl-button variant="text" size="medium" @click="${this.handleDocClick}" title="Go to Documents" class="theme-toggle">
                   <sl-icon name="file-text"></sl-icon>
                 </sl-button>`}
-            <sl-button
-              variant="text"
-              size="medium"
-              @click="${this.toggleTheme}"
-              title="Toggle theme"
-              class="theme-toggle"
-            >
+            <sl-button variant="text" size="medium" @click="${this.toggleTheme}" title="Toggle theme" class="theme-toggle">
               <sl-icon name="${this.themeManager.getCurrentTheme() === 'dark' ? 'sun' : 'moon'}"></sl-icon>
             </sl-button>
-            ${this.isAdmin() ? this.renderPulldown() : ''} 
-            ${this.me?.email ? this.renderUserAvatar() : this.renderLoginButton()}
+            ${this.isAdmin() ? this.renderPulldown() : ''} ${this.me?.email ? this.renderUserAvatar() : this.renderLoginButton()}
           </div>
         </nav>
 
@@ -166,6 +166,14 @@ export class PwNavPage extends LitElement {
           <slot></slot>
         </main>
       </div>
+
+      <!-- Reload DB Dialog -->
+      <sl-dialog id="reload-dialog" label="Database Reload" no-header contained>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 20px;" role="status" aria-live="polite">
+          <sl-spinner style="font-size: 2rem;" aria-label="Loading"></sl-spinner>
+          <div>Reloading album information from Apple Photo DB ...<br/>This takes about a minute!</div>
+        </div>
+      </sl-dialog>
     `;
   }
 
@@ -176,26 +184,13 @@ export class PwNavPage extends LitElement {
           <sl-icon name="three-dots-vertical"></sl-icon>
         </sl-button>
         <sl-menu>
-          <sl-menu-item @click=${this.toggleTheme}> 🌙 Toggle Theme (${this.themeManager.getCurrentTheme()}) </sl-menu-item>
-          <sl-menu-item>
-            <a href="users" style="text-decoration: none; color: inherit;">Users ...</a>
-          </sl-menu-item>
-          <sl-menu-item>
-            <a href="tests" style="text-decoration: none; color: inherit;">Tests ...</a>
-          </sl-menu-item>
-          <sl-menu-item>
-            <a href="https://traefik.${location.host}" style="text-decoration: none; color: inherit;">Traefik Dashboard ...</a>
-          </sl-menu-item>
-          <sl-menu-item>
-            <a href="${location.origin}/auth/docs" style="text-decoration: none; color: inherit;">Auth API ...</a>
-          </sl-menu-item>
-          <sl-menu-item>
-            <a href="${location.origin}/photos/docs" style="text-decoration: none; color: inherit;">Photos API ...</a>
-          </sl-menu-item>
-          <sl-menu-item>
-            <a href="${location.origin}/doc/docs" style="text-decoration: none; color: inherit;">Doc API ...</a>
-          </sl-menu-item>
-          <sl-menu-item @click=${this.reloadDb}>Reload DB</sl-menu-item>
+          <sl-menu-item @click=${() => this.handleNavigation('users')}>Users ...</sl-menu-item>
+          <sl-menu-item @click=${() => this.handleNavigation('tests')}>Tests ...</sl-menu-item>
+          <sl-menu-item @click=${() => this.handleNavigation('/ui/traefik-dashboard')}>Traefik Dashboard ...</sl-menu-item>
+          <sl-menu-item @click=${() => this.handleNavigation('/ui/auth-api')}>Auth API ...</sl-menu-item>
+          <sl-menu-item @click=${() => this.handleNavigation('/ui/photos-api')}>Photos API ...</sl-menu-item>
+          <sl-menu-item @click=${() => this.handleNavigation('/ui/doc-api')}>Doc API ...</sl-menu-item>
+          <sl-menu-item @click=${this.openReloadDialog}>Reload DB</sl-menu-item>
         </sl-menu>
       </sl-dropdown>
     `;
@@ -245,16 +240,24 @@ export class PwNavPage extends LitElement {
     this.requestUpdate();
   }
 
+  private async openReloadDialog() {
+    // Show the dialog and wait for it to be fully rendered
+    this.reload_dialog.show();
+    await this.reloadDb();
+  }
+
   private async reloadDb() {
-    console.log('reloading db');
     try {
       const resp = await fetch('/photos/api/reload-db');
       const text = await resp.text();
-      console.log(text);
+      console.log("reload-db", text);
     } catch (e) {
       if (e instanceof Error) {
         console.log(`failed to reload db: ${e.message}`);
       }
+    } finally {
+      this.reload_dialog.focus();
+      this.reload_dialog.hide();
     }
   }
 
@@ -276,5 +279,9 @@ export class PwNavPage extends LitElement {
 
   private handleDocClick() {
     window.location.href = '/ui/doc';
+  }
+
+  private handleNavigation(url: string) {
+    window.location.href = url;
   }
 }
