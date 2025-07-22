@@ -188,7 +188,7 @@ export class PwAlbumBrowser extends LitElement {
           (album: any) => html`
             <sl-tree-item>
               <sl-icon name="image"></sl-icon>
-              <a href="${import.meta.env.BASE_URL}slideshow/${album.uuid}" class="album-link"> ${album.title} </a>
+              <a href="${import.meta.env.BASE_URL}slideshow?playlist=${album.uuid}" class="album-link"> ${album.title} </a>
             </sl-tree-item>
           `
         )}
@@ -209,7 +209,7 @@ export class PwAlbumBrowser extends LitElement {
             (album: any) => html`
               <sl-tree-item>
                 <sl-icon name="image"></sl-icon>
-                <a href="${import.meta.env.BASE_URL}slideshow/${album.uuid}" class="album-link"> ${album.title} </a>
+                <a href="${import.meta.env.BASE_URL}slideshow?playlist=${album.uuid}" class="album-link"> ${album.title} </a>
               </sl-tree-item>
             `
           )}
@@ -228,11 +228,12 @@ export class PwAlbumBrowser extends LitElement {
     const sortedAlbums = allAlbums.sort((a, b) => a.title.localeCompare(b.title));
 
     // todo: use srcset to let browser choose image
+    // FIXED: carousel component now properly reacts to uuid changes
     return html`
       ${sortedAlbums.map(
         (album) => html`
           <div class="album-card">
-            <a href="${import.meta.env.BASE_URL}slideshow/${album.uuid}" class="album-card-link" title="Ken Burns Slideshow">
+            <a href="${import.meta.env.BASE_URL}slideshow?playlist=${album.uuid}" class="album-card-link" title="Ken Burns Slideshow">
               <div class="album-thumbnail">
                 ${album.thumbnail
                   ? html` <img src="/photos/api/photos/${album.thumbnail}/img-sm" alt="${album.title}" loading="lazy" /> `
@@ -242,7 +243,7 @@ export class PwAlbumBrowser extends LitElement {
             <div class="album-info">
               <div class="album-title">${album.title}</div>
               <div class="album-icons">
-                <a href="${import.meta.env.BASE_URL}carousel/${album.uuid}" class="album-icon-link" title="Carousel">
+                <a href="${import.meta.env.BASE_URL}carousel?playlist=${album.uuid}" class="album-icon-link" title="Carousel">
                   <sl-icon name="play"></sl-icon>
                 </a>
               </div>

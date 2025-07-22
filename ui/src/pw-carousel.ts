@@ -16,24 +16,42 @@ export class PwCarousel extends LitElement {
 
   @state() private photos!: PhotoModel[];
 
-  override async connectedCallback(): Promise<void> {
-    await super.connectedCallback();
-    this.photos = await get_json(`/photos/api/albums/${this.uuid}`);
-    console.log('Loaded photos:', this.photos);
+
+  override async updated(changedProperties: Map<string | number | symbol, unknown>) {
+    super.updated(changedProperties);
+
+    // Reload photos when uuid changes
+    if (changedProperties.has('uuid') && this.uuid) {
+      await this.loadPhotos();
+    }
+  }
+
+  private async loadPhotos(): Promise<void> {
+    if (!this.uuid) {
+      this.photos = [];
+      return;
+    }
+
+    try {
+      this.photos = await get_json(`/photos/api/albums/${this.uuid}`);
+      // console.log('Loaded photos for album:', this.uuid, this.photos);
+    } catch (error) {
+      console.error('Failed to load photos for album:', this.uuid, error);
+      this.photos = [];
+    }
   }
 
   private generateSrcset(photoUuid: string): string {
     if (!this.srcsetInfo || this.srcsetInfo.length === 0) {
       return '';
     }
-    
+
     // Include all scaled versions from srcsetInfo
-    const scaledSources = this.srcsetInfo
-      .map(size => `/photos/api/photos/${photoUuid}/img${size.suffix} ${size.width}w`);
-    
+    const scaledSources = this.srcsetInfo.map((size) => `/photos/api/photos/${photoUuid}/img${size.suffix} ${size.width}w`);
+
     // Add the unscaled image endpoint (no suffix) as the highest resolution option
     scaledSources.push(`/photos/api/photos/${photoUuid}/img`);
-    
+
     return scaledSources.join(', ');
   }
 
@@ -42,7 +60,7 @@ export class PwCarousel extends LitElement {
   }
 
   override render() {
-    if (this.photos.length == null) {
+    if (this.photos?.length == null) {
       return html`
         <div class="loading">
           <sl-spinner></sl-spinner>
@@ -59,14 +77,7 @@ export class PwCarousel extends LitElement {
               ${this.isVideo(photo.mime_type)
                 ? html`
                     <!-- optionally add muted -->
-                    <video
-                      src=${`/photos/api/photos/${photo.uuid}/img`}
-                      controls
-                      autoplay
-                      muted
-                      preload="metadata"
-                      title="${photo.title || 'Video'}"
-                    >
+                    <video src=${`/photos/api/photos/${photo.uuid}/img`} controls autoplay muted preload="metadata" title="${photo.title || 'Video'}">
                       Your browser does not support the video tag.
                     </video>
                   `
@@ -86,6 +97,8 @@ export class PwCarousel extends LitElement {
     `;
   }
 
+
+
   static styles = [
     css`
       :host {
@@ -93,7 +106,7 @@ export class PwCarousel extends LitElement {
         align-items: center;
         justify-content: center;
         width: 100%;
-        height: calc(100vh - 20px);;
+        height: calc(100vh - 20px);
         box-sizing: border-box;
       }
 
@@ -109,8 +122,8 @@ export class PwCarousel extends LitElement {
       sl-carousel {
         --aspect-ratio: 4/3;
         aspect-ratio: 4/3;
-        width: min(90vw, calc((100vh - 4rem) * 4/3));
-        height: min(90vh - 4rem, calc(90vw * 3/4));
+        width: min(90vw, calc((100vh - 4rem) * 4 / 3));
+        height: min(90vh - 4rem, calc(90vw * 3 / 4));
         max-height: calc(100vh - 4rem);
         max-width: calc(100vw - 4rem);
         display: block;

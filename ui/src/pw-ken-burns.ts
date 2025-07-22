@@ -106,6 +106,7 @@ export class PwKenBurns extends LitElement {
   }
 
   override render() {
+    // console.log("ken burns render", this.uuid, this.photos)
     /*
     TODO:
     - move "fetchSlide" to render: will "<img lazy ..." have the same effect?
@@ -157,7 +158,7 @@ export class PwKenBurns extends LitElement {
       if (!this.isImageLoaded(img)) {
         // Image not yet available, try again later
         // BUG: this occurs for every image, is preloading not working?
-        console.log(`goto ${nextIndex}: waiting for image to load`);
+        // console.log(`goto ${nextIndex}: waiting for image to load`);
         if (this.autoplayTimeout) {
           clearTimeout(this.autoplayTimeout);
         }

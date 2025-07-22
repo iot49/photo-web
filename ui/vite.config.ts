@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: '../nginx/html/ui',
       emptyOutDir: true,
-      /*
+      /* 
       minify: false,
       terserOptions: {
         compress: false,
