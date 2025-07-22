@@ -3,7 +3,7 @@ import { logout } from '../app/login';
 import { PwTests } from '../pw-tests';
 
 export async function test_authorize(msg: PwTests) {
-  msg.header('Testing /authorize endpoint...');
+  msg.out('# Testing /authorize endpoint...');
   
   // Initial user check and roles fetch
   const me = await get_json('/auth/me');
@@ -72,7 +72,7 @@ export async function test_authorize(msg: PwTests) {
   
   // Helper function to run authorization tests
   async function runAuthorizationTests(testRun: string, currentUserRoles: string[], rolesData: string) {
-    msg.header(`${testRun} - Testing authorization with roles: ${JSON.stringify(currentUserRoles)}`);
+    msg.out(`## ${testRun} - Testing authorization with roles: ${JSON.stringify(currentUserRoles)}`);
     
     let totalTests = 0;
     let passedTests = 0;
@@ -82,7 +82,7 @@ export async function test_authorize(msg: PwTests) {
       const spec = openapi[service];
       const routes = extractGetRoutesFromOpenAPI(spec);
       
-      msg.header(`Testing "${service}" service GET endpoints (${routes.length} routes)...`);
+      msg.out(`### Testing "${service}" service GET endpoints (${routes.length} routes)...`);
       
       for (const route of routes) {
         const fullUri = `/${service}${route.path}`;
@@ -138,11 +138,16 @@ export async function test_authorize(msg: PwTests) {
     }
     
     // Test run summary
-    msg.header(`${testRun} Summary:`);
-    msg.out(`Total tests: ${totalTests}`);
-    msg.out(`Passed: ${passedTests}`);
-    msg.out(`Failed: ${failedTests}`);
-    msg.out(`Success rate: ${totalTests > 0 ? Math.round((passedTests / totalTests) * 100) : 0}%`);
+    msg.out(`## ${testRun} Summary:`);
+    const summaryTable = `
+| Metric | Value |
+|--------|-------|
+| Total tests | ${totalTests} |
+| Passed | ${passedTests} |
+| Failed | ${failedTests} |
+| Success rate | ${totalTests > 0 ? Math.round((passedTests / totalTests) * 100) : 0}% |
+`;
+    msg.out(summaryTable);
     
     return { totalTests, passedTests, failedTests };
   }
@@ -151,7 +156,7 @@ export async function test_authorize(msg: PwTests) {
   const firstRunResults = await runAuthorizationTests('First Run (Admin)', userRoles, roles || '');
   
   // 2) Log out and fetch me again to get new user roles
-  msg.header('Logging out user...');
+  msg.out('## Logging out user...');
   try {
     await logout('/');
     msg.out('✓ Successfully logged out');
@@ -170,15 +175,19 @@ export async function test_authorize(msg: PwTests) {
   const secondRunResults = await runAuthorizationTests('Second Run (After Logout)', userRolesAfterLogout, roles || '');
   
   // Overall summary
-  msg.header(`Overall Authorization Test Summary:`);
-  msg.out(`First run (Admin) - Total: ${firstRunResults.totalTests}, Passed: ${firstRunResults.passedTests}, Failed: ${firstRunResults.failedTests}`);
-  msg.out(`Second run (Logged out) - Total: ${secondRunResults.totalTests}, Passed: ${secondRunResults.passedTests}, Failed: ${secondRunResults.failedTests}`);
+  msg.out(`## Overall Authorization Test Summary:`);
   
   const totalOverallTests = firstRunResults.totalTests + secondRunResults.totalTests;
   const totalOverallPassed = firstRunResults.passedTests + secondRunResults.passedTests;
   const totalOverallFailed = firstRunResults.failedTests + secondRunResults.failedTests;
   
-  msg.out(`Combined totals - Tests: ${totalOverallTests}, Passed: ${totalOverallPassed}, Failed: ${totalOverallFailed}`);
-  msg.out(`Overall success rate: ${totalOverallTests > 0 ? Math.round((totalOverallPassed / totalOverallTests) * 100) : 0}%`);
+  const overallSummaryTable = `
+| Test Run | Total | Passed | Failed | Success Rate |
+|----------|-------|--------|--------|--------------|
+| First run (Admin) | ${firstRunResults.totalTests} | ${firstRunResults.passedTests} | ${firstRunResults.failedTests} | ${firstRunResults.totalTests > 0 ? Math.round((firstRunResults.passedTests / firstRunResults.totalTests) * 100) : 0}% |
+| Second run (Logged out) | ${secondRunResults.totalTests} | ${secondRunResults.passedTests} | ${secondRunResults.failedTests} | ${secondRunResults.totalTests > 0 ? Math.round((secondRunResults.passedTests / secondRunResults.totalTests) * 100) : 0}% |
+| **Combined totals** | **${totalOverallTests}** | **${totalOverallPassed}** | **${totalOverallFailed}** | **${totalOverallTests > 0 ? Math.round((totalOverallPassed / totalOverallTests) * 100) : 0}%** |
+`;
+  msg.out(overallSummaryTable);
 }
 

@@ -2,6 +2,7 @@ import { css, html, LitElement } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { test_authorize } from './tests/authorize.js';
 import { test_photos_doc } from './tests/auth-photos-doc.js';
+import { nginx_cache } from './tests/nginx-cache.js';
 
 @customElement('pw-tests')
 export class PwTests extends LitElement {
@@ -13,36 +14,18 @@ export class PwTests extends LitElement {
       overflow-y: auto;
     }
 
-    .message {
-      border-radius: 4px;
-      white-space: pre-wrap;
-      word-wrap: break-word;
+    zero-md {
+      margin: 2px 0;
+      padding: 0;
+      display: block;
     }
 
-    .header-message {
-      font-weight: bold;
-      font-size: 1.2rem;
-      color: #2563eb;
-      background-color: rgba(37, 99, 235, 0.1);
-      border-left: 3px solid #2563eb;
-      margin: 2px 0;
-      padding: 4px 8px;
+    zero-md.out {
+      border: 2px solid #22c55e;
     }
 
-    .out-message {
-      color: #1d5e39;
-      background-color: rgba(29, 94, 57, 0.1);
-      border-left: 3px solid #1d5e39;
-      margin: 2px 0;
-      padding: 4px 8px;
-    }
-
-    .err-message {
-      color: #dc2626;
-      background-color: rgba(220, 38, 38, 0.1);
-      border-left: 3px solid #dc2626;
-      margin: 2px 0;
-      padding: 4px 8px;
+    zero-md.err {
+      border: 2px solid #ef4444;
     }
 
     /* Test controls styling - matching pw-nav-page.ts hover effects */
@@ -69,12 +52,7 @@ export class PwTests extends LitElement {
   `;
 
   @property({ type: Array })
-  private allMessages: { type: 'out' | 'err' | 'header'; message: string }[] = [];
-
-  public header(msg: string) {
-    this.allMessages = [...this.allMessages, { type: 'header', message: msg }];
-    this.requestUpdate();
-  }
+  private allMessages: { type: 'out' | 'err'; message: string }[] = [];
 
   public out(msg: string) {
     this.allMessages = [...this.allMessages, { type: 'out', message: msg }];
@@ -102,6 +80,14 @@ export class PwTests extends LitElement {
     }
   }
 
+  private async runNginxCacheTest() {
+    try {
+      await nginx_cache(this);
+    } catch (error) {
+      this.err(`Error running nginx cache test: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   override render() {
     return html`
       <pw-nav-page>
@@ -116,12 +102,17 @@ export class PwTests extends LitElement {
             <sl-menu-item @click=${this.runPhotosDocTest}>
               Run Photos/Doc Authorization Test
             </sl-menu-item>
+            <sl-menu-item @click=${this.runNginxCacheTest}>
+              Run Nginx Cache Test
+            </sl-menu-item>
           </sl-menu>
         </sl-dropdown>
         <div class="messages-container">
           ${this.allMessages.map(
             (msg) => html`
-              <div class="message ${msg.type === 'out' ? 'out-message' : msg.type === 'header' ? 'header-message' : 'err-message'}">${msg.message}</div>
+              <div class="message">
+                <zero-md class="${msg.type}"><script type="text/markdown">${msg.message}</script></zero-md>
+              </div>
             `
           )}
         </div>

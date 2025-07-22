@@ -109,6 +109,7 @@ services:
     volumes:
       # IMPORTANT: give Docker and Terminal "Full Disk Access" in System Preferences/Privacy & Security
       - ${PHOTOS_LIBRARY}:${PHOTOS_LIBRARY_MOUNT}:ro
+      - nginx-cache:/var/cache/nginx:ro # Read-only access to nginx cache
     # No direct Traefik labels - accessed through nginx proxy
     networks:
       - ingress

@@ -3,7 +3,7 @@ import { logout } from '../app/login';
 import { PwTests } from '../pw-tests';
 
 export async function test_photos_doc(msg: PwTests) {
-  msg.header('Testing /photos authorization...');
+  msg.out('# Testing /photos authorization...');
 
   // Initial user check and roles fetch
   let me = await get_json('/auth/me');
@@ -114,7 +114,7 @@ export async function test_photos_doc(msg: PwTests) {
   }
 
   // Test authorization for logged-in user
-  msg.header('Testing authorization for logged-in user...');
+  msg.out('## Testing authorization for logged-in user...');
   let loggedInPassed = 0;
   let loggedInFailed = 0;
   let loggedInTotal = 0;
@@ -144,7 +144,7 @@ export async function test_photos_doc(msg: PwTests) {
     }
   }
 
-  msg.header('Logging out user...');
+  msg.out('## Logging out user...');
   try {
     await logout('/');
     msg.out('✓ Successfully logged out');
@@ -159,7 +159,7 @@ export async function test_photos_doc(msg: PwTests) {
   userRoles = (me.roles || 'public').split(',').map((r: string) => r.trim());
 
   // Test authorization for logged-out user
-  msg.header('Testing authorization for logged-out user...');
+  msg.out('## Testing authorization for logged-out user...');
   let loggedOutPassed = 0;
   let loggedOutFailed = 0;
   let loggedOutTotal = 0;
@@ -190,29 +190,19 @@ export async function test_photos_doc(msg: PwTests) {
   }
 
   // Summarize results
-  msg.header('Authorization Test Summary');
-  msg.out(`Total URIs tested: ${test_uri.length}`);
-  msg.out('');
-  msg.out('Logged-in user results:');
-  msg.out(`  Total tests: ${loggedInTotal}`);
-  msg.out(`  Passed: ${loggedInPassed}`);
-  msg.out(`  Failed: ${loggedInFailed}`);
-  msg.out(`  Success rate: ${loggedInTotal > 0 ? Math.round((loggedInPassed / loggedInTotal) * 100) : 0}%`);
-  msg.out('');
-  msg.out('Logged-out user results:');
-  msg.out(`  Total tests: ${loggedOutTotal}`);
-  msg.out(`  Passed: ${loggedOutPassed}`);
-  msg.out(`  Failed: ${loggedOutFailed}`);
-  msg.out(`  Success rate: ${loggedOutTotal > 0 ? Math.round((loggedOutPassed / loggedOutTotal) * 100) : 0}%`);
-  msg.out('');
+  msg.out('## Authorization Test Summary');
+  msg.out(`**Total URIs tested:** ${test_uri.length}`);
   
   const totalTests = loggedInTotal + loggedOutTotal;
   const totalPassed = loggedInPassed + loggedOutPassed;
   const totalFailed = loggedInFailed + loggedOutFailed;
   
-  msg.out('Overall results:');
-  msg.out(`  Total tests: ${totalTests}`);
-  msg.out(`  Passed: ${totalPassed}`);
-  msg.out(`  Failed: ${totalFailed}`);
-  msg.out(`  Overall success rate: ${totalTests > 0 ? Math.round((totalPassed / totalTests) * 100) : 0}%`);
+  const summaryTable = `
+| User State | Total Tests | Passed | Failed | Success Rate |
+|------------|-------------|--------|--------|--------------|
+| Logged-in user | ${loggedInTotal} | ${loggedInPassed} | ${loggedInFailed} | ${loggedInTotal > 0 ? Math.round((loggedInPassed / loggedInTotal) * 100) : 0}% |
+| Logged-out user | ${loggedOutTotal} | ${loggedOutPassed} | ${loggedOutFailed} | ${loggedOutTotal > 0 ? Math.round((loggedOutPassed / loggedOutTotal) * 100) : 0}% |
+| **Overall results** | **${totalTests}** | **${totalPassed}** | **${totalFailed}** | **${totalTests > 0 ? Math.round((totalPassed / totalTests) * 100) : 0}%** |
+`;
+  msg.out(summaryTable);
 }

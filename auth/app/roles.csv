@@ -8,6 +8,7 @@ allow, /photos/api/photos/srcset, public, Srcset for images
 allow, /photos/api/albums/*, !photos:8000, Delegate album access to photos service
 allow, /photos/api/photos/*, !photos:8000, Delegate photo access to photos service
 allow, /photos/api/reload-db, admin, Reload photos database
+allow, /photos/api/nginx-cache, admin, Get cache state
 
 allow, /doc/api/root, public, List of folders user is permitted to view
 allow, /doc/api/folder/*, !doc:8000, Delegate folder listing to doc service

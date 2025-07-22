@@ -227,6 +227,7 @@ export class PwAlbumBrowser extends LitElement {
     // Sort albums alphabetically by title
     const sortedAlbums = allAlbums.sort((a, b) => a.title.localeCompare(b.title));
 
+    // todo: use srcset to let browser choose image
     return html`
       ${sortedAlbums.map(
         (album) => html`
