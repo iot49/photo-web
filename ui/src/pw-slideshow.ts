@@ -1,10 +1,63 @@
-import { html, LitElement, css, PropertyValues } from 'lit';
+import { html, LitElement, css, PropertyValues, nothing } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
 import { get_json } from './app/api';
 import { Albums, PhotoModel, SrcsetInfo } from './app/interfaces';
 import { consume } from '@lit/context';
 import { albumsContext, srcsetInfoContext } from './app/context';
+
+/*
+Themes:
+@property theme switches between different versions of css classes .last and .next
+to achieve alternate behaviors.
+
+**plain**: No animations when transistioning between slides.
+**ken-burns**:
+1) Transition opacity of .next from 0 to 1 over TRANSITION_MS,
+2) Render slide initially with
+        object-fit: cover;
+        object-position: change depending on slide position, e.g.
+              .slide-wrapper:nth-child(4n + 1) img {
+                object-position: top left;
+              }
+
+              .slide-wrapper:nth-child(4n + 2) img {
+                object-position: bottom right;
+              }
+
+              .slide-wrapper:nth-child(4n + 3) img {
+                object-position: bottom left;
+              }
+
+              .slide-wrapper:nth-child(4n + 4) img {
+                object-position: top right;
+              }
+3) Then over SLIDE_MS seconds transition to 
+        object-position: move to align diagonally oposite corner of slide, e.g.
+              .slide-wrapper:nth-child(4n + 1) img {
+                object-position: bottom right;
+              }
+
+              .slide-wrapper:nth-child(4n + 2) img {
+                object-position: top left;
+              }
+
+              .slide-wrapper:nth-child(4n + 3) img {
+                object-position: top right;
+              }
+
+              .slide-wrapper:nth-child(4n + 4) img {
+                object-position: bottom left;
+              }
+
+        scale slide by SCALE_FACTOR;
+*/
+
+const TRANSITION_MS = 1500; // duration of slide transition in [ms]
+const SLIDE_MS = 3000; // time each slide is shown in [ms]; note: extra wide or tall slides take more time
+// const PANORAMA_TIME = 3; // increase parnorama image animation time by up to this factor
+const SCALE_FACTOR = 1.2; // factor by which the image is scaled during translation
+
 
 @customElement('pw-slideshow')
 export class PwSlideshow extends LitElement {
@@ -19,6 +72,9 @@ export class PwSlideshow extends LitElement {
   // colon-separated uid's of albums to display
   @property({ type: String }) playlist = '';
 
+  // css theme
+  @property({ type: String, reflect: true }) theme: 'plain' | 'ken-burns' = 'ken-burns';
+
   // autoplay status
   @property({ type: Boolean }) autoplay = false;
 
@@ -27,6 +83,8 @@ export class PwSlideshow extends LitElement {
 
   // Index into #slideshow.children: slide-wrapper
   @state() currentIndex = 0;
+
+  private useSrcSet = true;
 
   // playlist to array of album uid's
   private get uids(): string[] {
@@ -71,36 +129,26 @@ export class PwSlideshow extends LitElement {
     if (N === 0) return;
     
     nextIndex = ((nextIndex % N) + N) % N;
-    
-    // Special case: when going backwards from first slide (currentIndex=0),
-    // go to the second-to-last slide (N-2) instead of last slide (N-1)
-    // This avoids the problematic last slide that appears black
-    if (this.currentIndex === 0 && nextIndex === N - 1) {
-      nextIndex = N - 2;
-    }
-    
-    // First, hide all slides
+    // console.log(`N = ${N} curr = ${this.currentIndex} next = ${nextIndex}`, slides[nextIndex])
+
+    // hide all slides
     for (let i = 0; i < slides.length; i++) {
       const slide = slides[i] as HTMLElement;
-      slide.style.setProperty('opacity', '0', 'important');
-      slide.style.setProperty('z-index', '1', 'important');
+      slide.classList.remove('last');
+      slide.classList.remove('next');
     }
     
-    // Then show only the target slide
-    const targetSlide = slides[nextIndex] as HTMLElement;
-    if (targetSlide) {
-      targetSlide.style.setProperty('opacity', '1', 'important');
-      targetSlide.style.setProperty('z-index', '2', 'important');
-      targetSlide.style.setProperty('display', 'flex', 'important');
-    }
-    
+    // then show last and next slide with selected theme
+    slides[this.currentIndex].classList.add('last');
+    slides[nextIndex].classList.add('next');
+
+
     // Update current index
     this.currentIndex = nextIndex;
     
-    
     // Only schedule next transition if autoplay is enabled
     if (this.autoplay) {
-      setTimeout(() => this.goto(nextIndex+1), 2000);
+      setTimeout(() => this.goto(nextIndex+1), SLIDE_MS);
     }
   };
 
@@ -132,8 +180,8 @@ export class PwSlideshow extends LitElement {
           `;
         })}
       </div>
-      <div class="overlay prev-slide" @click=${() => this.goto(this.currentIndex-1)}></div>
-      <div class="overlay next-slide" @click=${() => this.goto(this.currentIndex+1)}></div>
+      <div class="overlay prev-overlay" @click=${() => this.goto(this.currentIndex-1)}></div>
+      <div class="overlay next-overlay" @click=${() => this.goto(this.currentIndex+1)}></div>
     `;
   }
 
@@ -141,7 +189,15 @@ export class PwSlideshow extends LitElement {
     const mime_type = photo.mime_type;
     const uri = `/photos/api/photos/${photo.uuid}/img`;
     if (mime_type.startsWith('image')) {
-      return html` <img src=${uri} srcset=${this.generateSrcset(photo.uuid)} sizes="100vw" alt="${photo.title || 'Photo'}" loading="lazy" />`;
+      if (mime_type === 'image/x-adobe-dng') {
+        console.log(`No renderer for MIME type ${mime_type}`);
+        return nothing;
+      }
+      if (this.useSrcSet)
+          // BUG: browser chooses too low a resolution for panoramic images (e.g. that undergo big translations with ken-burns theme)
+          return html` <img src=${uri} srcset=${this.generateSrcset(photo.uuid)} sizes="100vw" alt="${photo.title || 'Photo'}" loading="lazy" />`;
+      else
+          return html` <img src=${uri} alt="${photo.title || 'Photo'}" loading="lazy" />`;
     } else if (mime_type.startsWith('video')) {
       return html`
         <!-- optionally add muted -->
@@ -150,7 +206,8 @@ export class PwSlideshow extends LitElement {
         </video>
       `;
     } else {
-      return html`No renderer for MIME type ${mime_type}`;
+      console.log(`No renderer for MIME type ${mime_type}`);
+      return nothing;
     }
   }
 
@@ -178,6 +235,7 @@ export class PwSlideshow extends LitElement {
         width: 100vw;
         height: 100vh;
         box-sizing: border-box;
+        overflow: hidden;
       }
 
       .loading {
@@ -215,6 +273,125 @@ export class PwSlideshow extends LitElement {
         z-index: 0;
       }
 
+      /* Plain theme: instant transitions */
+      :host([theme="plain"]) .last {
+        opacity: 0;
+        z-index: 1;
+      }
+
+      :host([theme="plain"]) .next {
+        opacity: 1;
+        z-index: 2;
+      }
+
+      /* Ken Burns theme: opacity, translation, scaling */
+
+      @keyframes ken-burns-fade {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      @keyframes ken-burns-pan-1 {
+        from { object-position: top left; }
+        to { object-position: bottom right; }
+      }
+
+      @keyframes ken-burns-pan-2 {
+        from { object-position: bottom right; }
+        to { object-position: top left; }
+      }
+
+      @keyframes ken-burns-pan-3 {
+        from { object-position: bottom left; }
+        to { object-position: top right; }
+      }
+
+      @keyframes ken-burns-pan-4 {
+        from { object-position: top right; }
+        to { object-position: bottom left; }
+      }
+
+      @keyframes ken-burns-scale {
+        from { transform: scale(1); }
+        to { transform: scale(${SCALE_FACTOR}); }
+      }
+
+      /* Ken Burns theme: fade in + slow zoom/pan */
+      :host([theme="ken-burns"]) .last {
+        opacity: 1;
+        z-index: 1;
+      }
+
+      :host([theme="ken-burns"]) .next {
+        opacity: 0;
+        z-index: 2;
+        animation-name: ken-burns-fade;
+        animation-duration: ${TRANSITION_MS}ms;
+        animation-fill-mode: forwards;
+        animation-timing-function: linear;
+      }
+
+      :host([theme="ken-burns"]) .slide-wrapper img,
+      :host([theme="ken-burns"]) .slide-wrapper video {
+        object-fit: cover;
+      }
+
+      /* Position-dependent starting positions and animations */
+      :host([theme="ken-burns"]) .slide-wrapper:nth-child(4n + 1) img,
+      :host([theme="ken-burns"]) .slide-wrapper:nth-child(4n + 1) video {
+        object-position: top left;
+      }
+
+      :host([theme="ken-burns"]) .slide-wrapper:nth-child(4n + 2) img,
+      :host([theme="ken-burns"]) .slide-wrapper:nth-child(4n + 2) video {
+        object-position: bottom right;
+      }
+
+      :host([theme="ken-burns"]) .slide-wrapper:nth-child(4n + 3) img,
+      :host([theme="ken-burns"]) .slide-wrapper:nth-child(4n + 3) video {
+        object-position: bottom left;
+      }
+
+      :host([theme="ken-burns"]) .slide-wrapper:nth-child(4n + 4) img,
+      :host([theme="ken-burns"]) .slide-wrapper:nth-child(4n + 4) video {
+        object-position: top right;
+      }
+
+      /* Position-dependent animations for active slides */
+      :host([theme="ken-burns"]) .next:nth-child(4n + 1) img,
+      :host([theme="ken-burns"]) .next:nth-child(4n + 1) video {
+        animation-name: ken-burns-pan-1, ken-burns-scale;
+        animation-duration: ${SLIDE_MS}ms;
+        animation-fill-mode: forwards;
+        animation-timing-function: linear;
+      }
+
+      :host([theme="ken-burns"]) .next:nth-child(4n + 2) img,
+      :host([theme="ken-burns"]) .next:nth-child(4n + 2) video {
+        animation-name: ken-burns-pan-2, ken-burns-scale;
+        animation-duration: ${SLIDE_MS}ms;
+        animation-fill-mode: forwards;
+        animation-timing-function: linear;
+      }
+
+      :host([theme="ken-burns"]) .next:nth-child(4n + 3) img,
+      :host([theme="ken-burns"]) .next:nth-child(4n + 3) video {
+        animation-name: ken-burns-pan-3, ken-burns-scale;
+        animation-duration: ${SLIDE_MS}ms;
+        animation-fill-mode: forwards;
+        animation-timing-function: linear;
+      }
+
+      :host([theme="ken-burns"]) .next:nth-child(4n + 4) img,
+      :host([theme="ken-burns"]) .next:nth-child(4n + 4) video {
+        animation-name: ken-burns-pan-4, ken-burns-scale;
+        animation-duration: ${SLIDE_MS}ms;
+        animation-fill-mode: forwards;
+        animation-timing-function: linear;
+      }
+
+      /* Slideshow controls: prev, next, start/stop animation, ... */
+
       .overlay {
         position: absolute;
         transform: translateY(-50%);
@@ -227,20 +404,26 @@ export class PwSlideshow extends LitElement {
         border: 2px solid yellow;
       }
 
-      .prev-slide {
+      .prev-overlay {
         left: 0%;
       }
-      .next-slide {
+      .next-overlay {
         right: 0%;
       }
 
+      /* Title slide */
+
       .title {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         color: white;
         font-size: 2rem;
         text-align: center;
-        background: rgba(0, 0, 0, 0.7);
-        padding: 1rem 2rem;
-        border-radius: 8px;
+        background: black;
+        box-sizing: border-box;
       }
 
     `,

@@ -352,7 +352,7 @@ export class PwMain extends LitElement {
       {
         key: 'carousel',
         isActive: this.uri === '/ui/test',
-        componentFactory: () => html`<pw-slideshow playlist="697FAD48-6DE7-4111-AC7F-754D0C2B287C:8A368C96-5CE7-423F-B163-5AE013660735:F04C8C5B-4D02-4848-AFE4-02F0251CDE52"></pw-slideshow>`,
+        componentFactory: () => html`<pw-slideshow playlist="F04C8C5B-4D02-4848-AFE4-02F0251CDE52:8A368C96-5CE7-423F-B163-5AE013660735:697FAD48-6DE7-4111-AC7F-754D0C2B287C"></pw-slideshow>`,
         isDynamic: true
       }
     ];
