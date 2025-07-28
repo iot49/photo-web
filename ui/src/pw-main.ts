@@ -137,14 +137,6 @@ export class PwMain extends LitElement {
     // 1. Navigation API for modern browsers (programmatic navigation)
     if ('navigation' in window && window.navigation) {
       window.navigation.addEventListener('navigate', (event: NavigateEvent) => {
-        if (false)
-          console.log('Navigation API event:', {
-            url: event.destination.url,
-            canIntercept: event.canIntercept,
-            navigationType: event.navigationType,
-            userInitiated: event.userInitiated,
-          });
-
         // Handle the URL change
         handleUrlChange('Navigation API', event.destination.url);
 
@@ -196,6 +188,15 @@ export class PwMain extends LitElement {
     return urlObj.pathname.startsWith('/ui/') || urlObj.pathname.startsWith('/doc/api/file/');
   }
 
+  /**
+   * Helper method to check if current URI matches any of the provided URI patterns
+   * @param uris Array of URI patterns to match against
+   * @returns true if current URI matches any pattern
+   */
+  private matchesAnyUri(uris: string[]): boolean {
+    return uris.some(uri => this.uri === uri);
+  }
+
   private getFilePathFromUri(): string | null {
     // Check if URI matches the pattern /doc/api/file/*
     const filePathPrefix = '/doc/api/file/';
@@ -221,7 +222,7 @@ export class PwMain extends LitElement {
         </div>
         ${routeDefinitions.map(route =>
           this.renderLazyComponent(
-            route.key,
+            route.routeId,
             {
               isActive: route.isActive,
               display: route.isActive ? 'block' : 'none',
@@ -236,40 +237,40 @@ export class PwMain extends LitElement {
 
   /**
    * Renders a component lazily - only creates it when first needed, then reuses the instance.
-   * @param componentKey - Unique key for the component in the cache
+   * @param routeId - Unique identifier for the route/component in the cache
    * @param route - Route information including isActive and display properties
    * @param componentFactory - Function that returns the component template when called
    * @returns The component template with proper display styling, or empty template if not active
    */
   private renderLazyComponent(
-    componentKey: string,
+    routeId: string,
     route: { isActive: boolean; display: string; selectedFilePath?: string },
     componentFactory: () => any
   ) {
     // For components that depend on dynamic properties (playlist), always re-render
     // to ensure they get the latest values, and only show when active
     const routeDefinitions = this.getRouteDefinitions();
-    const routeDefinition = routeDefinitions.find(r => r.key === componentKey);
+    const routeDefinition = routeDefinitions.find(r => r.routeId === routeId);
     if (routeDefinition?.isDynamic) {
       if (!route.isActive) {
         return html``;
       }
-      if (DEBUG) console.log(`Re-rendering dynamic component for route: ${componentKey}`);
+      if (DEBUG) console.log(`Re-rendering dynamic component for route: ${routeId}`);
       const component = componentFactory();
       return html`<div style="display: ${route.display}">${component}</div>`;
     }
 
     // For non-dynamic components, keep them in the DOM to preserve state
     // If component hasn't been created yet, create it and cache it
-    if (!this.componentCache.has(componentKey)) {
-      if (DEBUG) console.log(`Creating component for route: ${componentKey}`);
+    if (!this.componentCache.has(routeId)) {
+      if (DEBUG) console.log(`Creating component for route: ${routeId}`);
       const component = componentFactory();
-      this.componentCache.set(componentKey, component);
+      this.componentCache.set(routeId, component);
     }
 
     // Always render non-dynamic components, but control visibility with display style
-    if (DEBUG && route.isActive) console.log(`Showing cached component for route: ${componentKey}`);
-    const cachedComponent = this.componentCache.get(componentKey);
+    if (DEBUG && route.isActive) console.log(`Showing cached component for route: ${routeId}`);
+    const cachedComponent = this.componentCache.get(routeId);
     return html`<div style="display: ${route.display}">${cachedComponent}</div>`;
   }
 
@@ -277,60 +278,85 @@ export class PwMain extends LitElement {
     const filePath = this.getFilePathFromUri();
     const selectedFilePath = filePath ? `/doc/api/file/${filePath}` : undefined;
 
+    /**
+     * Route definition structure:
+     * - routeId: Unique identifier for component caching and debugging (replaces 'key')
+     * - matchUris: Array of URI patterns this route should match (replaces hardcoded isActive logic)
+     * - componentFactory: Function that creates the component
+     * - isDynamic: Whether component should be re-rendered on each activation
+     * - description: Human-readable description of what this route does
+     */
     return [
       {
-        key: 'album',
-        isActive: this.uri === '/ui/album' || this.uri === '/ui' || this.uri === '/ui/',
+        routeId: 'album',
+        description: 'Photo album browser - main landing page',
+        matchUris: ['/ui/album', '/ui', '/ui/'],
+        isActive: this.matchesAnyUri(['/ui/album', '/ui', '/ui/']),
         componentFactory: () => html`<pw-album-browser></pw-album-browser>`,
         isDynamic: false
       },
       {
-        key: 'doc',
+        routeId: 'doc',
+        description: 'Documentation browser with file viewer',
+        matchUris: ['/ui/doc'],
         isActive: this.uri === '/ui/doc' || this.getFilePathFromUri() !== null,
         componentFactory: () => html`<pw-doc-browser .selectedFilePath=${selectedFilePath}></pw-doc-browser>`,
         isDynamic: false,
         selectedFilePath
       },
       {
-        key: 'users',
-        isActive: this.uri === '/ui/users',
+        routeId: 'users',
+        description: 'User management interface (admin only)',
+        matchUris: ['/ui/users'],
+        isActive: this.matchesAnyUri(['/ui/users']),
         componentFactory: () => html`<pw-users></pw-users>`,
         isDynamic: true
       },
       {
-        key: 'tests',
-        isActive: this.uri === '/ui/tests',
+        routeId: 'tests',
+        description: 'Test runner and results viewer',
+        matchUris: ['/ui/tests'],
+        isActive: this.matchesAnyUri(['/ui/tests']),
         componentFactory: () => html`<pw-tests></pw-tests>`,
         isDynamic: true
       },
-      // Iframe styles moved to static CSS for better maintainability
       {
-        key: 'traefik-dashboard',
-        isActive: this.uri === '/ui/traefik-dashboard',
+        routeId: 'traefik-dashboard',
+        description: 'Traefik reverse proxy dashboard',
+        matchUris: ['/ui/traefik-dashboard'],
+        isActive: this.matchesAnyUri(['/ui/traefik-dashboard']),
         componentFactory: () => html`<pw-nav-page><iframe src="https://traefik.${location.host}"></iframe></pw-nav-page>`,
         isDynamic: true
       },
       {
-        key: 'auth-api',
-        isActive: this.uri === '/ui/auth-api',
+        routeId: 'auth-api',
+        description: 'Authentication API documentation',
+        matchUris: ['/ui/auth-api'],
+        isActive: this.matchesAnyUri(['/ui/auth-api']),
         componentFactory: () => html`<pw-nav-page><iframe src="/auth/docs"></iframe></pw-nav-page>`,
         isDynamic: true
       },
       {
-        key: 'photos-api',
-        isActive: this.uri === '/ui/photos-api',
+        routeId: 'photos-api',
+        description: 'Photos API documentation',
+        matchUris: ['/ui/photos-api'],
+        isActive: this.matchesAnyUri(['/ui/photos-api']),
         componentFactory: () => html`<pw-nav-page><iframe src="/photos/docs"></iframe></pw-nav-page>`,
         isDynamic: true
       },
       {
-        key: 'doc-api',
-        isActive: this.uri === '/ui/doc-api',
+        routeId: 'doc-api',
+        description: 'Documentation API documentation',
+        matchUris: ['/ui/doc-api'],
+        isActive: this.matchesAnyUri(['/ui/doc-api']),
         componentFactory: () => html`<pw-nav-page><iframe src="/doc/docs"></iframe></pw-nav-page>`,
         isDynamic: true
       },
       {
-        key: 'slideshow',
-        isActive: this.uri === '/ui/slideshow',
+        routeId: 'slideshow',
+        description: 'Photo slideshow with themes and playlists',
+        matchUris: ['/ui/slideshow'],
+        isActive: this.matchesAnyUri(['/ui/slideshow']),
         componentFactory: () => {
           // Use the preserved query parameters from the router state
           // This ensures we get the correct parameters even during navigation timing issues
@@ -354,7 +380,7 @@ export class PwMain extends LitElement {
     // Convert route definitions to the legacy format for backward compatibility
     const routes: Record<string, any> = {};
     routeDefinitions.forEach(route => {
-      routes[route.key.replace('-', '_')] = {
+      routes[route.routeId.replace('-', '_')] = {
         isActive: route.isActive,
         display: route.isActive ? 'block' : 'none',
         ...(route.selectedFilePath !== undefined && { selectedFilePath: route.selectedFilePath })
@@ -370,13 +396,13 @@ export class PwMain extends LitElement {
   /**
    * Clears the component cache. Useful for memory management or when you want to force
    * components to be recreated (e.g., after a major state change).
-   * @param componentKey - Optional specific component to clear, or clear all if not provided
+   * @param routeId - Optional specific route/component to clear, or clear all if not provided
    */
-  public clearComponentCache(componentKey?: string) {
-    if (componentKey) {
-      if (this.componentCache.has(componentKey)) {
-        if (DEBUG) console.log(`Clearing cached component: ${componentKey}`);
-        this.componentCache.delete(componentKey);
+  public clearComponentCache(routeId?: string) {
+    if (routeId) {
+      if (this.componentCache.has(routeId)) {
+        if (DEBUG) console.log(`Clearing cached component: ${routeId}`);
+        this.componentCache.delete(routeId);
       }
     } else {
       if (DEBUG) console.log('Clearing all cached components');
