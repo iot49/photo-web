@@ -100,8 +100,8 @@ export class PwSlideshow extends LitElement {
 
     // hide all slides
     for (let i = 0; i < slides.length; i++) {
-      // don't touch current slide for smooth ken-burns transitions
-      if (i === this.currentIndex) continue;
+      // don't touch current slide for smooth ken-burns transitions, unless we're going to the same slide
+      if (i === this.currentIndex && nextIndex !== this.currentIndex) continue;
       const slide = slides[i] as HTMLElement;
       slide.classList.remove('last');
       slide.classList.remove('next');
@@ -109,7 +109,9 @@ export class PwSlideshow extends LitElement {
 
     // then show last and next slide with selected theme
     // note: slides[this.currentIndex] retains class .next otherwise ken-burns transition will not be smooth
-    slides[this.currentIndex].classList.add('last');
+    if (nextIndex !== this.currentIndex) {
+      slides[this.currentIndex].classList.add('last');
+    }
     slides[nextIndex].classList.add('next');
 
     // Get dynamic slide time from pre-calculated CSS custom property
@@ -138,7 +140,15 @@ export class PwSlideshow extends LitElement {
         // We've reached the last slide ("The End"), stop autoplay and navigate away after showing it
         this.autoplay = false;
         this.autoplayTimeoutId = window.setTimeout(() => {
-          window.location.href = '/ui/album';
+          // Use Navigation API or history.pushState to preserve component state
+          if ('navigation' in window && window.navigation) {
+            window.navigation.navigate('/ui/album');
+          } else {
+            // Fallback for browsers without Navigation API
+            history.pushState(null, '', '/ui/album');
+            // Dispatch a popstate event to trigger the router's navigation handling
+            window.dispatchEvent(new PopStateEvent('popstate'));
+          }
         }, SLIDE_MS);
       } else {
         this.autoplayTimeoutId = window.setTimeout(() => this.goto(nextIndex + 1), dynamicSlideMs - TRANSITION_MS);
@@ -205,7 +215,16 @@ export class PwSlideshow extends LitElement {
       clearTimeout(this.autoplayTimeoutId);
       this.autoplayTimeoutId = null;
     }
-    window.location.href = '/ui/album';
+    // Use Navigation API or history.pushState to preserve component state
+    // This allows pw-main's router to handle navigation and preserve pw-album-browser state
+    if ('navigation' in window && window.navigation) {
+      window.navigation.navigate('/ui/album');
+    } else {
+      // Fallback for browsers without Navigation API
+      history.pushState(null, '', '/ui/album');
+      // Dispatch a popstate event to trigger the router's navigation handling
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
   }
 
   override render() {
@@ -560,7 +579,7 @@ export class PwSlideshow extends LitElement {
         align-items: center;
         justify-content: center;
         color: white;
-        font-size: 2rem;
+        font-size: 4rem;
         text-align: center;
         background: black;
         box-sizing: border-box;

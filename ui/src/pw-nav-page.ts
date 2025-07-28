@@ -144,7 +144,7 @@ export class PwNavPage extends LitElement {
       <div class="app-container">
         <!-- Navigation Bar -->
         <nav class="navbar">
-          <div class="nav-title" @click="${this.handleTitleClick}">${import.meta.env.VITE_TITLE || 'Photo Web'}</div>
+          <div class="nav-title" @click="${this.handleAlbumClick}">${import.meta.env.VITE_TITLE || 'Photo Web'}</div>
           <slot name="nav-controls"></slot>
           <div class="nav-user">
             ${this.parentIsDoc
@@ -267,10 +267,6 @@ export class PwNavPage extends LitElement {
 
   private async handleLogout() {
     await logout('/ui');
-  }
-
-  private handleTitleClick() {
-    window.location.href = '/';
   }
 
   private handleAlbumClick() {

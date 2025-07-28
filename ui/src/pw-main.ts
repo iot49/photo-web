@@ -46,6 +46,13 @@ export class PwMain extends LitElement {
     main *[display='none'] {
       display: none !important;
     }
+
+    /* Iframe styles for embedded API documentation and dashboard pages */
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
   `;
 
   // Albums and me data automatically reload on login/logout via handleLoginLogoutEvents()
@@ -239,33 +246,29 @@ export class PwMain extends LitElement {
     route: { isActive: boolean; display: string; selectedFilePath?: string },
     componentFactory: () => any
   ) {
-    // If the route is not active, don't render anything
-    if (!route.isActive) {
-      return html``;
-    }
-
     // For components that depend on dynamic properties (playlist), always re-render
-    // to ensure they get the latest values
+    // to ensure they get the latest values, and only show when active
     const routeDefinitions = this.getRouteDefinitions();
     const routeDefinition = routeDefinitions.find(r => r.key === componentKey);
     if (routeDefinition?.isDynamic) {
+      if (!route.isActive) {
+        return html``;
+      }
       if (DEBUG) console.log(`Re-rendering dynamic component for route: ${componentKey}`);
       const component = componentFactory();
       return html`<div style="display: ${route.display}">${component}</div>`;
     }
 
+    // For non-dynamic components, keep them in the DOM to preserve state
     // If component hasn't been created yet, create it and cache it
     if (!this.componentCache.has(componentKey)) {
       if (DEBUG) console.log(`Creating component for route: ${componentKey}`);
-      // Create the component and store it in cache
-      // Note: We'll render it with display block since it's active
       const component = componentFactory();
       this.componentCache.set(componentKey, component);
-      return html`<div style="display: ${route.display}">${component}</div>`;
     }
 
-    // Component exists in cache, reuse it
-    if (DEBUG) console.log(`Reusing cached component for route: ${componentKey}`);
+    // Always render non-dynamic components, but control visibility with display style
+    if (DEBUG && route.isActive) console.log(`Showing cached component for route: ${componentKey}`);
     const cachedComponent = this.componentCache.get(componentKey);
     return html`<div style="display: ${route.display}">${cachedComponent}</div>`;
   }
@@ -292,38 +295,38 @@ export class PwMain extends LitElement {
         key: 'users',
         isActive: this.uri === '/ui/users',
         componentFactory: () => html`<pw-users></pw-users>`,
-        isDynamic: false
+        isDynamic: true
       },
       {
         key: 'tests',
         isActive: this.uri === '/ui/tests',
         componentFactory: () => html`<pw-tests></pw-tests>`,
-        isDynamic: false
+        isDynamic: true
       },
-      
+      // Iframe styles moved to static CSS for better maintainability
       {
         key: 'traefik-dashboard',
         isActive: this.uri === '/ui/traefik-dashboard',
-        componentFactory: () => html`<pw-nav-page><iframe src="https://traefik.${location.host}" style="width: 100%; height: 100%; border: none;"></iframe></pw-nav-page>`,
-        isDynamic: false
+        componentFactory: () => html`<pw-nav-page><iframe src="https://traefik.${location.host}"></iframe></pw-nav-page>`,
+        isDynamic: true
       },
       {
         key: 'auth-api',
         isActive: this.uri === '/ui/auth-api',
-        componentFactory: () => html`<pw-nav-page><iframe src="/auth/docs" style="width: 100%; height: 100%; border: none;"></iframe></pw-nav-page>`,
-        isDynamic: false
+        componentFactory: () => html`<pw-nav-page><iframe src="/auth/docs"></iframe></pw-nav-page>`,
+        isDynamic: true
       },
       {
         key: 'photos-api',
         isActive: this.uri === '/ui/photos-api',
-        componentFactory: () => html`<pw-nav-page><iframe src="/photos/docs" style="width: 100%; height: 100%; border: none;"></iframe></pw-nav-page>`,
-        isDynamic: false
+        componentFactory: () => html`<pw-nav-page><iframe src="/photos/docs"></iframe></pw-nav-page>`,
+        isDynamic: true
       },
       {
         key: 'doc-api',
         isActive: this.uri === '/ui/doc-api',
-        componentFactory: () => html`<pw-nav-page><iframe src="/doc/docs" style="width: 100%; height: 100%; border: none;"></iframe></pw-nav-page>`,
-        isDynamic: false
+        componentFactory: () => html`<pw-nav-page><iframe src="/doc/docs"></iframe></pw-nav-page>`,
+        isDynamic: true
       },
       {
         key: 'slideshow',

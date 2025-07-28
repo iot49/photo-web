@@ -1,6 +1,6 @@
 import { LitElement, css, html } from 'lit';
-import { customElement } from 'lit/decorators.js';
-import { Albums } from './app/interfaces.js';
+import { customElement, state } from 'lit/decorators.js';
+import { AlbumFilter, Albums } from './app/interfaces.js';
 import { consume } from '@lit/context';
 import { albumsContext } from './app/context.js';
 import { album_tree, TreeNode } from './app/album_tree.js';
@@ -44,6 +44,16 @@ export class PwAlbumBrowser extends LitElement {
       text-overflow: ellipsis;
       display: flex;
       align-items: center;
+      cursor: pointer;
+    }
+
+    .folder-name {
+      cursor: pointer;
+      display: inline-block;
+    }
+
+    .folder-name:hover {
+      color: var(--sl-color-primary-600);
     }
 
     .album-link {
@@ -154,9 +164,16 @@ export class PwAlbumBrowser extends LitElement {
   @consume({ context: albumsContext, subscribe: true })
   private albums!: Albums;
 
-  // Fixed: albumTree now updates when this.albums changes
   get albumTree() {
     return album_tree(this.albums);
+  }
+
+  @state() private albumFilter = new AlbumFilter();
+
+  get filteredAlbums(): Albums {
+    const filtered = this.albumFilter.filter(this.albums);
+    // Sort albums alphabetically by title
+    return Object.fromEntries(Object.entries(filtered).sort(([, a], [, b]) => a.title.localeCompare(b.title)));
   }
 
   override render() {
@@ -177,19 +194,33 @@ export class PwAlbumBrowser extends LitElement {
     `;
   }
 
-  /* BUG: album.uuid='' */
-  private renderAlbumTree(node: TreeNode, level: number): any {
+  private handleFolderClick(event: Event, folderPath: string) {
+    // Prevent event bubbling to parent tree items
+    event.stopPropagation();
+    
+    // Update the album filter to show only albums in the selected folder
+    this.albumFilter = new AlbumFilter();
+    this.albumFilter.path = folderPath;
+    this.requestUpdate();
+  }
+
+  private buildNodePath(node: TreeNode, parentPath: string = ''): string {
+    if (!node.name) return parentPath;
+    return parentPath ? `${parentPath}/${node.name}` : node.name;
+  }
+
+  private renderAlbumTree(node: TreeNode, level: number, parentPath: string = ''): any {
     if (!node) return '';
 
     // For root level, just render children
     if (level === 0) {
       return html`
-        ${node.nodes?.map((childNode: any) => this.renderAlbumTree(childNode, level + 1))}
+        ${node.nodes?.map((childNode: any) => this.renderAlbumTree(childNode, level + 1, ''))}
         ${node.albums?.map(
           (album: any) => html`
             <sl-tree-item>
               <sl-icon name="image"></sl-icon>
-              <a href="${import.meta.env.BASE_URL}slideshow?playlist=${album.uuid}" class="album-link"> ${album.title} </a>
+              <a href="/ui/slideshow?playlist=${album.uuid}" class="album-link"> ${album.title} </a>
             </sl-tree-item>
           `
         )}
@@ -197,20 +228,22 @@ export class PwAlbumBrowser extends LitElement {
     }
 
     // For folder nodes
+    // FIXED: handleFolderClick now works for all tree levels with proper event handling
     if (node.nodes?.length > 0 || node.albums?.length > 0) {
+      const currentPath = this.buildNodePath(node, parentPath);
       return html`
         <sl-tree-item>
-          ${node.name}
+          <span class="folder-name" @click=${(e: Event) => this.handleFolderClick(e, currentPath)}>${node.name}</span>
 
           <!-- Child nodes -->
-          ${node.nodes?.map((childNode: any) => this.renderAlbumTree(childNode, level + 1))}
+          ${node.nodes?.map((childNode: any) => this.renderAlbumTree(childNode, level + 1, currentPath))}
 
           <!-- Albums in this node -->
           ${node.albums?.map(
             (album: any) => html`
               <sl-tree-item>
                 <sl-icon name="image"></sl-icon>
-                <a href="${import.meta.env.BASE_URL}slideshow?playlist=${album.uuid}" class="album-link"> ${album.title} </a>
+                <a href="/ui/slideshow?playlist=${album.uuid}" class="album-link"> ${album.title} </a>
               </sl-tree-item>
             `
           )}
@@ -219,32 +252,39 @@ export class PwAlbumBrowser extends LitElement {
     }
 
     // For leaf nodes (empty folders)
-    return html` <sl-tree-item> ${node.name} </sl-tree-item> `;
+    const currentPath = this.buildNodePath(node, parentPath);
+    return html` <sl-tree-item> <span class="folder-name" @click=${(e: Event) => this.handleFolderClick(e, currentPath)}>${node.name}</span> </sl-tree-item> `;
   }
 
   private renderAlbumGrid() {
-    const allAlbums = this.getAllAlbums(this.albumTree);
+    // Use filteredAlbums which are already sorted by title
+    const albums = Object.values(this.filteredAlbums);
 
-    // Sort albums alphabetically by title
-    const sortedAlbums = allAlbums.sort((a, b) => a.title.localeCompare(b.title));
-
-    // todo: use srcset to let browser choose image
+    // Use srcset to let browser choose appropriate image size
     // FIXED: carousel component now properly reacts to uuid changes
     return html`
-      ${sortedAlbums.map(
+      ${albums.map(
         (album) => html`
           <div class="album-card">
-            <a href="${import.meta.env.BASE_URL}slideshow?playlist=${album.uuid}" class="album-card-link" title="Ken Burns Slideshow">
+            <a href="/ui/slideshow?playlist=${album.uuid}" class="album-card-link" title="Ken Burns Slideshow">
               <div class="album-thumbnail">
                 ${album.thumbnail
-                  ? html` <img src="/photos/api/photos/${album.thumbnail}/img-sm" alt="${album.title}" loading="lazy" /> `
+                  ? html`
+                      <img
+                        src="/photos/api/photos/${album.thumbnail}/img-sm"
+                        srcset="/photos/api/photos/${album.thumbnail}/img-sm 200w, /photos/api/photos/${album.thumbnail}/img-md 400w"
+                        sizes="(max-width: 300px) 200px, 400px"
+                        alt="${album.title}"
+                        loading="lazy"
+                      />
+                    `
                   : html` <div class="no-thumbnail">📷</div> `}
               </div>
             </a>
             <div class="album-info">
               <div class="album-title">${album.title}</div>
               <div class="album-icons">
-                <a href="${import.meta.env.BASE_URL}slideshow?playlist=${album.uuid}&theme=plain&autoplay=false" class="album-icon-link" title="Carousel">
+                <a href="/ui/slideshow?playlist=${album.uuid}&theme=plain&autoplay=false" class="album-icon-link" title="Carousel">
                   <sl-icon name="play"></sl-icon>
                 </a>
               </div>
@@ -254,19 +294,4 @@ export class PwAlbumBrowser extends LitElement {
       )}
     `;
   }
-
-  private getAllAlbums(node: any): any[] {
-    if (!node) return [];
-
-    let albums = [...(node.albums || [])];
-
-    if (node.nodes) {
-      for (const childNode of node.nodes) {
-        albums = albums.concat(this.getAllAlbums(childNode));
-      }
-    }
-
-    return albums;
-  }
-
 }
