@@ -15,17 +15,17 @@ export class PwTests extends LitElement {
     }
 
     zero-md {
-      margin: 2px 0;
-      padding: 0;
+      margin: 0;
+      padding: 5px 10px;
       display: block;
     }
 
     zero-md.out {
-      border: 2px solid #22c55e;
+      border-left: 6px solid #22c55e;
     }
 
     zero-md.err {
-      border: 2px solid #ef4444;
+      border-left: 6px solid #ef4444;
     }
 
     /* Test controls styling - matching pw-nav-page.ts hover effects */
