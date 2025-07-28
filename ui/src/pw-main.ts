@@ -60,7 +60,6 @@ export class PwMain extends LitElement {
   srcsetInfo: SrcsetInfo = [] as SrcsetInfo;
 
   private uri = '';
-  private playlist = '';
 
   async connectedCallback() {
     super.connectedCallback();
@@ -117,16 +116,9 @@ export class PwMain extends LitElement {
 
         // Handle the navigation if it's within our app
         if (this.shouldInterceptNavigation(url)) {
-          // Update URI and playlist from the new URL
+          // Update URI from the new URL
           const urlObj = new URL(url);
           this.uri = urlObj.pathname;
-
-          // Parse playlist from URL search parameters
-          const urlParams = new URLSearchParams(urlObj.search);
-          const playlistParam = urlParams.get('playlist');
-          if (playlistParam) {
-            this.playlist = playlistParam;
-          }
 
           this.requestUpdate(); // Force re-render for URL changes
         }
@@ -186,13 +178,6 @@ export class PwMain extends LitElement {
     });
 
     this.uri = window.location.pathname;
-
-    // Parse playlist from URL search parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    const playlistParam = urlParams.get('playlist');
-    if (playlistParam) {
-      this.playlist = playlistParam;
-    }
   }
 
   private shouldInterceptNavigation(url: string): boolean {
@@ -222,7 +207,7 @@ export class PwMain extends LitElement {
     return html`
       <main>
         <div class="fallback-message" style="display: ${hasActiveRoute ? 'none' : 'block'}">
-          <p>no route to ${this.uri} (playlist = ${this.playlist})</p>
+          <p>no route to ${this.uri}</p>
         </div>
         ${routeDefinitions.map(route =>
           this.renderLazyComponent(
@@ -340,19 +325,18 @@ export class PwMain extends LitElement {
       {
         key: 'slideshow',
         isActive: this.uri === '/ui/slideshow',
-        componentFactory: () => html`<pw-ken-burns uuid=${this.playlist}></pw-ken-burns>`,
-        isDynamic: true
-      },
-      {
-        key: 'carousel',
-        isActive: this.uri === '/ui/carousel',
-        componentFactory: () => html`<pw-carousel uuid=${this.playlist}></pw-carousel>`,
-        isDynamic: true
-      },
-      {
-        key: 'carousel',
-        isActive: this.uri === '/ui/test',
-        componentFactory: () => html`<pw-slideshow playlist="F04C8C5B-4D02-4848-AFE4-02F0251CDE52:8A368C96-5CE7-423F-B163-5AE013660735:697FAD48-6DE7-4111-AC7F-754D0C2B287C"></pw-slideshow>`,
+        componentFactory: () => {
+          // Extract parameters from current URL - use window.location to ensure we get the latest URL
+          const currentUrl = new URL(window.location.href);
+          const urlParams = currentUrl.searchParams;
+          const playlist = urlParams.get('playlist') || '';
+          const theme = urlParams.get('theme') || 'ken-burns';
+          // Handle autoplay parameter correctly - default to true, false only when explicitly set to 'false'
+          const autoplayParam = urlParams.get('autoplay');
+          const autoplay = autoplayParam === null ? true : autoplayParam !== 'false';
+          
+          return html`<pw-slideshow playlist=${playlist} theme=${theme} .autoplay=${autoplay}></pw-slideshow>`;
+        },
         isDynamic: true
       }
     ];

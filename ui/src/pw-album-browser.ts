@@ -243,7 +243,7 @@ export class PwAlbumBrowser extends LitElement {
             <div class="album-info">
               <div class="album-title">${album.title}</div>
               <div class="album-icons">
-                <a href="${import.meta.env.BASE_URL}carousel?playlist=${album.uuid}" class="album-icon-link" title="Carousel">
+                <a href="${import.meta.env.BASE_URL}slideshow?playlist=${album.uuid}&theme=plain&autoplay=false" class="album-icon-link" title="Carousel">
                   <sl-icon name="play"></sl-icon>
                 </a>
               </div>
