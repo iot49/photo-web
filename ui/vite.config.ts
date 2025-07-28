@@ -13,13 +13,13 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: '../nginx/html/ui',
       emptyOutDir: true,
-      /* 
+      /* */
       minify: false,
       terserOptions: {
         compress: false,
         mangle: false,
       },
-      */
+      /* */
       // Remove lib configuration to build a complete web app instead of a library
       rollupOptions: {
         input: {

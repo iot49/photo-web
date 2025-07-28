@@ -60,6 +60,7 @@ export class PwMain extends LitElement {
   srcsetInfo: SrcsetInfo = [] as SrcsetInfo;
 
   private uri = '';
+  private queryParams = new URLSearchParams();
 
   async connectedCallback() {
     super.connectedCallback();
@@ -116,9 +117,10 @@ export class PwMain extends LitElement {
 
         // Handle the navigation if it's within our app
         if (this.shouldInterceptNavigation(url)) {
-          // Update URI from the new URL
+          // Update URI and query parameters from the new URL
           const urlObj = new URL(url);
           this.uri = urlObj.pathname;
+          this.queryParams = urlObj.searchParams;
 
           this.requestUpdate(); // Force re-render for URL changes
         }
@@ -178,6 +180,7 @@ export class PwMain extends LitElement {
     });
 
     this.uri = window.location.pathname;
+    this.queryParams = new URLSearchParams(window.location.search);
   }
 
   private shouldInterceptNavigation(url: string): boolean {
@@ -326,9 +329,9 @@ export class PwMain extends LitElement {
         key: 'slideshow',
         isActive: this.uri === '/ui/slideshow',
         componentFactory: () => {
-          // Extract parameters from current URL - use window.location to ensure we get the latest URL
-          const currentUrl = new URL(window.location.href);
-          const urlParams = currentUrl.searchParams;
+          // Use the preserved query parameters from the router state
+          // This ensures we get the correct parameters even during navigation timing issues
+          const urlParams = this.queryParams;
           const playlist = urlParams.get('playlist') || '';
           const theme = urlParams.get('theme') || 'ken-burns';
           // Handle autoplay parameter correctly - default to true, false only when explicitly set to 'false'

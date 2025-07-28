@@ -177,6 +177,7 @@ export class PwAlbumBrowser extends LitElement {
     `;
   }
 
+  /* BUG: album.uuid='' */
   private renderAlbumTree(node: TreeNode, level: number): any {
     if (!node) return '';
 

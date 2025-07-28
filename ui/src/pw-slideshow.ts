@@ -12,49 +12,11 @@ Themes:
 to achieve alternate behaviors.
 
 **plain**: No animations when transistioning between slides.
-**ken-burns**:
-1) Transition opacity of .next from 0 to 1 over TRANSITION_MS,
-2) Render slide initially with
-        object-fit: cover;
-        object-position: change depending on slide position, e.g.
-              .slide-wrapper:nth-child(4n + 1) img {
-                object-position: top left;
-              }
-
-              .slide-wrapper:nth-child(4n + 2) img {
-                object-position: bottom right;
-              }
-
-              .slide-wrapper:nth-child(4n + 3) img {
-                object-position: bottom left;
-              }
-
-              .slide-wrapper:nth-child(4n + 4) img {
-                object-position: top right;
-              }
-3) Then over SLIDE_MS seconds transition to 
-        object-position: move to align diagonally oposite corner of slide, e.g.
-              .slide-wrapper:nth-child(4n + 1) img {
-                object-position: bottom right;
-              }
-
-              .slide-wrapper:nth-child(4n + 2) img {
-                object-position: top left;
-              }
-
-              .slide-wrapper:nth-child(4n + 3) img {
-                object-position: top right;
-              }
-
-              .slide-wrapper:nth-child(4n + 4) img {
-                object-position: bottom left;
-              }
-
-        scale slide by SCALE_FACTOR;
+**ken-burns**: Animate transition opacity, translate image position in viewport, scale image
 */
 
 const TRANSITION_MS = 2000; // duration of slide transition in [ms]
-const SLIDE_MS = 3000; // time each slide is shown in [ms]; note: extra wide or tall slides take more time
+const SLIDE_MS = 5000; // time each slide is shown in [ms]; note: extra wide or tall slides take more time
 const PANORAMA_TIME = 5; // increase parnorama image animation time by up to this factor
 const SCALE_FACTOR = 1.2; // factor by which the image is scaled during translation
 
@@ -83,6 +45,9 @@ export class PwSlideshow extends LitElement {
   // Index into #slideshow.children: slide-wrapper
   @state() currentIndex = 0;
 
+  // Timeout ID for autoplay scheduling
+  private autoplayTimeoutId: number | null = null;
+
   // playlist to array of album uid's
   private get uids(): string[] {
     return this.playlist.split(':');
@@ -95,8 +60,11 @@ export class PwSlideshow extends LitElement {
       try {
         photos.push(await get_json(`/photos/api/albums/${uid}`));
       } catch (error) {
-        console.error(`Failed to load photos for album: {uid}`, uid);
-        this.photos = [];
+        console.error(`Failed to load photos for album: {uid}, trying again`, error);
+        setTimeout(() => {
+          this.loadPhotos();
+        }, 1000);
+        return;
       }
     }
     this.photos = photos;
@@ -116,22 +84,23 @@ export class PwSlideshow extends LitElement {
     /* transition from showing slide at `this.currentIndex` to at `nextIndex`.
      */
     if (this.slideshow == null) {
-      console.log('slides array not yet rendered');
       setTimeout(() => this.goto(nextIndex), 300);
       return;
     }
     const slides = this.slideshow?.children as unknown as HTMLElement[];
 
-    // BUG: N incorrect? it's 1 when goto is first called. with theme = ken-burns
     const N = slides.length;
-    if (N === 0) return;
+    if (N === 0) {
+      console.log(`Empty playlist ${this.playlist}`);
+      return;
+    }
 
     nextIndex = ((nextIndex % N) + N) % N;
-    console.log(`N = ${N} curr = ${this.currentIndex} next = ${nextIndex}`, slides[nextIndex], slides);
+    // console.log(`N = ${N} curr = ${this.currentIndex} next = ${nextIndex}`, slides[nextIndex]);
 
     // hide all slides
     for (let i = 0; i < slides.length; i++) {
-      // don't touch current slide to avoid screen "blink"
+      // don't touch current slide for smooth ken-burns transitions
       if (i === this.currentIndex) continue;
       const slide = slides[i] as HTMLElement;
       slide.classList.remove('last');
@@ -139,6 +108,7 @@ export class PwSlideshow extends LitElement {
     }
 
     // then show last and next slide with selected theme
+    // note: slides[this.currentIndex] retains class .next otherwise ken-burns transition will not be smooth
     slides[this.currentIndex].classList.add('last');
     slides[nextIndex].classList.add('next');
 
@@ -164,17 +134,79 @@ export class PwSlideshow extends LitElement {
 
     // Only schedule next transition if autoplay is enabled
     if (this.autoplay) {
-      console.log(`autoplay ${this.currentIndex} + 1 >= ${N}`)
-      if (false && this.currentIndex + 1 >= N) {
-        console.log("stop")
+      if (this.currentIndex + 1 >= N) {
+        // We've reached the last slide ("The End"), stop autoplay and navigate away after showing it
         this.autoplay = false;
-        // Navigate back to main album browser
-        window.location.href = '/ui/album';
+        this.autoplayTimeoutId = window.setTimeout(() => {
+          window.location.href = '/ui/album';
+        }, SLIDE_MS);
       } else {
-        setTimeout(() => this.goto(nextIndex + 1), dynamicSlideMs - TRANSITION_MS);
+        this.autoplayTimeoutId = window.setTimeout(() => this.goto(nextIndex + 1), dynamicSlideMs - TRANSITION_MS);
       }
     }
   };
+
+  private toggleAutoplay() {
+    // Cancel any pending autoplay timeout
+    if (this.autoplayTimeoutId !== null) {
+      clearTimeout(this.autoplayTimeoutId);
+      this.autoplayTimeoutId = null;
+    }
+
+    this.autoplay = !this.autoplay;
+
+    if (this.autoplay) {
+      // Restart autoplay with ken-burns theme
+      this.theme = 'ken-burns';
+
+      // Get the current slide to calculate dynamic timing
+      const slides = this.slideshow?.children as unknown as HTMLElement[];
+      if (slides && slides.length > 0) {
+        const currentSlide = slides[this.currentIndex];
+        const imgElement = currentSlide?.querySelector('img') as HTMLElement;
+        let dynamicTimeFactor = 1.0;
+
+        if (imgElement) {
+          const customProperty = getComputedStyle(imgElement).getPropertyValue('--data-dynamic-time-factor');
+          if (customProperty) dynamicTimeFactor = parseFloat(customProperty) || 1.0;
+        }
+
+        const dynamicSlideMs = SLIDE_MS * dynamicTimeFactor;
+
+        // Schedule next slide transition
+        this.autoplayTimeoutId = window.setTimeout(() => this.goto(this.currentIndex + 1), dynamicSlideMs - TRANSITION_MS);
+      }
+    } else {
+      // Stop autoplay and switch to plain theme for immediate transitions
+      this.theme = 'plain';
+    }
+  }
+
+  private handlePrevClick() {
+    // Cancel any pending autoplay timeout
+    if (this.autoplayTimeoutId !== null) {
+      clearTimeout(this.autoplayTimeoutId);
+      this.autoplayTimeoutId = null;
+    }
+    this.goto(this.currentIndex - 1);
+  }
+
+  private handleNextClick() {
+    // Cancel any pending autoplay timeout
+    if (this.autoplayTimeoutId !== null) {
+      clearTimeout(this.autoplayTimeoutId);
+      this.autoplayTimeoutId = null;
+    }
+    this.goto(this.currentIndex + 1);
+  }
+
+  private endSlideshow() {
+    if (this.autoplayTimeoutId !== null) {
+      clearTimeout(this.autoplayTimeoutId);
+      this.autoplayTimeoutId = null;
+    }
+    window.location.href = '/ui/album';
+  }
 
   override render() {
     // wait for photo info to load
@@ -199,9 +231,15 @@ export class PwSlideshow extends LitElement {
             ${albumPhotos.map((photo) => html` <div class="slide-wrapper">${this.photoTemplate(photo)}</div> `)}
           `;
         })}
+        <div class="slide-wrapper">
+          <div class="title"><p>The End</p></div>
+        </div>
       </div>
-      <div class="overlay prev-overlay" @click=${() => this.goto(this.currentIndex - 1)}></div>
-      <div class="overlay next-overlay" @click=${() => this.goto(this.currentIndex + 1)}></div>
+      <div class="overlay prev-overlay" @click=${() => this.handlePrevClick()}></div>
+      <div class="overlay next-overlay" @click=${() => this.handleNextClick()}></div>
+      <div class="overlay center-overlay" @click=${() => this.toggleAutoplay()}></div>
+      <div class="overlay top-overlay" @click=${() => this.endSlideshow()}></div>
+      <div class="overlay bottom-overlay" @click=${() => console.log('implement an action for bottom clicks')}></div>
     `;
   }
 
@@ -292,6 +330,7 @@ export class PwSlideshow extends LitElement {
         width: 100vw;
         height: 100vh;
         box-sizing: border-box;
+        /* BUG: scrollbars show despite overflow hidden */
         overflow: hidden;
       }
 
@@ -331,14 +370,14 @@ export class PwSlideshow extends LitElement {
       }
 
       /* Plain theme: instant transitions */
-      :host([theme='plain']) .last {
-        opacity: 0;
-        z-index: 1;
-      }
-
       :host([theme='plain']) .next {
         opacity: 1;
         z-index: 2;
+      }
+
+      :host([theme='plain']) .last {
+        opacity: 0 !important;
+        z-index: 1;
       }
 
       /* Ken Burns theme: opacity, translation, scaling */
@@ -475,21 +514,41 @@ export class PwSlideshow extends LitElement {
 
       .overlay {
         position: absolute;
-        transform: translateY(-50%);
         top: 50%;
+        left: 50%;
         width: 25%;
-        height: 30%;
+        height: 45%;
         background: transparent;
         z-index: 100;
         cursor: pointer;
-        border: 2px solid yellow;
+        /* border: 1px solid yellow; */
       }
 
       .prev-overlay {
-        left: 0%;
+        left: 1%;
+        transform: translateY(-50%);
       }
       .next-overlay {
-        right: 0%;
+        left: auto;
+        right: 1%;
+        transform: translateY(-50%);
+      }
+      .center-overlay {
+        width: 35%;
+        transform: translateX(-50%) translateY(-50%);
+      }
+      .top-overlay {
+        top: 1%;
+        height: 25%;
+        width: 98%;
+        transform: translateX(-50%);
+      }
+      .bottom-overlay {
+        top: auto;
+        bottom: 1%;
+        height: 25%;
+        width: 98%;
+        transform: translateX(-50%);
       }
 
       /* Title slide */
