@@ -175,7 +175,7 @@ async def inspect_nginx_cache():
                                         # Try to parse the original URL from cache key
                                         if cache_key.startswith("http"):
                                             cache_info["original_url"] = cache_key
-                    except:
+                    except:  # noqa: E722
                         # If we can't read the cache file, that's okay
                         pass
 
@@ -193,7 +193,7 @@ async def inspect_nginx_cache():
             "total_files": len(cache_files),
             "total_size": total_size,
             "total_size_human": format_bytes(total_size),
-            "files": cache_files[:50],  # Limit to first 50 files for performance
+            "files": cache_files,
             "timestamp": datetime.now().isoformat(),
         }
 

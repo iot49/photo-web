@@ -6,7 +6,6 @@ import { PwTests } from '../pw-tests';
 
 // Configuration constants for selective reporting
 const LOADING = false; // Enable/disable "Loading photos to populate cache..." section
-const DEBUG = false; // Enable/disable "Nginx Cache Contents Analysis" section
 
 async function testNginxHealth(msg: PwTests): Promise<void> {
   // First, let's check if we can access nginx health endpoint
@@ -22,7 +21,6 @@ async function testNginxHealth(msg: PwTests): Promise<void> {
     msg.err(`✗ Nginx health check failed: ${healthResponse.status}`);
   }
 }
-
 
 async function loadPhotosToPopulateCache(msg: PwTests): Promise<number> {
   msg.out('## Loading photos to populate cache...');
@@ -100,7 +98,7 @@ async function loadPhotosToPopulateCache(msg: PwTests): Promise<number> {
 }
 
 async function analyzeCacheByImageSuffix(msg: PwTests): Promise<void> {
-  msg.out('## Cache Analysis by Image Suffix');
+  msg.out('## Cache Summary Table');
 
   try {
     const cacheData = await get_json('/photos/api/nginx-cache');
@@ -115,45 +113,16 @@ async function analyzeCacheByImageSuffix(msg: PwTests): Promise<void> {
       return;
     }
 
-    // Analyze files by img suffix
+    // Analyze files by img suffix and track non-image files
     const imgSuffixCounts: { [suffix: string]: number } = {};
     const imgSuffixSizes: { [suffix: string]: number } = {};
+    const nonImageFiles: Array<{ url: string; size: number; size_human: string }> = [];
+    let totalImageFiles = 0;
 
-    // Debug: Show total files being processed
-    msg.out(`Debug: Processing ${cacheData.files.length} total cache files`);
-
-    // Enhanced debugging: First, let's see ALL cache file URLs to understand what's being cached
-    msg.out(`Debug: All cached file URLs:`);
-    for (let i = 0; i < Math.min(cacheData.files.length, 20); i++) {
-      const file = cacheData.files[i];
-      const cleanUrl = file.original_url.replace(/^httpGET/, '');
-      msg.out(`Debug: [${i+1}] ${cleanUrl} (size: ${file.size})`);
-    }
-    if (cacheData.files.length > 20) {
-      msg.out(`Debug: ... and ${cacheData.files.length - 20} more files`);
-    }
-
-    // Look specifically for any URLs containing 'thumb'
-    const thumbFiles = cacheData.files.filter((file: any) =>
-      file.original_url.toLowerCase().includes('thumb')
-    );
-    if (thumbFiles.length > 0) {
-      msg.out(`Debug: Found ${thumbFiles.length} files containing 'thumb':`);
-      thumbFiles.forEach((file: any, i: number) => {
-        const cleanUrl = file.original_url.replace(/^httpGET/, '');
-        msg.out(`Debug: Thumb file [${i+1}]: ${cleanUrl} (size: ${file.size})`);
-      });
-    } else {
-      msg.out(`Debug: No files containing 'thumb' found in cache`);
-    }
+    msg.out(`Processing ${cacheData.files.length} total cache files...`);
 
     for (const file of cacheData.files) {
       const cleanUrl = file.original_url.replace(/^httpGET/, '');
-
-      // Debug: log all photo-related URLs to understand what we're processing
-      if (cleanUrl.includes('/photos/api/photos/') && cleanUrl.includes('/img')) {
-        msg.out(`Debug: Processing URL: ${cleanUrl}, size: ${file.size}`);
-      }
 
       // Match URLs like /photos/api/photos/{uuid}/img{suffix}
       // Updated regex to capture text suffixes like -thumb, -sm, -md, etc.
@@ -162,32 +131,28 @@ async function analyzeCacheByImageSuffix(msg: PwTests): Promise<void> {
         const suffix = imgMatch[1] || ''; // Empty string for just 'img', or the suffix like '-thumb'
         const suffixKey = suffix === '' ? 'img' : `img${suffix}`;
 
-        msg.out(`Debug: Found match - suffix: '${suffix}', suffixKey: '${suffixKey}', size: ${file.size}`);
-
         // Only count files with valid sizes (skip files with size 0 or unknown)
         if (file.size && file.size > 0) {
           imgSuffixCounts[suffixKey] = (imgSuffixCounts[suffixKey] || 0) + 1;
           imgSuffixSizes[suffixKey] = (imgSuffixSizes[suffixKey] || 0) + file.size;
-        } else {
-          msg.out(`Debug: Skipping file with invalid size: ${suffixKey}, size: ${file.size}`);
+          totalImageFiles++;
         }
       } else {
-        // Debug: log URLs that don't match the pattern
-        if (cleanUrl.includes('/photos/api/photos/') && cleanUrl.includes('/img')) {
-          msg.out(`Debug: URL didn't match pattern: ${cleanUrl}`);
-        }
+        // This is a non-image file, add it to our list
+        nonImageFiles.push({
+          url: cleanUrl,
+          size: file.size || 0,
+          size_human: file.size_human || '0B',
+        });
       }
     }
 
-    // Debug: Show what we found
-    msg.out(`Debug: Final suffix counts: ${JSON.stringify(imgSuffixCounts)}`);
-    msg.out(`Debug: Final suffix sizes: ${JSON.stringify(imgSuffixSizes)}`);
-
-    // Display img suffix analysis
+    // Display image files summary table
     if (Object.keys(imgSuffixCounts).length > 0) {
+      msg.out('\n### Image Files by Size');
       let suffixTable = `
-| Suffix | File Count | Total Size | Avg Size |
-|--------|------------|------------|----------|
+| Image Size | File Count | Total Size | Avg Size |
+|------------|------------|------------|----------|
 `;
 
       // Sort by suffix name for consistent display
@@ -198,6 +163,9 @@ async function analyzeCacheByImageSuffix(msg: PwTests): Promise<void> {
         return a.localeCompare(b);
       });
 
+      let totalImageCount = 0;
+      let totalImageSize = 0;
+
       for (const suffix of sortedSuffixes) {
         const count = imgSuffixCounts[suffix];
         const totalSize = imgSuffixSizes[suffix];
@@ -206,11 +174,63 @@ async function analyzeCacheByImageSuffix(msg: PwTests): Promise<void> {
         const avgSizeHuman = avgSize > 1024 * 1024 ? `${(avgSize / (1024 * 1024)).toFixed(1)}MB` : `${(avgSize / 1024).toFixed(1)}KB`;
 
         suffixTable += `| ${suffix} | ${count} | ${totalSizeHuman} | ${avgSizeHuman} |\n`;
+        totalImageCount += count;
+        totalImageSize += totalSize;
       }
+
+      // Add totals row
+      const totalSizeHuman =
+        totalImageSize > 1024 * 1024 ? `${(totalImageSize / (1024 * 1024)).toFixed(1)}MB` : `${(totalImageSize / 1024).toFixed(1)}KB`;
+      const avgTotalSize = totalImageCount > 0 ? Math.round(totalImageSize / totalImageCount) : 0;
+      const avgTotalSizeHuman =
+        avgTotalSize > 1024 * 1024 ? `${(avgTotalSize / (1024 * 1024)).toFixed(1)}MB` : `${(avgTotalSize / 1024).toFixed(1)}KB`;
+      suffixTable += `|------------|------------|------------|----------|\n`;
+      suffixTable += `| **TOTAL** | **${totalImageCount}** | **${totalSizeHuman}** | **${avgTotalSizeHuman}** |\n`;
 
       msg.out(suffixTable);
     } else {
       msg.out('No image files found in cache');
+    }
+
+    // Display non-image files
+    if (nonImageFiles.length > 0) {
+      msg.out('\n### Other Cached Files (Non-Image)');
+      let nonImageTable = `
+| # | URL | Size |
+|---|-----|------|
+`;
+
+      // Sort by size (largest first) for better readability
+      nonImageFiles.sort((a, b) => b.size - a.size);
+
+      for (let i = 0; i < nonImageFiles.length; i++) {
+        const file = nonImageFiles[i];
+        nonImageTable += `| ${i + 1} | \`${file.url}\` | ${file.size_human} |\n`;
+      }
+
+      msg.out(nonImageTable);
+    } else {
+      msg.out('\n### Other Cached Files (Non-Image)');
+      msg.out('No non-image files found in cache');
+    }
+
+    // Verification summary
+    const totalProcessedFiles = totalImageFiles + nonImageFiles.length;
+    msg.out('\n### Cache Summary Verification');
+    let verificationTable = `
+| Category | Count |
+|----------|-------|
+| Image files | ${totalImageFiles} |
+| Non-image files | ${nonImageFiles.length} |
+| **Total processed** | **${totalProcessedFiles}** |
+| **Total in cache** | **${cacheData.files.length}** |
+| **Match?** | **${totalProcessedFiles === cacheData.files.length ? '✓ YES' : '✗ NO'}** |
+`;
+
+    msg.out(verificationTable);
+
+    if (totalProcessedFiles !== cacheData.files.length) {
+      msg.err(`Warning: Processed ${totalProcessedFiles} files but cache contains ${cacheData.files.length} files. Some files may have been missed!`);
     }
   } catch (error) {
     msg.err(`Error analyzing cache by image suffix: ${error instanceof Error ? error.message : String(error)}`);
@@ -308,20 +328,6 @@ async function analyzeCacheContents(msg: PwTests): Promise<void> {
   }
 }
 
-function displayCacheConfigurationSummary(msg: PwTests, photosAccessed: number): void {
-  msg.out('## Cache Configuration Summary');
-  const configSummary = `
-| Configuration | Value |
-|---------------|-------|
-| Total photos accessed | ${photosAccessed} |
-| Cache levels | 1:2 |
-| Max cache size | 4g |
-| Inactive timeout | 600m |
-| Cache validity | 1 hour (200, 302 responses) |
-`;
-  msg.out(configSummary);
-}
-
 export async function nginx_cache(msg: PwTests) {
   msg.out('# Testing nginx photos cache');
 
@@ -333,19 +339,17 @@ export async function nginx_cache(msg: PwTests) {
     let photosAccessed = 0;
     if (LOADING) {
       photosAccessed = await loadPhotosToPopulateCache(msg);
+      console.log('photosAccessed', photosAccessed);
     }
 
-    // Cache analysis by image suffix
-    if (DEBUG) await analyzeCacheByImageSuffix(msg);
-
-    // Always show largest and smallest files
-    await showLargestAndSmallestFiles(msg);
+    // Cache summary table (always show)
+    await analyzeCacheByImageSuffix(msg);
 
     // Analyze cache contents
     await analyzeCacheContents(msg);
 
-    // Always display configuration summary
-    displayCacheConfigurationSummary(msg, photosAccessed);
+    // Show largest and smallest files at the end
+    await showLargestAndSmallestFiles(msg);
   } catch (error) {
     msg.err(`Error in nginx cache test: ${error instanceof Error ? error.message : String(error)}`);
   }
