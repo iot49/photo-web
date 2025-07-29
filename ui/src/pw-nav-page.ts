@@ -200,6 +200,7 @@ export class PwNavPage extends LitElement {
           <sl-menu-item @click=${() => this.handleNavigation('/ui/auth-api')}>Auth API ...</sl-menu-item>
           <sl-menu-item @click=${() => this.handleNavigation('/ui/photos-api')}>Photos API ...</sl-menu-item>
           <sl-menu-item @click=${() => this.handleNavigation('/ui/doc-api')}>Doc API ...</sl-menu-item>
+          <sl-menu-item @click=${() => this.handleNavigation('/ui/img-size-test')}>Image Size Test ...</sl-menu-item>
           <sl-menu-item @click=${this.clearCacheDialog}>Clear Photo Cache</sl-menu-item>
           <sl-menu-item @click=${this.reloadDialog}>Reload DB</sl-menu-item>
         </sl-menu>

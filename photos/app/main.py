@@ -423,6 +423,7 @@ async def list_albums(
 
 @app.get("/api/photos/{photo_id}/img")
 @app.get("/api/photos/{photo_id}/img{size_suffix}")
+@app.get("/api/photos/{photo_id}/img{size_suffix}")
 async def serve_photo_image_sized(
     photo_id: str,
     request: Request,
@@ -495,33 +496,44 @@ async def serve_photo_image_sized(
 
     # Process the image
     try:
+        logger.debug(
+            f"URL: {request.url}  Query params: {dict(request.query_params)} test-enabled: {test}"
+        )
+
         # Check if format conversion is needed (HEIC/TIFF always need conversion to JPEG)
         needs_conversion = photo.uti in ["public.heic", "public.tiff"]
         mime_type = "image/jpeg" if needs_conversion else photo.mime_type
 
-        # Check if scaling is needed for scalable image formats
+        # Check if scaling is needed (target dimensions are smaller than original)
         needs_scaling = (width > 0 and width < photo.width) or (
             height > 0 and height < photo.height
         )
-        needs_scaling = needs_scaling and photo.uti in [
-            "public.jpeg",
-            "public.jpeg-2000",
-            "public.tiff",
-        ]
 
-        # Process image if conversion or scaling is needed
-        needs_processing = needs_conversion or needs_scaling
+        logger.debug(
+            f"Processing flags: needs_conversion={needs_conversion}, needs_scaling={needs_scaling}, test={test}"
+        )
 
-        if not needs_processing and not test:
-            # Return original unscaled image (only if no test overlay needed)
+        # Process image if conversion, scaling, or test overlay is needed
+        needs_processing = needs_conversion or needs_scaling or test
+
+        if not needs_processing:
+            logger.info("No processing needed, returning original file")
+            # Return original unscaled image (only if no processing needed at all)
             return FileResponse(path, media_type=mime_type)
+
+        logger.debug("Processing image with PIL")
 
         # Process the image
         img = Image.open(path)
 
-        # Resize if needed
-        if needs_scaling:
+        # Resize if needed (either because scaling was requested OR we're processing anyway and target is smaller)
+        if needs_scaling or (
+            needs_processing and (width < photo.width or height < photo.height)
+        ):
             img = img.resize((width, height), Image.Resampling.LANCZOS)
+            logger.info(
+                f"Resized image from {photo.width}x{photo.height} to {width}x{height}"
+            )
 
         # Add test overlay if requested
         if test:
@@ -530,13 +542,14 @@ async def serve_photo_image_sized(
             draw = ImageDraw.Draw(img)
 
             # Determine text to overlay
-            text = size_suffix or "original"
-            if text == "":
-                text = "original"
+            text = size_suffix if size_suffix else "original"
 
-            font_size = int(0.2 * img.width)
+            # Use a more reasonable font size (5% of image width, min 20px, max 100px)
+            font_size = max(20, min(100, int(0.05 * img.width)))
+            font = None
+
             try:
-                # Try to load a system font with the large size
+                # Try to load a system font with the calculated size
                 font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", font_size)
             except (OSError, IOError):
                 try:
@@ -552,14 +565,14 @@ async def serve_photo_image_sized(
                             font_size,
                         )
                     except (OSError, IOError):
-                        # Create a large default font by using load_default with size parameter
                         try:
+                            # Create a default font with size parameter
                             font = ImageFont.load_default(size=font_size)
                         except:
-                            # Final fallback - no font, use manual drawing
-                            font = None
+                            # Final fallback - use default font
+                            font = ImageFont.load_default()
                             logger.warning(
-                                f"Could not load any font with size {font_size}"
+                                f"Could not load any font with size {font_size}, using default"
                             )
 
             # Get text dimensions
@@ -567,24 +580,35 @@ async def serve_photo_image_sized(
                 bbox = draw.textbbox((0, 0), text, font=font)
                 text_width = bbox[2] - bbox[0]
                 text_height = bbox[3] - bbox[1]
-                logger.info(
-                    f"Font loaded successfully, text dimensions: {text_width}x{text_height}"
-                )
             else:
-                # Rough estimate if no font available - make it very large
-                text_width = len(text) * font_size * 0.8
+                # Rough estimate if no font available
+                text_width = len(text) * font_size * 0.6
                 text_height = font_size
-                logger.info(
-                    f"No font available, estimated text dimensions: {text_width}x{text_height}"
-                )
 
-            # Position in lower right corner with some padding
-            padding = 30
-            x = img.width - text_width - padding
-            y = img.height - text_height - padding
+            # Position in lower right corner with more padding to avoid cutoff
+            padding_x = max(
+                50, int(text_width * 0.1)
+            )  # At least 50px or 10% of text width
+            padding_y = max(
+                50, int(text_height * 1.5)
+            )  # At least 50px or 1.5x text height (about one line)
+            x = max(0, img.width - text_width - padding_x)
+            y = max(0, img.height - text_height - padding_y)
 
-            # Draw white text
+            # Draw text with black outline for better visibility
+            outline_width = 2
+            # Draw outline
+            for dx in range(-outline_width, outline_width + 1):
+                for dy in range(-outline_width, outline_width + 1):
+                    if dx != 0 or dy != 0:
+                        draw.text((x + dx, y + dy), text, fill=(0, 0, 0), font=font)
+
+            # Draw main text in white
             draw.text((x, y), text, fill=(255, 255, 255), font=font)
+
+            logger.info(
+                f"Added test overlay '{text}' at position ({x}, {y}) with font size {font_size}"
+            )
 
         # Convert to JPEG and return
         buf = io.BytesIO()
@@ -630,58 +654,6 @@ async def get_photos_srcset():
         ```
     """
     return SCREEN_SIZES
-
-
-@app.get("/api/photos/{photo_id}/srcset")
-async def get_photo_srcset(photo_id: str, db: DB = Depends(get_db)):
-    """
-    Get srcset string for a specific photo in the format expected by HTML img srcset attribute.
-
-    Returns the actual image sizes that /api/photos/{photo_id}/img{-XXX} returns for this specific photo,
-    taking into account the photo's actual dimensions (no upscaling).
-
-    Access rules handled by /authorize
-
-    Args:
-        photo_id (str): The UUID of the photo to generate srcset for
-
-    Returns:
-        Plain text srcset string, e.g.:
-        "/photos/api/photos/{photo_id}/img-sm 480w, /photos/api/photos/{photo_id}/img-md 768w, /photos/api/photos/{photo_id}/img 1920w"
-    """
-    photo = db.photos.get(photo_id)
-    if not photo:
-        raise HTTPException(status_code=404, detail="Photo not found")
-
-    srcset_entries = []
-
-    # Process all defined screen sizes
-    for suffix, size_config in SCREEN_SIZES.items():
-        target_width = size_config["width"]
-
-        # Scale based on width only, maintaining aspect ratio
-        # Don't upscale - limit to original width
-        actual_width = min(target_width, photo.width)
-        url = f"/photos/api/photos/{photo_id}/img{suffix}"
-
-        # Skip sizes that would be the same as original or larger than original
-        if actual_width >= photo.width:
-            continue
-
-        srcset_entries.append(f"{url} {actual_width}w")
-
-    # Always include the original size at the end
-    original_url = f"/photos/api/photos/{photo_id}/img"
-    if not any(f"{original_url} {photo.width}w" == entry for entry in srcset_entries):
-        srcset_entries.append(f"{original_url} {photo.width}w")
-
-    # Sort by width for consistent ordering
-    srcset_entries.sort(key=lambda x: int(x.split()[-1][:-1]))  # Sort by width value
-
-    # Return as plain text
-    from fastapi.responses import PlainTextResponse
-
-    return PlainTextResponse(", ".join(srcset_entries))
 
 
 # Keep other endpoints from original file...

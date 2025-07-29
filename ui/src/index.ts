@@ -17,4 +17,5 @@ import './pw-album-browser'
 import './pw-doc-browser'
 import './pw-slideshow'
 import './pw-tests'
+import './pw-img-size'
 

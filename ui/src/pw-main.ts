@@ -344,6 +344,14 @@ export class PwMain extends LitElement {
         isDynamic: true,
       },
       {
+        routeId: 'img-size-test',
+        description: 'Responsive image size',
+        matchUris: ['/ui/img-size-test'],
+        isActive: this.matchesAnyUri(['/ui/img-size-test']),
+        componentFactory: () => html`<pw-img-size></pw-img-size>`,
+        isDynamic: true,
+      },
+      {
         routeId: 'traefik-dashboard',
         description: 'Traefik reverse proxy dashboard',
         matchUris: ['/ui/traefik-dashboard'],
