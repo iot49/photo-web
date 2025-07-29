@@ -6,6 +6,7 @@ import { meContext } from './app/context.js';
 import { login, logout } from './app/login.js';
 import { ThemeManager } from './shoelace-config.js';
 import { SlDialog } from '@shoelace-style/shoelace';
+import { get_json } from './app/api.js';
 
 /**
  * Album browser component that shows available photo albums.
@@ -137,6 +138,9 @@ export class PwNavPage extends LitElement {
   @query('#reload-dialog')
   private reload_dialog!: SlDialog;
 
+  @query('#cache-dialog')
+  private cache_dialog!: SlDialog;
+
   private themeManager = ThemeManager.getInstance();
 
   override render() {
@@ -174,6 +178,12 @@ export class PwNavPage extends LitElement {
           <div>Reloading album information from Apple Photo DB ...<br/>This takes about a minute!</div>
         </div>
       </sl-dialog>
+
+      <!-- Clear Cache Dialog -->
+      <sl-dialog id="cache-dialog" label="Clear Cache Result">
+        <div id="cache-result" style="padding: 20px; white-space: pre-wrap; font-family: monospace;"></div>
+        <sl-button slot="footer" variant="primary" @click="${() => this.cache_dialog.hide()}">Close</sl-button>
+      </sl-dialog>
     `;
   }
 
@@ -190,7 +200,8 @@ export class PwNavPage extends LitElement {
           <sl-menu-item @click=${() => this.handleNavigation('/ui/auth-api')}>Auth API ...</sl-menu-item>
           <sl-menu-item @click=${() => this.handleNavigation('/ui/photos-api')}>Photos API ...</sl-menu-item>
           <sl-menu-item @click=${() => this.handleNavigation('/ui/doc-api')}>Doc API ...</sl-menu-item>
-          <sl-menu-item @click=${this.openReloadDialog}>Reload DB</sl-menu-item>
+          <sl-menu-item @click=${this.clearCacheDialog}>Clear Photo Cache</sl-menu-item>
+          <sl-menu-item @click=${this.reloadDialog}>Reload DB</sl-menu-item>
         </sl-menu>
       </sl-dropdown>
     `;
@@ -240,17 +251,33 @@ export class PwNavPage extends LitElement {
     this.requestUpdate();
   }
 
-  private async openReloadDialog() {
+  private async reloadDialog() {
     // Show the dialog and wait for it to be fully rendered
     this.reload_dialog.show();
     await this.reloadDb();
   }
 
+  private async clearCacheDialog() {
+    try {
+      const resp = await get_json('/photos/api/clear-nginx-cache');
+      const cacheResult = this.shadowRoot?.querySelector('#cache-result');
+      if (cacheResult) {
+        cacheResult.textContent = JSON.stringify(resp, null, 2);
+      }
+      this.cache_dialog.show();
+    } catch (error) {
+      const cacheResult = this.shadowRoot?.querySelector('#cache-result');
+      if (cacheResult) {
+        cacheResult.textContent = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      }
+      this.cache_dialog.show();
+    }
+  }
+
   private async reloadDb() {
     try {
-      const resp = await fetch('/photos/api/reload-db');
-      const text = await resp.text();
-      console.log("reload-db", text);
+      const resp = await get_json('/photos/api/reload-db');
+      console.log("reload-db", resp);
     } catch (e) {
       if (e instanceof Error) {
         console.log(`failed to reload db: ${e.message}`);

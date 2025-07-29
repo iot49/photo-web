@@ -33,6 +33,15 @@ export class PwMain extends LitElement {
   // Cache for lazily loaded components
   private componentCache = new Map<string, HTMLElement>();
   static styles = css`
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 400px;
+      gap: 1rem;
+    }
+
     .fallback-message {
       position: absolute;
       z-index: -1;
@@ -58,13 +67,17 @@ export class PwMain extends LitElement {
   // Albums and me data automatically reload on login/logout via handleLoginLogoutEvents()
   @provide({ context: albumsContext })
   @state()
-  albums: Albums = {};
+  albums!: Albums;
+
   @provide({ context: meContext })
   @state()
-  me: Me = {} as Me;
+  me!: Me;
+
   @provide({ context: srcsetInfoContext })
   @state()
-  srcsetInfo: SrcsetInfo = [] as SrcsetInfo;
+  srcsetInfo!: SrcsetInfo;
+
+  @state() private isLoading = true;
 
   private uri = '';
   private queryParams = new URLSearchParams();
@@ -75,13 +88,15 @@ export class PwMain extends LitElement {
     // Load contexts
     this.albums = await get_json('/photos/api/albums');
     this.me = await get_json('/auth/me');
-    this.srcsetInfo = await get_json('/photos/api/photos/srcset');
+    this.srcsetInfo = new SrcsetInfo(await get_json('/photos/api/photos/srcset'));
 
     // Add event listeners for login/logout events
     this.handleLoginLogoutEvents();
 
     // Intercept navigation events using the modern Navigation API
     this.setupNavigationInterception();
+
+    this.isLoading = false;
   }
 
   private handleLoginLogoutEvents() {
@@ -89,12 +104,12 @@ export class PwMain extends LitElement {
       if (DEBUG) console.log('Auth state changed, refreshing albums and me');
       this.albums = await get_json('/photos/api/albums');
       this.me = await get_json('/auth/me');
-      
+
       // NOTE: this is probably not required. Components check out state.
       // Clear component cache on auth state change to ensure components
       // are recreated with the new authentication context
       // this.clearComponentCache();
-      
+
       this.requestUpdate(); // Force a re-render to ensure context consumers update
     };
 
@@ -194,7 +209,7 @@ export class PwMain extends LitElement {
    * @returns true if current URI matches any pattern
    */
   private matchesAnyUri(uris: string[]): boolean {
-    return uris.some(uri => this.uri === uri);
+    return uris.some((uri) => this.uri === uri);
   }
 
   private getFilePathFromUri(): string | null {
@@ -208,6 +223,14 @@ export class PwMain extends LitElement {
   }
 
   public render() {
+    if (this.isLoading) {
+      return html`
+        <div class="loading">
+          <sl-spinner></sl-spinner>
+          <p>Main loading contexts ...</p>
+        </div>
+      `;
+    }
     /*
     Implement lazy loading of components to avoid creating them all at startup.
     Components are only created when their route is first accessed, then reused on subsequent visits.
@@ -220,13 +243,13 @@ export class PwMain extends LitElement {
         <div class="fallback-message" style="display: ${hasActiveRoute ? 'none' : 'block'}">
           <p>no route to ${this.uri}</p>
         </div>
-        ${routeDefinitions.map(route =>
+        ${routeDefinitions.map((route) =>
           this.renderLazyComponent(
             route.routeId,
             {
               isActive: route.isActive,
               display: route.isActive ? 'block' : 'none',
-              ...(route.selectedFilePath !== undefined && { selectedFilePath: route.selectedFilePath })
+              ...(route.selectedFilePath !== undefined && { selectedFilePath: route.selectedFilePath }),
             },
             route.componentFactory
           )
@@ -250,7 +273,7 @@ export class PwMain extends LitElement {
     // For components that depend on dynamic properties (playlist), always re-render
     // to ensure they get the latest values, and only show when active
     const routeDefinitions = this.getRouteDefinitions();
-    const routeDefinition = routeDefinitions.find(r => r.routeId === routeId);
+    const routeDefinition = routeDefinitions.find((r) => r.routeId === routeId);
     if (routeDefinition?.isDynamic) {
       if (!route.isActive) {
         return html``;
@@ -293,7 +316,7 @@ export class PwMain extends LitElement {
         matchUris: ['/ui/album', '/ui', '/ui/'],
         isActive: this.matchesAnyUri(['/ui/album', '/ui', '/ui/']),
         componentFactory: () => html`<pw-album-browser></pw-album-browser>`,
-        isDynamic: false
+        isDynamic: false,
       },
       {
         routeId: 'doc',
@@ -302,7 +325,7 @@ export class PwMain extends LitElement {
         isActive: this.uri === '/ui/doc' || this.getFilePathFromUri() !== null,
         componentFactory: () => html`<pw-doc-browser .selectedFilePath=${selectedFilePath}></pw-doc-browser>`,
         isDynamic: false,
-        selectedFilePath
+        selectedFilePath,
       },
       {
         routeId: 'users',
@@ -310,7 +333,7 @@ export class PwMain extends LitElement {
         matchUris: ['/ui/users'],
         isActive: this.matchesAnyUri(['/ui/users']),
         componentFactory: () => html`<pw-users></pw-users>`,
-        isDynamic: true
+        isDynamic: true,
       },
       {
         routeId: 'tests',
@@ -318,7 +341,7 @@ export class PwMain extends LitElement {
         matchUris: ['/ui/tests'],
         isActive: this.matchesAnyUri(['/ui/tests']),
         componentFactory: () => html`<pw-tests></pw-tests>`,
-        isDynamic: true
+        isDynamic: true,
       },
       {
         routeId: 'traefik-dashboard',
@@ -326,7 +349,7 @@ export class PwMain extends LitElement {
         matchUris: ['/ui/traefik-dashboard'],
         isActive: this.matchesAnyUri(['/ui/traefik-dashboard']),
         componentFactory: () => html`<pw-nav-page><iframe src="https://traefik.${location.host}"></iframe></pw-nav-page>`,
-        isDynamic: true
+        isDynamic: true,
       },
       {
         routeId: 'auth-api',
@@ -334,7 +357,7 @@ export class PwMain extends LitElement {
         matchUris: ['/ui/auth-api'],
         isActive: this.matchesAnyUri(['/ui/auth-api']),
         componentFactory: () => html`<pw-nav-page><iframe src="/auth/docs"></iframe></pw-nav-page>`,
-        isDynamic: true
+        isDynamic: true,
       },
       {
         routeId: 'photos-api',
@@ -342,7 +365,7 @@ export class PwMain extends LitElement {
         matchUris: ['/ui/photos-api'],
         isActive: this.matchesAnyUri(['/ui/photos-api']),
         componentFactory: () => html`<pw-nav-page><iframe src="/photos/docs"></iframe></pw-nav-page>`,
-        isDynamic: true
+        isDynamic: true,
       },
       {
         routeId: 'doc-api',
@@ -350,7 +373,7 @@ export class PwMain extends LitElement {
         matchUris: ['/ui/doc-api'],
         isActive: this.matchesAnyUri(['/ui/doc-api']),
         componentFactory: () => html`<pw-nav-page><iframe src="/doc/docs"></iframe></pw-nav-page>`,
-        isDynamic: true
+        isDynamic: true,
       },
       {
         routeId: 'slideshow',
@@ -366,29 +389,29 @@ export class PwMain extends LitElement {
           // Handle autoplay parameter correctly - default to true, false only when explicitly set to 'false'
           const autoplayParam = urlParams.get('autoplay');
           const autoplay = autoplayParam === null ? true : autoplayParam !== 'false';
-          
+
           return html`<pw-slideshow playlist=${playlist} theme=${theme} .autoplay=${autoplay}></pw-slideshow>`;
         },
-        isDynamic: true
-      }
+        isDynamic: true,
+      },
     ];
   }
 
   private getRouteInfo() {
     const routeDefinitions = this.getRouteDefinitions();
-    
+
     // Convert route definitions to the legacy format for backward compatibility
     const routes: Record<string, any> = {};
-    routeDefinitions.forEach(route => {
+    routeDefinitions.forEach((route) => {
       routes[route.routeId.replace('-', '_')] = {
         isActive: route.isActive,
         display: route.isActive ? 'block' : 'none',
-        ...(route.selectedFilePath !== undefined && { selectedFilePath: route.selectedFilePath })
+        ...(route.selectedFilePath !== undefined && { selectedFilePath: route.selectedFilePath }),
       };
     });
 
     // Check if any route is active
-    const hasActiveRoute = routeDefinitions.some(route => route.isActive);
+    const hasActiveRoute = routeDefinitions.some((route) => route.isActive);
 
     return { routes, hasActiveRoute, routeDefinitions };
   }

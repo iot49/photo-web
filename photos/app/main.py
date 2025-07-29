@@ -9,7 +9,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from models import DB, AlbumModel, PhotoModel
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 from pillow_heif import register_heif_opener
 from read_db import read_db
 
@@ -19,17 +19,12 @@ logger.setLevel(logging.INFO)
 
 # Define common screen sizes for responsive images
 SCREEN_SIZES = {
-    "": {
-        "width": 0,
-        "height": 0,
-        "description": "Original size",
-    },  # Default - full size
-    "-thumb": {"width": 200, "height": 150, "description": "Thumbnail"},
-    "-sm": {"width": 480, "height": 320, "description": "Small mobile"},
-    "-md": {"width": 768, "height": 512, "description": "Tablet"},
-    "-lg": {"width": 1024, "height": 768, "description": "Desktop"},
-    "-xl": {"width": 1440, "height": 1080, "description": "Large desktop"},
-    "-xxl": {"width": 1920, "height": 1440, "description": "4K desktop"},
+    "-sm": {"width": 480, "description": "Small mobile"},
+    "-md": {"width": 768, "description": "Tablet"},
+    "-lg": {"width": 1024, "description": "Desktop"},
+    "-xl": {"width": 1440, "description": "Large desktop"},
+    "-xxl": {"width": 1920, "description": "4K desktop"},
+    "-xxxl": {"width": 3860, "description": "8K desktop"},
 }
 
 # Register the HEIF opener to allow Pillow to read HEIC files
@@ -208,6 +203,94 @@ async def inspect_nginx_cache():
         }
 
 
+@app.get("/api/clear-nginx-cache")
+async def clear_nginx_cache():
+    """
+    Clear nginx cache directory by removing all cached files.
+
+    Returns information about the clearing operation including:
+    - Number of files removed
+    - Total size freed
+    - Any errors encountered during the process
+    """
+    cache_dir = "/var/cache/nginx/photos"
+
+    try:
+        # Check if cache directory exists and is accessible
+        if not os.path.exists(cache_dir):
+            return {
+                "status": "success",
+                "message": "Cache directory not found - nothing to clear",
+                "cache_dir": cache_dir,
+                "files_removed": 0,
+                "size_freed": 0,
+                "size_freed_human": "0 B",
+            }
+
+        files_removed = 0
+        size_freed = 0
+        errors = []
+
+        # Walk through cache directory structure and remove files
+        for root, dirs, files in os.walk(cache_dir, topdown=False):
+            for file in files:
+                file_path = os.path.join(root, file)
+                try:
+                    # Get file size before removing
+                    stat = os.stat(file_path)
+                    file_size = stat.st_size
+
+                    # Remove the file
+                    os.remove(file_path)
+                    files_removed += 1
+                    size_freed += file_size
+
+                except OSError as e:
+                    errors.append(f"Failed to remove {file_path}: {str(e)}")
+                    continue
+
+            # Remove empty directories
+            for dir_name in dirs:
+                dir_path = os.path.join(root, dir_name)
+                try:
+                    if not os.listdir(dir_path):  # Only remove if empty
+                        os.rmdir(dir_path)
+                except OSError:
+                    # Don't report errors for directory removal
+                    pass
+
+        result = {
+            "status": "success" if not errors else "partial_success",
+            "message": f"Cache cleared successfully. Removed {files_removed} files, freed {format_bytes(size_freed)}",
+            "cache_dir": cache_dir,
+            "files_removed": files_removed,
+            "size_freed": size_freed,
+            "size_freed_human": format_bytes(size_freed),
+            "timestamp": datetime.now().isoformat(),
+        }
+
+        if errors:
+            result["errors"] = errors
+            result["error_count"] = len(errors)
+
+        logger.info(
+            f"Nginx cache cleared: {files_removed} files removed, {format_bytes(size_freed)} freed"
+        )
+        return result
+
+    except Exception as e:
+        logger.error(f"Error clearing nginx cache: {e}")
+        return {
+            "status": "error",
+            "message": f"Failed to clear cache: {str(e)}",
+            "cache_dir": cache_dir,
+            "files_removed": 0,
+            "size_freed": 0,
+            "size_freed_human": "0 B",
+            "timestamp": datetime.now().isoformat(),
+        }
+
+
 def format_bytes(bytes_value: int) -> str:
     """Format bytes into human readable format."""
     if bytes_value == 0:
@@ -225,15 +308,6 @@ def format_bytes(bytes_value: int) -> str:
         return f"{int(size)} {units[unit_index]}"
     else:
         return f"{size:.1f} {units[unit_index]}"
-
-
-@app.get("/api/test-me")
-async def get_me(request: Request):
-    """
-    Get user roles. Testing only.
-    """
-    roles = request.headers.get("X-Forwarded-Roles", "public")
-    return roles
 
 
 @app.get("/authorize")
@@ -354,6 +428,9 @@ async def serve_photo_image_sized(
     request: Request,
     size_suffix: str = "",
     quality: Optional[int] = Query(75, ge=1, le=100),
+    test: bool = Query(
+        False, description="When true, embed size-suffix text overlay in image"
+    ),
     db: DB = Depends(get_db),
 ):
     """
@@ -363,11 +440,12 @@ async def serve_photo_image_sized(
 
     Size suffixes:
     - "" (empty): Original full-size image
-    - "-sm": Small mobile (480x320)
-    - "-md": Tablet (768x512)
-    - "-lg": Desktop (1024x768)
-    - "-xl": Large desktop (1440x1080)
-    - "-xxl": 4K desktop (1920x1440)
+    - "-sm": Small mobile (480px width)
+    - "-md": Tablet (768px width)
+    - "-lg": Desktop (1024px width)
+    - "-xl": Large desktop (1440px width)
+    - "-xxl": 4K desktop (1920px width)
+    - "-xxxl": 8K desktop (3860px width)
 
     Access rules same as /api/photo/{photo_uuid}/image endpoint.
 
@@ -375,15 +453,19 @@ async def serve_photo_image_sized(
         photo_id (str): The UUID of the photo
         size_suffix (str): Size suffix like "-sm", "-md", etc.
         quality (int): JPEG quality (1-100, default 75)
+        test (bool): When true, embed size-suffix text overlay in image
 
     Returns:
-        Image file scaled to the specified size with correct MIME type
+        Image scaled to the number of width pixels specified by the suffix with correct MIME type.
+        No up-scaling: if the original image width is smaller than the specified width, the unscaled original is returned.
+        Without suffix, returns the unscaled original (may be huge).
+        When test=True, adds size-suffix text overlay in lower right corner.
     """
-    # Validate size suffix
-    if size_suffix not in SCREEN_SIZES:
+    # Validate size suffix (empty string is valid for original size)
+    if size_suffix != "" and size_suffix not in SCREEN_SIZES:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid size suffix '{size_suffix}'. Valid options: {list(SCREEN_SIZES.keys())}",
+            detail=f"Invalid size suffix '{size_suffix}'. Valid options: '' (original), {list(SCREEN_SIZES.keys())}",
         )
 
     photo = db.photos.get(photo_id)
@@ -394,11 +476,6 @@ async def serve_photo_image_sized(
     if not path or not os.path.exists(path):
         raise HTTPException(status_code=404, detail="Photo file not found")
 
-    # Get target dimensions from size configuration
-    size_config = SCREEN_SIZES[size_suffix]
-    target_width = size_config["width"]
-    target_height = size_config["height"]
-
     # Calculate actual dimensions respecting aspect ratio and no upscaling
     original_aspect = photo.width / photo.height
 
@@ -407,19 +484,14 @@ async def serve_photo_image_sized(
         width = photo.width
         height = photo.height
     else:
-        # Don't upscale - limit to original dimensions
-        max_width = min(target_width, photo.width)
-        max_height = min(target_height, photo.height)
+        # Get target dimensions from size configuration
+        size_config = SCREEN_SIZES[size_suffix]
+        target_width = size_config["width"]
 
-        # Calculate dimensions maintaining aspect ratio
-        if max_width / original_aspect <= max_height:
-            # Width is the limiting factor
-            width = max_width
-            height = int(width / original_aspect)
-        else:
-            # Height is the limiting factor
-            height = max_height
-            width = int(height * original_aspect)
+        # Scale based on width only, maintaining aspect ratio
+        # Don't upscale - limit to original width
+        width = min(target_width, photo.width)
+        height = int(width / original_aspect)
 
     # Process the image
     try:
@@ -440,14 +512,90 @@ async def serve_photo_image_sized(
         # Process image if conversion or scaling is needed
         needs_processing = needs_conversion or needs_scaling
 
-        if not needs_processing:
-            # Return original unscaled image
+        if not needs_processing and not test:
+            # Return original unscaled image (only if no test overlay needed)
             return FileResponse(path, media_type=mime_type)
 
         # Process the image
         img = Image.open(path)
-        img = img.resize((width, height), Image.Resampling.LANCZOS)
+
+        # Resize if needed
+        if needs_scaling:
+            img = img.resize((width, height), Image.Resampling.LANCZOS)
+
+        # Add test overlay if requested
+        if test:
+            # Create a copy to avoid modifying the original
+            img = img.copy()
+            draw = ImageDraw.Draw(img)
+
+            # Determine text to overlay
+            text = size_suffix or "original"
+            if text == "":
+                text = "original"
+
+            font_size = int(0.2 * img.width)
+            try:
+                # Try to load a system font with the large size
+                font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", font_size)
+            except (OSError, IOError):
+                try:
+                    # Try other common system fonts
+                    font = ImageFont.truetype(
+                        "/System/Library/Fonts/Helvetica.ttc", font_size
+                    )
+                except (OSError, IOError):
+                    try:
+                        # Try another fallback
+                        font = ImageFont.truetype(
+                            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                            font_size,
+                        )
+                    except (OSError, IOError):
+                        # Create a large default font by using load_default with size parameter
+                        try:
+                            font = ImageFont.load_default(size=font_size)
+                        except:
+                            # Final fallback - no font, use manual drawing
+                            font = None
+                            logger.warning(
+                                f"Could not load any font with size {font_size}"
+                            )
+
+            # Get text dimensions
+            if font:
+                bbox = draw.textbbox((0, 0), text, font=font)
+                text_width = bbox[2] - bbox[0]
+                text_height = bbox[3] - bbox[1]
+                logger.info(
+                    f"Font loaded successfully, text dimensions: {text_width}x{text_height}"
+                )
+            else:
+                # Rough estimate if no font available - make it very large
+                text_width = len(text) * font_size * 0.8
+                text_height = font_size
+                logger.info(
+                    f"No font available, estimated text dimensions: {text_width}x{text_height}"
+                )
+
+            # Position in lower right corner with some padding
+            padding = 30
+            x = img.width - text_width - padding
+            y = img.height - text_height - padding
+
+            # Draw white text
+            draw.text((x, y), text, fill=(255, 255, 255), font=font)
+
+        # Convert to JPEG and return
         buf = io.BytesIO()
+        # Convert to RGB if necessary (for RGBA images with transparency)
+        if img.mode in ("RGBA", "LA", "P"):
+            rgb_img = Image.new("RGB", img.size, (255, 255, 255))
+            if img.mode == "P":
+                img = img.convert("RGBA")
+            rgb_img.paste(img, mask=img.split()[-1] if img.mode == "RGBA" else None)
+            img = rgb_img
+
         img.save(buf, format="JPEG", quality=quality)
         buf.seek(0)
 
@@ -474,39 +622,66 @@ async def get_photos_srcset():
         ```json
         [
             {
-                "suffix": "-thumb",
-                "width": 200,
-                "height": 150,
-                "description": "Thumbnail"
-            },
-            {
                 "suffix": "-xxl",
                 "width": 1920,
-                "height": 1440,
                 "description": "4K desktop"
             }
         ]
         ```
     """
-    sizes_info = []
+    return SCREEN_SIZES
 
+
+@app.get("/api/photos/{photo_id}/srcset")
+async def get_photo_srcset(photo_id: str, db: DB = Depends(get_db)):
+    """
+    Get srcset string for a specific photo in the format expected by HTML img srcset attribute.
+
+    Returns the actual image sizes that /api/photos/{photo_id}/img{-XXX} returns for this specific photo,
+    taking into account the photo's actual dimensions (no upscaling).
+
+    Access rules handled by /authorize
+
+    Args:
+        photo_id (str): The UUID of the photo to generate srcset for
+
+    Returns:
+        Plain text srcset string, e.g.:
+        "/photos/api/photos/{photo_id}/img-sm 480w, /photos/api/photos/{photo_id}/img-md 768w, /photos/api/photos/{photo_id}/img 1920w"
+    """
+    photo = db.photos.get(photo_id)
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+
+    srcset_entries = []
+
+    # Process all defined screen sizes
     for suffix, size_config in SCREEN_SIZES.items():
-        width = size_config["width"]
+        target_width = size_config["width"]
 
-        # Skip the original size (empty suffix)
-        if suffix == "":
+        # Scale based on width only, maintaining aspect ratio
+        # Don't upscale - limit to original width
+        actual_width = min(target_width, photo.width)
+        url = f"/photos/api/photos/{photo_id}/img{suffix}"
+
+        # Skip sizes that would be the same as original or larger than original
+        if actual_width >= photo.width:
             continue
 
-        sizes_info.append(
-            {
-                "suffix": suffix,
-                "width": width,
-                "height": size_config["height"],
-                "description": size_config["description"],
-            }
-        )
+        srcset_entries.append(f"{url} {actual_width}w")
 
-    return sizes_info
+    # Always include the original size at the end
+    original_url = f"/photos/api/photos/{photo_id}/img"
+    if not any(f"{original_url} {photo.width}w" == entry for entry in srcset_entries):
+        srcset_entries.append(f"{original_url} {photo.width}w")
+
+    # Sort by width for consistent ordering
+    srcset_entries.sort(key=lambda x: int(x.split()[-1][:-1]))  # Sort by width value
+
+    # Return as plain text
+    from fastapi.responses import PlainTextResponse
+
+    return PlainTextResponse(", ".join(srcset_entries))
 
 
 # Keep other endpoints from original file...

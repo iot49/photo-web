@@ -26,8 +26,8 @@ export class PwSlideshow extends LitElement {
   private albums!: Albums;
 
   @consume({ context: srcsetInfoContext, subscribe: true })
-  private srcsetInfo!: SrcsetInfo;
-
+  private srcsetInfo!: SrcsetInfo;  
+  
   @query('#slideshow') slideshow!: HTMLDivElement;
 
   // colon-separated uid's of albums to display
@@ -69,6 +69,7 @@ export class PwSlideshow extends LitElement {
     }
     this.photos = photos;
   }
+
 
   async connectedCallback() {
     super.connectedCallback();
@@ -271,24 +272,14 @@ export class PwSlideshow extends LitElement {
         return nothing;
       }
 
-      // Detect panoramic images (aspect ratio > 2:1 or < 1:2)
-      const isPanoramic = photo.width && photo.height && (photo.width / photo.height > 2 || photo.height / photo.width > 2);
-
-      // Calculate scale factor for sizes attribute to force browser to choose sufficiently high resolution for panoramic images
-      let scaleFactor = 1.0;
-      if (this.theme === 'ken-burns') {
-        scaleFactor = isPanoramic ? 2.0 : SCALE_FACTOR;
-      }
-      const sizes = `${Math.round(100 * scaleFactor)}vw`;
-
       // Calculate dynamic slide time factor and store as CSS custom property
       const dynamicTimeFactor = this.calculateDynamicSlideTimeFactorForPhoto(photo);
       const style = `--data-dynamic-time-factor: ${dynamicTimeFactor}`;
 
       return html` <img
         src=${uri}
-        srcset=${this.generateSrcset(photo.uuid)}
-        sizes="${sizes}"
+        srcset=${this.srcsetInfo.srcsetFor(photo)}
+        sizes="100vw"
         alt="${photo.title || 'Photo'}"
         loading="lazy"
         style="${style}"
@@ -306,23 +297,6 @@ export class PwSlideshow extends LitElement {
     }
   }
 
-  private generateSrcset(photoUuid: string): string {
-    if (!this.srcsetInfo || this.srcsetInfo.length === 0) {
-      return '';
-    }
-
-    // Filter out very small resolutions for ken-burns theme to ensure adequate quality
-    const minWidth = this.theme === 'ken-burns' ? 1200 : 400;
-    const filteredSizes = this.srcsetInfo.filter((size) => size.width >= minWidth);
-
-    // Include filtered scaled versions from srcsetInfo
-    const scaledSources = filteredSizes.map((size) => `/photos/api/photos/${photoUuid}/img${size.suffix} ${size.width}w`);
-
-    // Add the unscaled image endpoint (no suffix) as the highest resolution option
-    scaledSources.push(`/photos/api/photos/${photoUuid}/img`);
-
-    return scaledSources.join(', ');
-  }
 
   /**
    * Calculate dynamic slide timing factor for a specific photo
@@ -364,15 +338,15 @@ export class PwSlideshow extends LitElement {
 
       #slideshow {
         position: relative;
-        width: 100%;
-        height: 100%;
+        width: 100vw;
+        height: 100vh;
         background: black;
       }
 
       .slide-wrapper {
         position: absolute;
-        width: 100%;
-        height: 100%;
+        width: 100vw;
+        height: 100vh;
         opacity: 0;
         display: flex;
         align-items: center;
@@ -381,8 +355,8 @@ export class PwSlideshow extends LitElement {
 
       .slide-wrapper img,
       .slide-wrapper video {
-        width: 100%;
-        height: 100%;
+        width: 100vw;
+        height: 100vh;
         object-fit: contain;
         object-position: 50% 50%;
         z-index: 0;

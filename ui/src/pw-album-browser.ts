@@ -1,8 +1,8 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
-import { AlbumFilter, Albums } from './app/interfaces.js';
+import { AlbumFilter, Albums, SrcsetInfo } from './app/interfaces.js';
 import { consume } from '@lit/context';
-import { albumsContext } from './app/context.js';
+import { albumsContext, srcsetInfoContext } from './app/context.js';
 import { album_tree, TreeNode } from './app/album_tree.js';
 
 /**
@@ -164,6 +164,11 @@ export class PwAlbumBrowser extends LitElement {
   @consume({ context: albumsContext, subscribe: true })
   private albums!: Albums;
 
+  @consume({ context: srcsetInfoContext, subscribe: true })
+  private srcsetInfo!: SrcsetInfo;
+
+
+
   get albumTree() {
     return album_tree(this.albums);
   }
@@ -175,6 +180,7 @@ export class PwAlbumBrowser extends LitElement {
     // Sort albums alphabetically by title
     return Object.fromEntries(Object.entries(filtered).sort(([, a], [, b]) => a.title.localeCompare(b.title)));
   }
+
 
   override render() {
     return html`
@@ -197,7 +203,7 @@ export class PwAlbumBrowser extends LitElement {
   private handleFolderClick(event: Event, folderPath: string) {
     // Prevent event bubbling to parent tree items
     event.stopPropagation();
-    
+
     // Update the album filter to show only albums in the selected folder
     this.albumFilter = new AlbumFilter();
     this.albumFilter.path = folderPath;
@@ -253,26 +259,27 @@ export class PwAlbumBrowser extends LitElement {
 
     // For leaf nodes (empty folders)
     const currentPath = this.buildNodePath(node, parentPath);
-    return html` <sl-tree-item> <span class="folder-name" @click=${(e: Event) => this.handleFolderClick(e, currentPath)}>${node.name}</span> </sl-tree-item> `;
+    return html`
+      <sl-tree-item> <span class="folder-name" @click=${(e: Event) => this.handleFolderClick(e, currentPath)}>${node.name}</span> </sl-tree-item>
+    `;
   }
 
   private renderAlbumGrid() {
     // Use filteredAlbums which are already sorted by title
     const albums = Object.values(this.filteredAlbums);
 
-    // Use srcset to let browser choose appropriate image size
-    // FIXED: carousel component now properly reacts to uuid changes
     return html`
-      ${albums.map(
-        (album) => html`
+      ${albums.map((album) => {
+        const srcset = album.thumbnail ? this.srcsetInfo.srcsetFor(album.thumbnail) : '';
+        return html`
           <div class="album-card">
             <a href="/ui/slideshow?playlist=${album.uuid}" class="album-card-link" title="Ken Burns Slideshow">
               <div class="album-thumbnail">
                 ${album.thumbnail
                   ? html`
                       <img
-                        src="/photos/api/photos/${album.thumbnail}/img-sm"
-                        srcset="/photos/api/photos/${album.thumbnail}/img-sm 200w, /photos/api/photos/${album.thumbnail}/img-md 400w"
+                        src="/photos/api/photos/${album.thumbnail.uuid}/img-sm"
+                        srcset="${srcset}"
                         sizes="(max-width: 300px) 200px, 400px"
                         alt="${album.title}"
                         loading="lazy"
@@ -290,8 +297,8 @@ export class PwAlbumBrowser extends LitElement {
               </div>
             </div>
           </div>
-        `
-      )}
+        `;
+      })}
     `;
   }
 }

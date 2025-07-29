@@ -5,6 +5,7 @@ from models import (
     AlbumDateRange,
     AlbumLocation,
     AlbumModelWithPhotos,
+    PhotoModel,
     PhotoModelWithPath,
 )
 from osxphotos import PhotosDB
@@ -166,7 +167,9 @@ def read_db(db_path: str, filters: str) -> DB:
             "keywords": list(
                 {k for photo in album.photos for k in photo.keywords if k}
             ),
-            "thumbnail": album.photos[0].uuid if album.photos else None,
+            "thumbnail": PhotoModel.model_validate(photos[album.photos[0].uuid])
+            if album.photos
+            else None,
         }
 
     return DB(albums=albums, photos=photos)

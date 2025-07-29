@@ -53,7 +53,7 @@ class AlbumModel(BaseModel):
     location: Optional[AlbumLocation] = None
     persons: List[str]
     keywords: List[str]
-    thumbnail: Optional[str] = None  # UUID of the thumbnail photo, if available
+    thumbnail: PhotoModel = None
 
 
 class AlbumModelWithPhotos(AlbumModel):
