@@ -170,6 +170,7 @@ def read_db(db_path: str, filters: str) -> DB:
             "thumbnail": PhotoModel.model_validate(photos[album.photos[0].uuid])
             if album.photos
             else None,
+            "created": album.creation_date.isoformat(),
         }
 
     return DB(albums=albums, photos=photos)
@@ -178,7 +179,7 @@ def read_db(db_path: str, filters: str) -> DB:
 if __name__ == "__main__":
     data = read_db(
         db_path="/Users/boser/Pictures/Photos Library.photoslibrary",
-        filters="Public/Test:Proteced:Private",
+        filters="Public:Proteced:Private",
     )
 
     # Save the data to JSON files using Pydantic's built-in JSON serialization using model_dump_json()

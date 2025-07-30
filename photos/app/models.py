@@ -54,6 +54,10 @@ class AlbumModel(BaseModel):
     persons: List[str]
     keywords: List[str]
     thumbnail: PhotoModel = None
+    created: Annotated[
+        str,
+        Field(description="Creation date in ISO 8601 format"),
+    ]
 
 
 class AlbumModelWithPhotos(AlbumModel):

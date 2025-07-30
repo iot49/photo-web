@@ -1,6 +1,6 @@
-import { LitElement, css, html } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
-import { AlbumFilter, Albums, SrcsetInfo } from './app/interfaces.js';
+import { LitElement, PropertyValues, css, html } from 'lit';
+import { customElement, property } from 'lit/decorators.js';
+import { Albums, SrcsetInfo } from './app/interfaces.js';
 import { consume } from '@lit/context';
 import { albumsContext, srcsetInfoContext } from './app/context.js';
 import { album_tree, TreeNode } from './app/album_tree.js';
@@ -117,19 +117,18 @@ export class PwAlbumBrowser extends LitElement {
 
     .no-thumbnail {
       font-size: 3rem;
-      color: #dee2e6;
+      color: lightblue;
     }
 
     .album-card .album-info {
       padding: 1px;
-      border-top: 1px solid #f8f9fa;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
 
     .album-card .album-title {
-      color: #495057;
+      color: #3f4245;
       text-align: left;
       flex: 1;
       margin-left: 3px;
@@ -149,7 +148,7 @@ export class PwAlbumBrowser extends LitElement {
     }
 
     .album-icon-link {
-      color: #6c757d;
+      color: #3f4245;
       text-decoration: none;
       padding: 4px;
       border-radius: 4px;
@@ -158,7 +157,7 @@ export class PwAlbumBrowser extends LitElement {
 
     .album-icon-link:hover {
       color: var(--sl-color-primary-600);
-      background-color: #f8f9fa;
+      //background-color: #f8f9fa;
     }
   `;
   @consume({ context: albumsContext, subscribe: true })
@@ -167,20 +166,18 @@ export class PwAlbumBrowser extends LitElement {
   @consume({ context: srcsetInfoContext, subscribe: true })
   private srcsetInfo!: SrcsetInfo;
 
-
-
   get albumTree() {
     return album_tree(this.albums);
   }
 
-  @state() private albumFilter = new AlbumFilter();
+  // list of album uid's shown in right panel
+  @property({ type: Object }) playList = new Set<string>();
 
-  get filteredAlbums(): Albums {
-    const filtered = this.albumFilter.filter(this.albums);
-    // Sort albums alphabetically by title
-    return Object.fromEntries(Object.entries(filtered).sort(([, a], [, b]) => a.title.localeCompare(b.title)));
+  protected override firstUpdated(_changedProperties: PropertyValues): void {
+    super.firstUpdated(_changedProperties);
+    const since = new Date(new Date().setFullYear(new Date().getFullYear() - 1));
+    this.createdFilter(since);
   }
-
 
   override render() {
     return html`
@@ -200,14 +197,36 @@ export class PwAlbumBrowser extends LitElement {
     `;
   }
 
-  private handleFolderClick(event: Event, folderPath: string) {
-    // Prevent event bubbling to parent tree items
-    event.stopPropagation();
+  private addAlbumToPlaylist(uid: string) {
+    const newPlaylist = new Set(this.playList);
+    newPlaylist.add(uid);
+    this.playList = newPlaylist;    
+  }
 
-    // Update the album filter to show only albums in the selected folder
-    this.albumFilter = new AlbumFilter();
-    this.albumFilter.path = folderPath;
-    this.requestUpdate();
+  private removeAlbumFromPlaylist(uid: string) {
+    const newPlaylist = new Set(this.playList);
+    newPlaylist.delete(uid);
+    this.playList = newPlaylist;    
+  }
+
+  private pathFilter(folderPath: string) {
+    // add albums matchhing path to playlist
+    const newPlaylist = new Set(this.playList);
+    Object.values(this.albums).forEach((album) => {
+      if (album.path.includes(folderPath)) newPlaylist.add(album.uuid);
+    });
+    // make it reactive
+    this.playList = newPlaylist;
+  }
+
+  private createdFilter(since: Date) {
+    // add albums created since to playlist
+    const newPlaylist = new Set(this.playList);
+    Object.values(this.albums).forEach((album) => {
+      if (new Date(album.created) > since) newPlaylist.add(album.uuid);
+    });
+    // make it reactive
+    this.playList = newPlaylist;
   }
 
   private buildNodePath(node: TreeNode, parentPath: string = ''): string {
@@ -226,7 +245,7 @@ export class PwAlbumBrowser extends LitElement {
           (album: any) => html`
             <sl-tree-item>
               <sl-icon name="image"></sl-icon>
-              <a href="/ui/slideshow?playlist=${album.uuid}" class="album-link"> ${album.title} </a>
+              <span class="album-link" @click=${(_: Event) => this.addAlbumToPlaylist(album.uuid)}>${album.title}</span>
             </sl-tree-item>
           `
         )}
@@ -239,7 +258,7 @@ export class PwAlbumBrowser extends LitElement {
       const currentPath = this.buildNodePath(node, parentPath);
       return html`
         <sl-tree-item>
-          <span class="folder-name" @click=${(e: Event) => this.handleFolderClick(e, currentPath)}>${node.name}</span>
+          <span class="folder-name" @click=${(_: Event) => this.pathFilter(currentPath)}>${node.name}</span>
 
           <!-- Child nodes -->
           ${node.nodes?.map((childNode: any) => this.renderAlbumTree(childNode, level + 1, currentPath))}
@@ -249,31 +268,23 @@ export class PwAlbumBrowser extends LitElement {
             (album: any) => html`
               <sl-tree-item>
                 <sl-icon name="image"></sl-icon>
-                <a href="/ui/slideshow?playlist=${album.uuid}" class="album-link"> ${album.title} </a>
+                <span class="album-link" @click=${(_: Event) => this.addAlbumToPlaylist(album.uuid)}>${album.title}</span>
               </sl-tree-item>
             `
           )}
         </sl-tree-item>
       `;
     }
-
-    // For leaf nodes (empty folders)
-    const currentPath = this.buildNodePath(node, parentPath);
-    return html`
-      <sl-tree-item> <span class="folder-name" @click=${(e: Event) => this.handleFolderClick(e, currentPath)}>${node.name}</span> </sl-tree-item>
-    `;
   }
 
   private renderAlbumGrid() {
-    // Use filteredAlbums which are already sorted by title
-    const albums = Object.values(this.filteredAlbums);
-
     return html`
-      ${albums.map((album) => {
+      ${Array.from(this.playList).map((albumUid) => {
+        const album = this.albums[albumUid];
         const srcset = album.thumbnail ? this.srcsetInfo.srcsetFor(album.thumbnail) : '';
         return html`
           <div class="album-card">
-            <a href="/ui/slideshow?playlist=${album.uuid}" class="album-card-link" title="Ken Burns Slideshow">
+            <a href="/ui/slideshow?playlist=${album.uuid}" class="album-card-link" title="Animated Slideshow">
               <div class="album-thumbnail">
                 ${album.thumbnail
                   ? html`
@@ -291,7 +302,10 @@ export class PwAlbumBrowser extends LitElement {
             <div class="album-info">
               <div class="album-title">${album.title}</div>
               <div class="album-icons">
-                <a href="/ui/slideshow?playlist=${album.uuid}&theme=plain&autoplay=false" class="album-icon-link" title="Carousel">
+                <span class="album-icon-link" @click="${(_: Event) => this.removeAlbumFromPlaylist(album.uuid)}" title="Remove from playlist">
+                  <sl-icon name="trash"></sl-icon>
+                </span>
+                <a href="/ui/slideshow?playlist=${album.uuid}&theme=plain&autoplay=true" class="album-icon-link" title="Carousel">
                   <sl-icon name="play"></sl-icon>
                 </a>
               </div>
