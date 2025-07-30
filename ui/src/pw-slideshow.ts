@@ -15,9 +15,9 @@ to achieve alternate behaviors.
 **ken-burns**: Animate transition opacity, translate image position in viewport, scale image
 */
 
-const TRANSITION_MS = 2000; // duration of slide transition in [ms]
-const SLIDE_MS = 5000; // time each slide is shown in [ms]; note: extra wide or tall slides take more time
-const PANORAMA_TIME = 5; // increase parnorama image animation time by up to this factor
+const TRANSITION_MS = 1500; // duration of slide transition in [ms]
+const SLIDE_MS = 4200; // time each slide is shown in [ms]; note: extra wide or tall slides take more time
+const PANORAMA_TIME = 2.4; // increase parnorama image animation time by up to this factor
 const SCALE_FACTOR = 1.2; // factor by which the image is scaled during translation
 
 @customElement('pw-slideshow')
@@ -26,8 +26,8 @@ export class PwSlideshow extends LitElement {
   private albums!: Albums;
 
   @consume({ context: srcsetInfoContext, subscribe: true })
-  private srcsetInfo!: SrcsetInfo;  
-  
+  private srcsetInfo!: SrcsetInfo;
+
   @query('#slideshow') slideshow!: HTMLDivElement;
 
   // colon-separated uid's of albums to display
@@ -60,7 +60,7 @@ export class PwSlideshow extends LitElement {
       try {
         photos.push(await get_json(`/photos/api/albums/${uid}`));
       } catch (error) {
-        console.error(`Failed to load photos for album: {uid}, trying again`, error);
+        console.error(`Failed to load photos for album: ${uid}, trying again`, error);
         setTimeout(() => {
           this.loadPhotos();
         }, 1000);
@@ -69,7 +69,6 @@ export class PwSlideshow extends LitElement {
     }
     this.photos = photos;
   }
-
 
   async connectedCallback() {
     super.connectedCallback();
@@ -193,8 +192,11 @@ export class PwSlideshow extends LitElement {
     }
   }
 
+  private toggleTheme() {
+    this.theme = this.theme === 'ken-burns' ? 'plain' : 'ken-burns';
+  }
+
   private handlePrevClick() {
-    // Cancel any pending autoplay timeout
     if (this.autoplayTimeoutId !== null) {
       clearTimeout(this.autoplayTimeoutId);
       this.autoplayTimeoutId = null;
@@ -203,7 +205,6 @@ export class PwSlideshow extends LitElement {
   }
 
   private handleNextClick() {
-    // Cancel any pending autoplay timeout
     if (this.autoplayTimeoutId !== null) {
       clearTimeout(this.autoplayTimeoutId);
       this.autoplayTimeoutId = null;
@@ -255,11 +256,23 @@ export class PwSlideshow extends LitElement {
           <div class="title"><p>The End</p></div>
         </div>
       </div>
-      <div class="overlay prev-overlay" @click=${() => this.handlePrevClick()}></div>
-      <div class="overlay next-overlay" @click=${() => this.handleNextClick()}></div>
-      <div class="overlay center-overlay" @click=${() => this.toggleAutoplay()}></div>
-      <div class="overlay top-overlay" @click=${() => this.endSlideshow()}></div>
-      <div class="overlay bottom-overlay" @click=${() => console.log('implement an action for bottom clicks')}></div>
+      <div id="overlays">
+        <div class="overlay prev-overlay" @click=${() => this.handlePrevClick()}>
+          <sl-icon name="caret-left"></sl-icon>
+        </div>
+        <div class="overlay next-overlay" @click=${() => this.handleNextClick()}>
+          <sl-icon name="caret-right"></sl-icon>
+        </div>
+        <div class="overlay center-overlay" @click=${() => this.toggleAutoplay()}>
+          <sl-icon name="${this.autoplay ? 'pause' : 'play-btn'}"></sl-icon>
+        </div>
+        <div class="overlay top-overlay" @click=${() => this.endSlideshow()}>
+          <sl-icon name="x-lg"></sl-icon>
+        </div>
+        <div class="overlay bottom-overlay" @click=${() => this.toggleTheme()}>
+          <sl-icon name="images"></sl-icon>
+        </div>
+      </div>
     `;
   }
 
@@ -297,7 +310,6 @@ export class PwSlideshow extends LitElement {
     }
   }
 
-
   /**
    * Calculate dynamic slide timing factor for a specific photo
    */
@@ -323,7 +335,6 @@ export class PwSlideshow extends LitElement {
         width: 100vw;
         height: 100vh;
         box-sizing: border-box;
-        /* BUG: scrollbars show despite overflow hidden */
         overflow: hidden;
       }
 
@@ -505,6 +516,17 @@ export class PwSlideshow extends LitElement {
 
       /* Slideshow controls: prev, next, start/stop animation, ... */
 
+      #overlays {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        bottom: 20px;
+        left: 20px;
+        z-index: 10;
+        /* border: 1px solid yellow; */
+      }
+
+      /* individual overlay placements */
       .overlay {
         position: absolute;
         top: 50%;
@@ -512,9 +534,8 @@ export class PwSlideshow extends LitElement {
         width: 25%;
         height: 45%;
         background: transparent;
-        z-index: 100;
         cursor: pointer;
-        /* border: 1px solid yellow; */
+        /* border: 1px solid white; */
       }
 
       .prev-overlay {
@@ -542,6 +563,26 @@ export class PwSlideshow extends LitElement {
         height: 25%;
         width: 98%;
         transform: translateX(-50%);
+      }
+
+      /* sl-icon sizing is now handled by the more specific #overlays sl-icon selector below */
+
+      /* Hide overlay icons by default */
+      #overlays sl-icon {
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        color: rgba(255, 255, 255, 0.8);
+        pointer-events: none;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 4rem;
+      }
+
+      /* Show sl-icon when hovering over #overlays */
+      #overlays:hover sl-icon {
+        opacity: 0.8;
       }
 
       /* Title slide */
