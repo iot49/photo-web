@@ -1,8 +1,8 @@
 import { LitElement, PropertyValues, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { Albums, SrcsetInfo } from './app/interfaces.js';
+import { Albums, Me, SrcsetInfo } from './app/interfaces.js';
 import { consume } from '@lit/context';
-import { albumsContext, srcsetInfoContext } from './app/context.js';
+import { albumsContext, meContext, srcsetInfoContext } from './app/context.js';
 import { album_tree, TreeNode } from './app/album_tree.js';
 
 /**
@@ -160,6 +160,11 @@ export class PwAlbumBrowser extends LitElement {
       //background-color: #f8f9fa;
     }
   `;
+
+  @consume({ context: meContext, subscribe: true })
+  @property({ attribute: false })
+  private me!: Me;
+    
   @consume({ context: albumsContext, subscribe: true })
   private albums!: Albums;
 
@@ -167,7 +172,8 @@ export class PwAlbumBrowser extends LitElement {
   private srcsetInfo!: SrcsetInfo;
 
   get albumTree() {
-    return album_tree(this.albums);
+    // Check if 'admin' role is present in the roles string
+    return album_tree(this.albums, this.me.roles.includes('admin'));
   }
 
   // list of album uid's shown in right panel

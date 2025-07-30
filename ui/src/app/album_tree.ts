@@ -6,7 +6,8 @@ export interface TreeNode {
     albums: AlbumModel[];
 }
 
-export function album_tree(albums: Albums): TreeNode {
+// TODO: skip albums with path="Test" unless isAdmin == true
+export function album_tree(albums: Albums, isAdmin: boolean): TreeNode {
     const root: TreeNode = {
         name: undefined,
         nodes: [],
@@ -37,6 +38,12 @@ export function album_tree(albums: Albums): TreeNode {
     for (const uuid in albums) {
         if (albums.hasOwnProperty(uuid)) {
             const album = albums[uuid];
+            
+            // Skip albums with path="Test" unless isAdmin is true
+            if (album.path === "Test" && !isAdmin) {
+                continue;
+            }
+            
             const pathParts = album.path.split('/').filter(part => part !== '');
             const targetNode = getOrCreateNode(root, pathParts);
             targetNode.albums.push(album);
