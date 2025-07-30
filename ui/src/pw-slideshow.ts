@@ -1,4 +1,4 @@
-import { html, LitElement, css, PropertyValues, nothing } from 'lit';
+import { html, LitElement, css, PropertyValues } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
 import { get_json } from './app/api';
@@ -55,6 +55,10 @@ export class PwSlideshow extends LitElement {
 
   // load descriptions of all photos in all albums in the playlist
   private async loadPhotos(): Promise<void> {
+    if (this.playlist === '') {
+      this.photos = [];
+      return;
+    }
     const photos: PhotoModel[][] = [];
     for (const uid of this.uids) {
       try {
@@ -240,6 +244,16 @@ export class PwSlideshow extends LitElement {
       `;
     }
 
+    if (this.photos.length < 1) {
+      return html`
+        <div id="slideshow">
+          <div class="slide-wrapper">
+            <div class="title"><p>No albums selected</p></div>
+          </div>
+        </div>
+      `;
+    }
+
     // render each album with a title followed by the photos
     return html`
       <div id="slideshow">
@@ -281,8 +295,7 @@ export class PwSlideshow extends LitElement {
     const uri = `/photos/api/photos/${photo.uuid}/img`;
     if (mime_type.startsWith('image')) {
       if (mime_type === 'image/x-adobe-dng') {
-        console.log(`No renderer for MIME type ${mime_type}`);
-        return nothing;
+        return html`<div class="title"><p>No render for MIME type<br/>${mime_type}</p></div>`;
       }
 
       // Calculate dynamic slide time factor and store as CSS custom property
@@ -305,8 +318,7 @@ export class PwSlideshow extends LitElement {
         </video>
       `;
     } else {
-      console.log(`No renderer for MIME type ${mime_type}`);
-      return nothing;
+      return html`<div class="title"><p>No render for MIME type<br/>${mime_type}</p></div>`;
     }
   }
 

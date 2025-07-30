@@ -159,12 +159,52 @@ export class PwAlbumBrowser extends LitElement {
       color: var(--sl-color-primary-600);
       //background-color: #f8f9fa;
     }
+
+    .nav-play-icon {
+      color: white;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 60px;
+      width: 60px;
+      border-radius: 4px;
+      transition: background-color 0.3s;
+    }
+
+    .nav-play-icon:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .nav-play-icon sl-icon {
+      font-size: 1.2rem;
+    }
+
+    .nav-controls-container {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      justify-content: space-between;
+      width: 100%;
+    }
+
+    .nav-controls-container sl-icon {
+      color: white;
+      cursor: pointer;
+      padding: 22px;
+      border-radius: 4px;
+      transition: background-color 0.3s;
+    }
+
+    .nav-controls-container sl-icon:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
   `;
 
   @consume({ context: meContext, subscribe: true })
   @property({ attribute: false })
   private me!: Me;
-    
+
   @consume({ context: albumsContext, subscribe: true })
   private albums!: Albums;
 
@@ -188,6 +228,25 @@ export class PwAlbumBrowser extends LitElement {
   override render() {
     return html`
       <pw-nav-page>
+        <div class="nav-controls-container" slot="nav-controls">
+          <sl-tooltip content="Play selected albums with Ken Burns style animation">
+            <a href="/ui/slideshow?playlist=${Array.from(this.playList).join(':')}&theme=ken-burns&autoplay=true" class="nav-play-icon">
+              <sl-icon name="arrow-right-circle"></sl-icon>
+            </a>
+          </sl-tooltip>
+          <sl-tooltip content="Play selected albums without animations">
+            <a href="/ui/slideshow?playlist=${Array.from(this.playList).join(':')}&theme=plain&autoplay=true" class="nav-play-icon">
+              <sl-icon name="play"></sl-icon>
+            </a>
+          </sl-tooltip>
+          <sl-tooltip content="Select recently added albums">
+            <sl-icon name="calendar-range" @click="${(_: Event) => this.createdFilter(new Date(new Date().setMonth(new Date().getMonth() - 1)))}"></sl-icon>
+          </sl-tooltip>
+          <sl-tooltip content="Clear selected albums">
+            <sl-icon name="x-lg" @click="${(_: Event) => (this.playList = new Set<string>())}"></sl-icon>
+          </sl-tooltip>
+        </div>
+
         <sl-split-panel position-in-pixels="250">
           <!-- Left Pane: Album Tree -->
           <div class="left-pane" slot="start">
@@ -206,13 +265,13 @@ export class PwAlbumBrowser extends LitElement {
   private addAlbumToPlaylist(uid: string) {
     const newPlaylist = new Set(this.playList);
     newPlaylist.add(uid);
-    this.playList = newPlaylist;    
+    this.playList = newPlaylist;
   }
 
   private removeAlbumFromPlaylist(uid: string) {
     const newPlaylist = new Set(this.playList);
     newPlaylist.delete(uid);
-    this.playList = newPlaylist;    
+    this.playList = newPlaylist;
   }
 
   private pathFilter(folderPath: string) {
@@ -259,7 +318,6 @@ export class PwAlbumBrowser extends LitElement {
     }
 
     // For folder nodes
-    // FIXED: handleFolderClick now works for all tree levels with proper event handling
     if (node.nodes?.length > 0 || node.albums?.length > 0) {
       const currentPath = this.buildNodePath(node, parentPath);
       return html`
@@ -290,30 +348,36 @@ export class PwAlbumBrowser extends LitElement {
         const srcset = album.thumbnail ? this.srcsetInfo.srcsetFor(album.thumbnail) : '';
         return html`
           <div class="album-card">
-            <a href="/ui/slideshow?playlist=${album.uuid}" class="album-card-link" title="Animated Slideshow">
-              <div class="album-thumbnail">
-                ${album.thumbnail
-                  ? html`
-                      <img
-                        src="/photos/api/photos/${album.thumbnail.uuid}/img-sm"
-                        srcset="${srcset}"
-                        sizes="(max-width: 300px) 200px, 400px"
-                        alt="${album.title}"
-                        loading="lazy"
-                      />
-                    `
-                  : html` <div class="no-thumbnail">📷</div> `}
-              </div>
-            </a>
+            <sl-tooltip content="Play Animated Slideshow">
+              <a href="/ui/slideshow?playlist=${album.uuid}" class="album-card-link">
+                <div class="album-thumbnail">
+                  ${album.thumbnail
+                    ? html`
+                        <img
+                          src="/photos/api/photos/${album.thumbnail.uuid}/img-sm"
+                          srcset="${srcset}"
+                          sizes="(max-width: 300px) 200px, 400px"
+                          alt="${album.title}"
+                          loading="lazy"
+                        />
+                      `
+                    : html` <div class="no-thumbnail">📷</div> `}
+                </div>
+              </a>
+            </sl-tooltip>
             <div class="album-info">
               <div class="album-title">${album.title}</div>
               <div class="album-icons">
-                <span class="album-icon-link" @click="${(_: Event) => this.removeAlbumFromPlaylist(album.uuid)}" title="Remove from playlist">
-                  <sl-icon name="trash"></sl-icon>
-                </span>
-                <a href="/ui/slideshow?playlist=${album.uuid}&theme=plain&autoplay=true" class="album-icon-link" title="Carousel">
-                  <sl-icon name="play"></sl-icon>
-                </a>
+                <sl-tooltip content="Remove album from playlist">
+                  <span class="album-icon-link" @click="${(_: Event) => this.removeAlbumFromPlaylist(album.uuid)}">
+                    <sl-icon name="trash"></sl-icon>
+                  </span>
+                </sl-tooltip>
+                <sl-tooltip content="Play album without animations">
+                  <a href="/ui/slideshow?playlist=${album.uuid}&theme=plain&autoplay=true" class="album-icon-link">
+                    <sl-icon name="play"></sl-icon>
+                  </a>
+                </sl-tooltip>
               </div>
             </div>
           </div>

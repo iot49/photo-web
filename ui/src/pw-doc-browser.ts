@@ -119,7 +119,6 @@ export class PwDocBrowser extends LitElement {
         });
         target.append(treeItem);
         if (fileName === 'index.md') {
-          console.log('showing index.md', dataPath);
           this.fileRenderer.showFile(dataPath);
         }
       }

@@ -40,6 +40,12 @@ export class PwNavPage extends LitElement {
       z-index: 1000;
     }
 
+    .navbar-right {
+      display: flex;
+      align-items: center;
+      gap: 0;
+    }
+
     .nav-title {
       font-size: 1.5rem;
       font-weight: bold;
@@ -149,19 +155,26 @@ export class PwNavPage extends LitElement {
         <!-- Navigation Bar -->
         <nav class="navbar">
           <div class="nav-title" @click="${this.handleAlbumClick}">${import.meta.env.VITE_TITLE || 'Photo Web'}</div>
-          <slot name="nav-controls"></slot>
-          <div class="nav-user">
-            ${this.parentIsDoc
-              ? html`<sl-button variant="text" size="medium" @click="${this.handleAlbumClick}" title="Go to Albums" class="theme-toggle">
-                  <sl-icon name="images"></sl-icon>
-                </sl-button>`
-              : html`<sl-button variant="text" size="medium" @click="${this.handleDocClick}" title="Go to Documents" class="theme-toggle">
-                  <sl-icon name="file-text"></sl-icon>
-                </sl-button>`}
-            <sl-button variant="text" size="medium" @click="${this.toggleTheme}" title="Toggle theme" class="theme-toggle">
-              <sl-icon name="${this.themeManager.getCurrentTheme() === 'dark' ? 'sun' : 'moon'}"></sl-icon>
-            </sl-button>
-            ${this.isAdmin() ? this.renderPulldown() : ''} ${this.me?.email ? this.renderUserAvatar() : this.renderLoginButton()}
+          <div class="navbar-right">
+            <slot name="nav-controls"></slot>
+            <div class="nav-user">
+              <sl-tooltip content="Toggle between Photo Albums and Documents">
+                ${this.parentIsDoc
+                  ? html`<sl-button variant="text" size="medium" @click="${this.handleAlbumClick}" class="theme-toggle">
+                      <sl-icon name="images"></sl-icon>
+                    </sl-button>`
+                  : html`<sl-button variant="text" size="medium" @click="${this.handleDocClick}" class="theme-toggle">
+                      <sl-icon name="file-text"></sl-icon>
+                    </sl-button>`}
+              </sl-tooltip>
+              <sl-tooltip content="Toggle between dark and light mode">
+                <sl-button variant="text" size="medium" @click="${this.toggleTheme}" class="theme-toggle">
+                  <sl-icon name="${this.themeManager.getCurrentTheme() === 'dark' ? 'sun' : 'moon'}"></sl-icon>
+                </sl-button>
+              </sl-tooltip>
+              ${this.isAdmin() ? this.renderPulldown() : ''} 
+              ${this.me?.email ? this.renderUserAvatar() : this.renderLoginButton()}
+            </div>
           </div>
         </nav>
 
@@ -175,7 +188,7 @@ export class PwNavPage extends LitElement {
       <sl-dialog id="reload-dialog" label="Database Reload" no-header contained>
         <div style="display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 20px;" role="status" aria-live="polite">
           <sl-spinner style="font-size: 2rem;" aria-label="Loading"></sl-spinner>
-          <div>Reloading album information from Apple Photo DB ...<br/>This takes about a minute!</div>
+          <div>Reloading album information from Apple Photo DB ...<br />This takes about a minute!</div>
         </div>
       </sl-dialog>
 
@@ -278,7 +291,7 @@ export class PwNavPage extends LitElement {
   private async reloadDb() {
     try {
       const resp = await get_json('/photos/api/reload-db');
-      console.log("reload-db", resp);
+      console.log('reload-db', resp);
     } catch (e) {
       if (e instanceof Error) {
         console.log(`failed to reload db: ${e.message}`);
