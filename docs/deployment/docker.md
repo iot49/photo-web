@@ -19,7 +19,7 @@ graph TB
         
         subgraph "Volumes"
             PL[Photos Library<br/>Read-Only]
-            DOCS[Documents<br/>Read-Only]
+            FILES[Documents<br/>Read-Only]
             DB[SQLite Database]
             CERTS[SSL Certificates]
         end
@@ -40,7 +40,7 @@ graph TB
     
     A --> DB
     P --> PL
-    D --> DOCS
+    D --> FILES
     T --> CERTS
 ```
 
@@ -78,7 +78,7 @@ AUTH_COOKIE_EXPIRATION_DAYS=30
 
 # Data Sources
 PHOTOS_LIBRARY_PATH=/data/photos/Photos Library.photoslibrary
-DOCS_PATH=/data/filesuments
+FILES_PATH=/data/filesuments
 
 # Security
 SESSION_SECRET_KEY=your-secure-random-key-here
@@ -284,7 +284,7 @@ networks:
 # Read-only volume mounts
 volumes:
   - ${PHOTOS_LIBRARY_PATH}:/photos:ro
-  - ${DOCS_PATH}:/filesuments:ro
+  - ${FILES_PATH}:/filesuments:ro
   - ./auth/app/roles.csv:/app/roles.csv:ro
 ```
 

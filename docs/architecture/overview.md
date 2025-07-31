@@ -33,7 +33,7 @@ graph TB
     
     subgraph "Data Sources"
         PL[Apple Photos Library<br/>Read-Only Mount]
-        DOCS[Documents Folder<br/>Read-Only Mount]
+        FILES[Documents Folder<br/>Read-Only Mount]
         DB[(SQLite Database)]
     end
     
@@ -51,7 +51,7 @@ graph TB
     A --> FB
     A --> DB
     P --> PL
-    D --> DOCS
+    D --> FILES
     
     UI -.-> A
     UI -.-> P

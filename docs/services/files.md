@@ -25,7 +25,7 @@ graph TB
     end
     
     subgraph "Document Storage"
-        DOCS[Host Documents]
+        FILES[Host Documents]
         REALMS[Role-based Realms]
     end
     
@@ -37,7 +37,7 @@ graph TB
     USER --> UI
     UI --> API
     API --> FS
-    FS --> DOCS
+    FS --> FILES
     API --> REALMS
     
     TRAEFIK -.->|Auth Delegation| AUTHSVC
@@ -215,7 +215,7 @@ EXCLUDE_FOLDERS = ["__pycache__", ".venv", ".git", ".*cache"]
 
 ```bash
 # Document Repository
-DOCS=/Users/boser/Documents        # Host path to documents
+FILES=/Users/boser/Documents        # Host path to documents
 
 # Service Configuration
 ROOT_DOMAIN=dev49.org              # Base domain for URLs
@@ -227,7 +227,7 @@ TZ=America/Los_Angeles             # Timezone
 ```yaml
 files:
   volumes:
-    - ${DOCS}:/docs:ro              # Read-only access to host documents
+    - ${FILES}:/docs:ro              # Read-only access to host documents
 ```
 
 ### Security Configuration

@@ -1,0 +1,25 @@
+# secrets
+.env
+auth/firebase_secrets/
+
+# misc
+.DS_Store
+.envrc
+BACKUP/
+memory-bank/
+photo-web-implementation-proposal.md
+pyproject.toml
+test_auth.py
+test_delegation.py
+test_photo_authorization.py
+
+
+# machine generated data
+__pycache__/
+.venv
+.pytest_cache
+site
+nginx/html/ui/
+nginx/html/static/docs/
+auth.db
+uv.lock

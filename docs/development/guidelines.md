@@ -137,7 +137,7 @@ AUTH_COOKIE_EXPIRATION_DAYS=30
 
 # Services
 PHOTOS_LIBRARY_PATH=/path/to/Photos Library.photoslibrary
-DOCS_PATH=/path/to/documents
+FILES_PATH=/path/to/documents
 ```
 
 #### Firebase Secrets (`auth/firebase_secrets`)

@@ -79,7 +79,7 @@ Access to photo albums and individual photos works as follows: Albums in folder 
 > [!CAUTION]
 > The public/protected/private access rights are deeply ingrained in the way the `photos` service works. Modification would require a major refactoring of the service.
 
-Access to documents is based on the name of folders in the `${DOCS}` directory. Only users with roles that match the folder name can access the documents in that folder. Matching is case insensitive. For example, a user with the `private` role can access documents in the `Private` folder, but not in the `Public` or `Protected` folders. The `public` role gives access to documents in the `Public` folder.
+Access to documents is based on the name of folders in the `${FILES}` directory. Only users with roles that match the folder name can access the documents in that folder. Matching is case insensitive. For example, a user with the `private` role can access documents in the `Private` folder, but not in the `Public` or `Protected` folders. The `public` role gives access to documents in the `Public` folder.
 
 #### Nginx
 
@@ -93,7 +93,7 @@ The service does not copy the photo library or its contents, but the `/api/photo
 
 #### Doc
 
-The `files` service gives read-only access to the `${DOCS}` folder. It is implemented at a [FastAPI](https://fastapi.tiangolo.com/) server. Endpoint documentation is available at `https://${ROOT_DOMAIN}/auth/openapi.json` or formatted at `https://\${ROOT_DOMAIN}/auth/redoc` and `https://\${ROOT_DOMAIN}/auth/docs`.
+The `files` service gives read-only access to the `${FILES}` folder. It is implemented at a [FastAPI](https://fastapi.tiangolo.com/) server. Endpoint documentation is available at `https://${ROOT_DOMAIN}/auth/openapi.json` or formatted at `https://\${ROOT_DOMAIN}/auth/redoc` and `https://\${ROOT_DOMAIN}/auth/docs`.
 
 #### Cloudflare Tunnel
 
@@ -107,4 +107,4 @@ The frontend is a single page application (SPA) based on [LitElement](https://li
 * `pw-nav-page`: Main look-and feel of the application. It contains the header with navigation and main content area.
 * `pw-photo-browser`: Interface for browsing and viewing albums in the Apple Photos library.
 * `pw-ken-burns`: Shows albums using the Ken Burns effect.
-* `pw-files-browser`: The files browser that allows users to browse and view documents in the `${DOCS}` folder. Renders common formats like markdown, pdf, and images.
+* `pw-files-browser`: The files browser that allows users to browse and view documents in the `${FILES}` folder. Renders common formats like markdown, pdf, and images.

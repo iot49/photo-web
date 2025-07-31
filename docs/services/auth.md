@@ -28,7 +28,7 @@ graph TB
     subgraph "Other Services"
         TRAEFIK[Traefik]
         PHOTOS[Photos Service]
-        DOCS[Doc Service]
+        FILES[Doc Service]
     end
     
     USER --> API
@@ -38,7 +38,7 @@ graph TB
     
     TRAEFIK -.->|Auth Requests| AUTH
     PHOTOS -.->|Delegation| AUTH
-    DOCS -.->|Delegation| AUTH
+    FILES -.->|Delegation| AUTH
 ```
 
 ## Core Components

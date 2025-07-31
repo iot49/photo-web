@@ -43,7 +43,7 @@ graph TB
     subgraph "Data Layer"
         DB[(SQLite)]
         PL[Photos Library]
-        DOCS[Documents]
+        FILES[Documents]
     end
     
     EXT --> T
@@ -54,7 +54,7 @@ graph TB
     
     A --> DB
     P --> PL
-    D --> DOCS
+    D --> FILES
     
     A -.->|Authorization| P
     A -.->|Authorization| D

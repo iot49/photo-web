@@ -22,7 +22,7 @@ graph TB
     
     subgraph "Protected Resources"
         PHOTOS[Photo Library]
-        DOCS[Documents]
+        FILES[Documents]
         USER[User Data]
     end
     
@@ -35,7 +35,7 @@ graph TB
     AUTH --> AUTHZ
     AUTHZ --> RBAC
     RBAC --> PHOTOS
-    RBAC --> DOCS
+    RBAC --> FILES
     RBAC --> USER
 ```
 
@@ -165,7 +165,7 @@ Albums are classified based on their folder structure in Apple Photos:
 Documents are secured based on their folder location:
 
 ```
-${DOCS}/
+${FILES}/
 ├── Public/          # public role required
 ├── Protected/       # protected role required
 ├── Private/         # private role required

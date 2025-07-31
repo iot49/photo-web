@@ -108,7 +108,7 @@ services:
       - .env
     volumes:
       # IMPORTANT: give Docker and Terminal "Full Disk Access" in System Preferences/Privacy & Security
-      - ${PHOTOS_LIBRARY}:${PHOTOS_LIBRARY_MOUNT}:ro
+      - ${PHOTOS_LIBRARY}:/photo_db:ro
       - nginx-cache:/var/cache/nginx # access to nginx cache
     # No direct Traefik labels - accessed through nginx proxy
     networks:
@@ -122,7 +122,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ${DOCS}:/docs:ro
+      - ${FILES}:/docs:ro
     # No direct Traefik labels - accessed through nginx proxy
     networks:
       - ingress

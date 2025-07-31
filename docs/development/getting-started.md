@@ -70,7 +70,7 @@ AUTH_COOKIE_EXPIRATION_DAYS=30
 
 # Data Sources
 PHOTOS_LIBRARY_PATH=/path/to/your/Photos Library.photoslibrary
-DOCS_PATH=/path/to/your/documents
+FILES_PATH=/path/to/your/documents
 
 # Development Settings
 DEBUG=true
@@ -149,7 +149,7 @@ echo "# Public Document" > ~/Documents/photo-web-docs/Public/readme.md
 echo "# Protected Document" > ~/Documents/photo-web-docs/Protected/guide.md
 
 # Update .env with the path
-DOCS_PATH=/Users/yourusername/Documents/photo-web-docs
+FILES_PATH=/Users/yourusername/Documents/photo-web-docs
 ```
 
 ## Development Workflow

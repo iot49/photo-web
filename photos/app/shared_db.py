@@ -56,8 +56,8 @@ class SharedDB:
 
     def reload_db(self) -> None:
         """Loads or reloads the shared database from the configured path."""
-        photos_db_path = os.getenv("PHOTOS_LIBRARY_MOUNT", "/photo_db")
-        photos_db_filters = os.getenv("PHOTOS_DB_FILTERS", "Public:Protected:Private")
+        photos_db_path = "/photo_db"
+        photos_db_filters = "Public:Protected:Private"
 
         logger.info(
             f"Loading photos database from {photos_db_path} with filters {photos_db_filters}..."
