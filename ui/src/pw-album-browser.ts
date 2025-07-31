@@ -235,7 +235,7 @@ export class PwAlbumBrowser extends LitElement {
             </a>
           </sl-tooltip>
           <sl-tooltip content="Play selected albums without animations">
-            <a href="/ui/slideshow?playlist=${Array.from(this.playList).join(':')}&theme=plain&autoplay=true" class="nav-play-icon">
+            <a href="/ui/slideshow?playlist=${Array.from(this.playList).join(':')}&theme=carousel&autoplay=true" class="nav-play-icon">
               <sl-icon name="play"></sl-icon>
             </a>
           </sl-tooltip>
@@ -374,7 +374,7 @@ export class PwAlbumBrowser extends LitElement {
                   </span>
                 </sl-tooltip>
                 <sl-tooltip content="Play album without animations">
-                  <a href="/ui/slideshow?playlist=${album.uuid}&theme=plain&autoplay=true" class="album-icon-link">
+                  <a href="/ui/slideshow?playlist=${album.uuid}&theme=carousel&autoplay=true" class="album-icon-link">
                     <sl-icon name="play"></sl-icon>
                   </a>
                 </sl-tooltip>

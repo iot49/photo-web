@@ -11,8 +11,13 @@ Themes:
 @property theme switches between different versions of css classes .last and .next
 to achieve alternate behaviors.
 
-**plain**: No animations when transistioning between slides.
-**ken-burns**: Animate transition opacity, translate image position in viewport, scale image
+**carousel**:  Scales images to fit viewport. 
+    Black borders if image aspect ratio differs from that of the viewport.
+    No animations.
+**ken-burns**: Images fill entire viewport (no black borders).
+    Pans over image (left/right or up/down) to show entire image.
+    In addition to panning also scales image (by SCALE_FACOR) to get a dynamic "Ken Burns" like effect.
+    Uses dissolve to transition between images.
 */
 
 const TRANSITION_MS = 1500; // duration of slide transition in [ms]
@@ -34,7 +39,7 @@ export class PwSlideshow extends LitElement {
   @property({ type: String }) playlist = '';
 
   // css theme
-  @property({ type: String, reflect: true }) theme: 'plain' | 'ken-burns' = 'ken-burns';
+  @property({ type: String, reflect: true }) theme: 'carousel' | 'ken-burns' = 'ken-burns';
 
   // autoplay status
   @property({ type: Boolean }) autoplay = true;
@@ -191,13 +196,13 @@ export class PwSlideshow extends LitElement {
         this.autoplayTimeoutId = window.setTimeout(() => this.goto(this.currentIndex + 1), dynamicSlideMs - TRANSITION_MS);
       }
     } else {
-      // Stop autoplay and switch to plain theme for immediate transitions
-      this.theme = 'plain';
+      // Stop autoplay and switch to carousel theme for immediate transitions
+      this.theme = 'carousel';
     }
   }
 
   private toggleTheme() {
-    this.theme = this.theme === 'ken-burns' ? 'plain' : 'ken-burns';
+    this.theme = this.theme === 'ken-burns' ? 'carousel' : 'ken-burns';
   }
 
   private handlePrevClick() {
@@ -284,7 +289,7 @@ export class PwSlideshow extends LitElement {
           <sl-icon name="x-lg"></sl-icon>
         </div>
         <div class="overlay bottom-overlay" @click=${() => this.toggleTheme()}>
-          <sl-icon name="images"></sl-icon>
+          <p>apply <q>${this.theme === 'carousel' ? 'ken burns' : 'carousel'}</q> theme</p>
         </div>
       </div>
     `;
@@ -385,13 +390,13 @@ export class PwSlideshow extends LitElement {
         z-index: 0;
       }
 
-      /* Plain theme: instant transitions */
-      :host([theme='plain']) .next {
+      /* carousel theme: instant transitions */
+      :host([theme='carousel']) .next {
         opacity: 1;
         z-index: 2;
       }
 
-      :host([theme='plain']) .last {
+      :host([theme='carousel']) .last {
         opacity: 0 !important;
         z-index: 1;
       }
@@ -579,8 +584,9 @@ export class PwSlideshow extends LitElement {
 
       /* sl-icon sizing is now handled by the more specific #overlays sl-icon selector below */
 
-      /* Hide overlay icons by default */
-      #overlays sl-icon {
+      /* Hide overlay content by default and center it */
+      #overlays sl-icon,
+      #overlays p {
         opacity: 0;
         transition: opacity 0.3s ease;
         color: rgba(255, 255, 255, 0.8);
@@ -590,11 +596,27 @@ export class PwSlideshow extends LitElement {
         left: 50%;
         transform: translate(-50%, -50%);
         font-size: 4rem;
+        margin: 0;
+        text-align: center;
       }
 
-      /* Show sl-icon when hovering over #overlays */
-      #overlays:hover sl-icon {
+      /* Show overlay content when hovering over #overlays with auto-fade */
+      #overlays:hover sl-icon,
+      #overlays:hover p {
         opacity: 0.8;
+        animation: overlay-auto-fade 2.5s ease-out forwards;
+      }
+
+      @keyframes overlay-auto-fade {
+        0% {
+          opacity: 0.8;
+        }
+        70% {
+          opacity: 0.8;
+        }
+        100% {
+          opacity: 0;
+        }
       }
 
       /* Title slide */
