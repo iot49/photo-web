@@ -3,6 +3,7 @@ import os
 from fnmatch import fnmatch
 from typing import List
 
+from doc_utils import dedent_and_convert_to_html
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, DirectoryPath, Field
@@ -109,15 +110,16 @@ class ErrorResponse(BaseModel):
 
 app = FastAPI(
     title="Photo Web Document Service",
-    description="""
-    The Document Service provides secure, role-based access to document repositories 
-    for the Photo Web application. Users can browse and access documents based on 
+    description=dedent_and_convert_to_html(
+        """
+    The Document Service provides secure, role-based access to document repositories
+    for the Photo Web application. Users can browse and access documents based on
     their assigned roles and permissions.
     
     ## Features
     
     * **Role-based Access Control**: Documents organized by realms matching user roles
-    * **Secure File Access**: Read-only access with path traversal protection  
+    * **Secure File Access**: Read-only access with path traversal protection
     * **Delegated Authorization**: Integrates with auth service for permission validation
     * **File System Integration**: Direct access to host document repositories
     
@@ -134,7 +136,8 @@ app = FastAPI(
     - `private`: Accessible to users with private role
     
     Access to a realm requires the corresponding role in the user's role list.
-    """,
+    """
+    ),
     version="1.0.0",
     root_path="/files",
     contact={
@@ -152,7 +155,9 @@ app = FastAPI(
     "/api/health",
     response_model=HealthResponse,
     summary="Health Check",
-    description="Check if the document service is running and healthy",
+    description=dedent_and_convert_to_html(
+        "Check if the document service is running and healthy"
+    ),
     tags=["Health"],
 )
 async def health_check() -> HealthResponse:
@@ -169,7 +174,9 @@ async def health_check() -> HealthResponse:
     "/api/root",
     response_model=FolderModel,
     summary="Get Accessible Document Realms",
-    description="Retrieve the list of document realms (top-level folders) that the authenticated user can access based on their roles",
+    description=dedent_and_convert_to_html(
+        "Retrieve the list of document realms (top-level folders) that the authenticated user can access based on their roles"
+    ),
     responses={
         200: {
             "description": "Successfully retrieved accessible realms",
@@ -216,7 +223,9 @@ async def get_roots(request: Request) -> FolderModel:
 @app.get(
     "/api/file/{path:path}",
     summary="Download File",
-    description="Download or view a specific file from the document repository",
+    description=dedent_and_convert_to_html(
+        "Download or view a specific file from the document repository"
+    ),
     responses={
         200: {
             "description": "File successfully retrieved",
@@ -260,7 +269,9 @@ async def get_file(path: str):
     "/api/folder/{path:path}",
     response_model=FolderModel,
     summary="Browse Folder Contents",
-    description="Retrieve the contents of a specific folder in the document repository",
+    description=dedent_and_convert_to_html(
+        "Retrieve the contents of a specific folder in the document repository"
+    ),
     responses={
         200: {
             "description": "Folder contents successfully retrieved",
@@ -328,7 +339,9 @@ async def get_folder(path: str) -> FolderModel:
     "/authorize",
     response_model=AuthorizationResponse,
     summary="Internal Authorization Check",
-    description="Internal endpoint used by the auth service for delegated authorization decisions",
+    description=dedent_and_convert_to_html(
+        "Internal endpoint used by the auth service for delegated authorization decisions"
+    ),
     responses={
         200: {
             "description": "Access authorized for the requested resource",

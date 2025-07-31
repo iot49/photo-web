@@ -2,6 +2,7 @@ import logging
 from typing import List
 
 from database import DatabaseManager, get_database_manager
+from doc_utils import dedent_and_convert_to_html
 from fastapi import APIRouter, Depends, HTTPException
 from models import UserCreate, UserResponse, UserUpdate
 
@@ -21,7 +22,8 @@ router = APIRouter(prefix="/users", tags=["users"])
     "",
     response_model=List[UserResponse],
     summary="List All Users",
-    description="""
+    description=dedent_and_convert_to_html(
+        """
     Get a list of all users in the system.
     
     Returns comprehensive information for all registered users including
@@ -36,7 +38,8 @@ router = APIRouter(prefix="/users", tags=["users"])
     - Bulk operations planning
     
     **Rate Limiting:** 100 requests per minute per IP
-    """,
+    """
+    ),
     responses={
         200: {
             "description": "List of all users successfully retrieved",
@@ -102,7 +105,8 @@ async def get_all_users(db: DatabaseManager = Depends(get_db)):
     "/{email}",
     response_model=UserResponse,
     summary="Get User by Email",
-    description="""
+    description=dedent_and_convert_to_html(
+        """
     Retrieve detailed information for a specific user by email address.
     
     Returns comprehensive user information including roles, timestamps,
@@ -115,7 +119,8 @@ async def get_all_users(db: DatabaseManager = Depends(get_db)):
     - Administrative user lookup
     - Role verification
     - Account management
-    """,
+    """
+    ),
     responses={
         200: {
             "description": "User information successfully retrieved",
@@ -183,7 +188,8 @@ async def get_user(email: str, db: DatabaseManager = Depends(get_db)):
     "",
     response_model=UserResponse,
     summary="Create New User",
-    description="""
+    description=dedent_and_convert_to_html(
+        """
     Create a new user account in the system.
     
     Creates a new user with the provided information including email,
@@ -201,7 +207,8 @@ async def get_user(email: str, db: DatabaseManager = Depends(get_db)):
     - New users get 'public' role by default
     - Creation timestamp automatically set
     - Last login initially null
-    """,
+    """
+    ),
     responses={
         201: {
             "description": "User successfully created",
@@ -268,7 +275,8 @@ async def create_user(user_data: UserCreate, db: DatabaseManager = Depends(get_d
     "/{email}",
     response_model=UserResponse,
     summary="Update User",
-    description="""
+    description=dedent_and_convert_to_html(
+        """
     Update user information by email address.
     
     Updates user profile information including name, picture, and roles.
@@ -285,7 +293,8 @@ async def create_user(user_data: UserCreate, db: DatabaseManager = Depends(get_d
     - Email cannot be changed (use as identifier)
     - Role changes require admin privileges
     - Self-updates limited to name and picture
-    """,
+    """
+    ),
     responses={
         200: {
             "description": "User successfully updated",
@@ -354,7 +363,8 @@ async def update_user(
 @router.delete(
     "/{email}",
     summary="Delete User",
-    description="""
+    description=dedent_and_convert_to_html(
+        """
     Delete a user account by email address.
     
     Permanently removes the user account and all associated data from
@@ -370,7 +380,8 @@ async def update_user(
     
     **Security Note:** This is a destructive operation that should be
     used with caution and proper authorization.
-    """,
+    """
+    ),
     responses={
         200: {
             "description": "User successfully deleted",

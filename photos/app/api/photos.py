@@ -3,6 +3,7 @@ import logging
 import os
 from typing import Optional
 
+from doc_utils import dedent_and_convert_to_html
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from models import DB
@@ -32,7 +33,8 @@ async def get_db() -> DB:
     "/api/photos/{photo_id}/img",
     tags=["photos"],
     summary="Serve Photo Image (Original)",
-    description="""
+    description=dedent_and_convert_to_html(
+        """
     Serve the original full-resolution photo image.
     
     Returns the photo in its original resolution and format, with optional
@@ -49,7 +51,8 @@ async def get_db() -> DB:
     - Original images may be very large (10MB+)
     - Consider using size variants for better performance
     - Images are cached after first processing
-    """,
+    """
+    ),
     responses={
         200: {
             "description": "Photo image successfully served",
@@ -89,7 +92,8 @@ async def get_db() -> DB:
     "/api/photos/{photo_id}/img{size_suffix}",
     tags=["photos"],
     summary="Serve Photo Image (Sized)",
-    description="""
+    description=dedent_and_convert_to_html(
+        """
     Serve a photo image scaled to specific screen sizes for responsive design.
     
     Returns the photo scaled to the specified size with optimized quality
@@ -118,7 +122,8 @@ async def get_db() -> DB:
     **Test Mode:**
     When `test=true`, adds a text overlay showing the size suffix
     for debugging responsive image implementations.
-    """,
+    """
+    ),
     responses={
         200: {
             "description": "Scaled photo image successfully served",
@@ -375,7 +380,8 @@ async def serve_photo_image_sized(
     "/api/photos/srcset",
     tags=["photos"],
     summary="Get Responsive Image Sizes",
-    description="""
+    description=dedent_and_convert_to_html(
+        """
     Get information about available responsive image sizes.
     
     Returns metadata about all supported image size variants that can be
@@ -395,7 +401,8 @@ async def serve_photo_image_sized(
     - Target width in pixels
     - Human-readable description
     - Intended use case
-    """,
+    """
+    ),
     responses={
         200: {
             "description": "Available image sizes successfully retrieved",

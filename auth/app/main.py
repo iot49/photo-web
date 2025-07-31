@@ -26,6 +26,7 @@ from api.login import router as login_router
 from api.users import router as users_router
 from authorization import get_authorization_manager
 from database import DatabaseManager, get_database_manager, init_database
+from doc_utils import dedent_and_convert_to_html
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from firebase_util import verify_user
 from starlette.middleware.sessions import SessionMiddleware
@@ -59,38 +60,40 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Photo Web Authentication Service",
-    description="""
-## Photo Web Authentication & Authorization API
+    description=dedent_and_convert_to_html(
+        """
+    ## Photo Web Authentication & Authorization API
 
-The Authentication Service is the security gateway for Photo Web, handling user authentication via Firebase and implementing role-based authorization for all system resources.
+    The Authentication Service is the security gateway for Photo Web, handling user authentication via Firebase and implementing role-based authorization for all system resources.
 
-### Key Features
-- **Firebase Authentication**: Secure user login with Firebase ID tokens
-- **Session Management**: Secure session cookies with configurable expiration
-- **Role-Based Access Control**: Flexible authorization rules via CSV configuration
-- **Traefik Integration**: Forward authentication for microservice architecture
-- **User Management**: Complete CRUD operations for user accounts
+    ### Key Features
+    - **Firebase Authentication**: Secure user login with Firebase ID tokens
+    - **Session Management**: Secure session cookies with configurable expiration
+    - **Role-Based Access Control**: Flexible authorization rules via CSV configuration
+    - **Traefik Integration**: Forward authentication for microservice architecture
+    - **User Management**: Complete CRUD operations for user accounts
 
-### Authentication Flow
-1. User authenticates with Firebase on frontend
-2. Frontend sends Firebase ID token to `/login` endpoint
-3. Service validates token and creates secure session cookie
-4. Subsequent requests use session cookie for authentication
-5. Authorization checked via `/authorize` endpoint for each request
+    ### Authentication Flow
+    1. User authenticates with Firebase on frontend
+    2. Frontend sends Firebase ID token to `/login` endpoint
+    3. Service validates token and creates secure session cookie
+    4. Subsequent requests use session cookie for authentication
+    5. Authorization checked via `/authorize` endpoint for each request
 
-### Access Levels
-- **Public**: Accessible without authentication
-- **Protected**: Requires authenticated user with protected role
-- **Private**: Requires authenticated user with private role
-- **Admin**: Administrative functions requiring admin role
+    ### Access Levels
+    - **Public**: Accessible without authentication
+    - **Protected**: Requires authenticated user with protected role
+    - **Private**: Requires authenticated user with private role
+    - **Admin**: Administrative functions requiring admin role
 
-### Base URL
-All endpoints are available at: `https://${ROOT_DOMAIN}/auth/`
+    ### Base URL
+    All endpoints are available at: `https://${ROOT_DOMAIN}/auth/`
 
-### Rate Limiting
-- Login endpoints: 5 requests per minute
-- Other endpoints: 1000 requests per minute
-    """,
+    ### Rate Limiting
+    - Login endpoints: 5 requests per minute
+    - Other endpoints: 1000 requests per minute
+    """
+    ),
     version="1.0.0",
     lifespan=lifespan,
     root_path="/auth",
@@ -150,7 +153,9 @@ def get_db() -> DatabaseManager:
     "/health",
     tags=["health"],
     summary="Service Health Check",
-    description="Basic health check endpoint for service monitoring and load balancer health checks.",
+    description=dedent_and_convert_to_html(
+        "Basic health check endpoint for service monitoring and load balancer health checks."
+    ),
     responses={
         200: {
             "description": "Service is healthy and operational",
@@ -185,7 +190,8 @@ async def health_check():
     "/authorize",
     tags=["authorization"],
     summary="Traefik Forward Authentication",
-    description="""
+    description=dedent_and_convert_to_html(
+        """
     Internal endpoint for Traefik forward authentication middleware.
     
     This endpoint integrates with Traefik's forwardAuth middleware to provide
@@ -207,7 +213,8 @@ async def health_check():
     
     **Response Headers Set:**
     - `X-Forwarded-Roles`: User roles for downstream services
-    """,
+    """
+    ),
     responses={
         200: {
             "description": "Access granted - user authorized for requested resource",

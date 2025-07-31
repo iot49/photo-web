@@ -6,3 +6,5 @@ osxphotos
 Pillow
 pillow-heif
 apscheduler
+
+markdown

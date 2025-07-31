@@ -1,6 +1,7 @@
 import logging
 from typing import Dict, List
 
+from doc_utils import dedent_and_convert_to_html
 from fastapi import APIRouter, Depends, HTTPException, Request
 from models import DB, AlbumModel, PhotoModel
 
@@ -18,7 +19,8 @@ async def get_db() -> DB:
     "/api/albums/{album_uuid}",
     tags=["albums"],
     summary="Get Album Photos",
-    description="""
+    description=dedent_and_convert_to_html(
+        """
     Get detailed information for all photos in a specific album.
     
     Returns a list of all photos in the specified album including metadata
@@ -38,7 +40,8 @@ async def get_db() -> DB:
     - Camera make and model
     - Location information (if available)
     - File size and format
-    """,
+    """
+    ),
     responses={
         200: {
             "description": "Album photos successfully retrieved",
@@ -113,7 +116,8 @@ async def get_album_details(
     "/api/albums",
     tags=["albums"],
     summary="List Albums",
-    description="""
+    description=dedent_and_convert_to_html(
+        """
     Get a list of albums filtered by user access level.
     
     Returns all albums that the current user has permission to access
@@ -134,7 +138,8 @@ async def get_album_details(
     
     **Response Format:**
     Returns a dictionary with album UUIDs as keys and album metadata as values.
-    """,
+    """
+    ),
     responses={
         200: {
             "description": "Albums successfully retrieved and filtered",
