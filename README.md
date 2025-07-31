@@ -14,11 +14,13 @@ Photo Web provides a secure, web-based interface for accessing your Apple Photos
 
 2. Docker and docker compose (installed on the server). E.g. [Docker Desktop](https://docs.docker.com/desktop/) on the Mac.
 
-3. A [Cloudflare Account](https://www.cloudflare.com/). Used for domain name registration and global access to the app (if desired).
+3. `npm`. Install with `brew install node`.
 
-4. A [Firebase Account](https://firebase.google.com/). Used for user authentication (with Google).
+4. A [Cloudflare Account](https://www.cloudflare.com/). Used for domain name registration and global access to the app (if desired).
 
-5. [Mkdocs](https://www.mkdocs.org/user-guide/installation/) installation (to create the documentation, if desired).
+5. A [Firebase Account](https://firebase.google.com/). Used for user authentication (with Google).
+
+6. [Mkdocs](https://www.mkdocs.org/user-guide/installation/) installation (to create the documentation, if desired).
 
 ### Steps
 
@@ -112,6 +114,7 @@ Login to [Cloudflare](https://www.cloudflare.com/) and purchase a domain name, e
 3. Click **Add app** and select the **Web** platform (</> icon)
 4. Register your app with a nickname (e.g., "photo-web-client")
 5. Copy the Firebase configuration object that looks like this:
+
    ```javascript
    const firebaseConfig = {
       apiKey: "your-api-key",
@@ -122,7 +125,9 @@ Login to [Cloudflare](https://www.cloudflare.com/) and purchase a domain name, e
       appId: "1:123456789:web:abcdef123456"
    };
    ```
+
 6. Create a file `auth/firebase-secrets/firebase-config.json` with this configuration:
+
    ```json
    {
      "apiKey": "your-api-key",
@@ -134,12 +139,10 @@ Login to [Cloudflare](https://www.cloudflare.com/) and purchase a domain name, e
    }
    ```
 
-
 #### Configure Authorized Domains
 
 > [!TIP]
 > If you can't find the right section, try asking Gemini. I find it exceedingly difficult to navigate the Firebase console.
-
 
 1. In the Firebase Console, go to **Overview** → **Authentication** → **Get Started** → **Settings** → **Authorized domains**
 2. Add your domain (the one you registered with Cloudflare) to the authorized domains list
