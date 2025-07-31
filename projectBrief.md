@@ -91,7 +91,7 @@ The `photos` service serves album indices and photos directly from the Apple Pho
 
 The service does not copy the photo library or its contents, but the `/api/photos/{photo_id}/img{size_suffix}` scales images to common sizes and converts `heic` images to `jpg` on the fly. Nginx caching can be used to speed up access to frequently accessed images.
 
-#### Doc
+#### Files
 
 The `files` service gives read-only access to the `${FILES}` folder. It is implemented at a [FastAPI](https://fastapi.tiangolo.com/) server. Endpoint documentation is available at `https://${ROOT_DOMAIN}/auth/openapi.json` or formatted at `https://\${ROOT_DOMAIN}/auth/redoc` and `https://\${ROOT_DOMAIN}/auth/docs`.
 
@@ -106,5 +106,5 @@ The frontend is a single page application (SPA) based on [LitElement](https://li
 * `pw-main`: Sets up the routing and provides contexts for `me` (user information) and other information used by several components.
 * `pw-nav-page`: Main look-and feel of the application. It contains the header with navigation and main content area.
 * `pw-photo-browser`: Interface for browsing and viewing albums in the Apple Photos library.
-* `pw-ken-burns`: Shows albums using the Ken Burns effect.
+* `pw-slideshow`: Shows photo albums.
 * `pw-files-browser`: The files browser that allows users to browse and view documents in the `${FILES}` folder. Renders common formats like markdown, pdf, and images.
