@@ -1,6 +1,8 @@
 # secrets
-.env
+.env*
+!.env.example
 auth/firebase_secrets/
+boser-guyon.org
 
 # misc
 .DS_Store

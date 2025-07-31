@@ -42,8 +42,6 @@ Login to [Cloudflare](https://www.cloudflare.com/) and purchase a domain name. U
 > [!TIP]
 > Modify the `traefik` configuration if you prefer a different registar.
 
-Create an [API Token](https://dash.cloudflare.com/profile/api-tokens)
-
 #### Create a Cloudflare API Token (CF_API_TOKEN)
 
 1. Go to [Cloudflare API Tokens](https://dash.cloudflare.com/profile/api-tokens)
@@ -54,9 +52,8 @@ Create an [API Token](https://dash.cloudflare.com/profile/api-tokens)
    - **Zone:Zone:Read** - to read zone information
 5. Set **Zone Resources** to:
    - Include: Zone - `your-domain.com` (replace with your actual domain)
-6. Optionally set **Client IP Address Filtering** to restrict token usage to your server's IP
-7. Click "Continue to summary" and then "Create Token"
-8. Copy the generated token and update `CF_API_TOKEN` in your `.env` file
+6. Click "Continue to summary" and then "Create Token"
+7. Copy the generated token and update `CF_API_TOKEN` in your `.env` file
 
 #### Create a Cloudflare Tunnel Token (CF_TUNNEL_TOKEN)
 
@@ -71,11 +68,116 @@ Create an [API Token](https://dash.cloudflare.com/profile/api-tokens)
 9. In the "Route tunnel" section, configure:
    - **Public hostname**: your domain (e.g., `example.com`)
    - **Service**: `http://traefik:81` (note: port 81, not 80)
-10. Add any additional subdomains you want to route (e.g., `traefik.example.com`)
-11. Click "Save tunnel"
+10. Click "Save tunnel"
+11. Add a second public hostname for subdomain `traefik` that also points to `http://traefik:81`
 
 > [!NOTE]
 > The tunnel token enables secure external access to your photo-web instance without opening ports on your firewall.
+
+#### Create a Firebase App
+
+1. Go to the [Firebase Console](https://console.firebase.google.com/)
+2. Click "Create a project" or "Add project"
+3. Enter a project name (e.g., "photo-web-auth")
+4. Choose whether to enable Google Analytics (optional)
+5. Click "Create project"
+
+#### Enable Authentication
+
+1. In your Firebase project, navigate to **Authentication** in the left sidebar
+2. Click on the **Sign-in method** tab
+3. Enable **Google** as a sign-in provider:
+   - Click on "Google"
+   - Toggle "Enable"
+   - Enter your project's public-facing name
+   - Select a support email
+   - Click "Save"
+
+#### Create Firebase Service Account (for Server)
+
+1. In the Firebase Console, click the gear icon ⚙️ next to "Project Overview"
+2. Select **Project settings**
+3. Go to the **Service accounts** tab
+4. Click **Generate new private key**
+5. Click **Generate key** to download the JSON file
+6. Save this file as `auth/app/service-account.json` in your photo-web directory
+
+> [!IMPORTANT]
+> Keep the service account key secure and never commit it to version control. This file contains sensitive credentials.
+
+#### Get Firebase Client Configuration
+
+1. In the Firebase Console, go to **Project settings** (gear icon ⚙️)
+2. Scroll down to the **Your apps** section
+3. Click **Add app** and select the **Web** platform (</> icon)
+4. Register your app with a nickname (e.g., "photo-web-client")
+5. Copy the Firebase configuration object that looks like this:
+   ```javascript
+   const firebaseConfig = {
+      apiKey: "your-api-key",
+      authDomain: "your-project.firebaseapp.com",
+      projectId: "your-project-id",
+      storageBucket: "your-project.appspot.com",
+      messagingSenderId: "123456789",
+      appId: "1:123456789:web:abcdef123456"
+   };
+   ```
+6. Create a file `auth/firebase-secrets/firebase-config.json` with this configuration:
+   ```json
+   {
+     "apiKey": "your-api-key",
+     "authDomain": "your-project.firebaseapp.com",
+     "projectId": "your-project-id",
+     "storageBucket": "your-project.appspot.com",
+     "messagingSenderId": "123456789",
+     "appId": "1:123456789:web:abcdef123456"
+   }
+   ```
+
+
+#### Configure Authorized Domains
+
+> [!TIP]
+> If you can't find the right section, try asking Gemini. I find it exceedingly difficult to navigate the Firebase console.
+
+
+1. In the Firebase Console, go to **Overview** → **Authentication** → **Get Started** → **Settings** → **Authorized domains**
+2. Add your domain (the one you registered with Cloudflare) to the authorized domains list
+3. For local development, `localhost` should already be included
+
+> [!NOTE]
+> The Firebase configuration files (`service-account.json` and `firebase-config.json`) are required for the authentication service to work properly. The service account key is used for server-side Firebase Admin SDK operations, while the client configuration is served to the frontend for user authentication.
+>
+
+#### Create Service Account Configuration File
+
+1. Head to Project Settings: In your Firebase console for the bg-photo-web project, look for the little gear icon (Settings) next to "Project overview" in the left-hand navigation bar. Click on it, then select "Project settings"
+2. Navigate to Service Accounts: Once you're in Project settings, click on the "Service accounts" tab. This is where you'll manage the service accounts associated with your project.
+3. Generate a New Private Key: On the "Service accounts" page, you'll see information about your default service account. To get your service-account.json file, look for a button that says "Generate new private key" or something similar. Click this button.
+4. Confirm and Download: A confirmation prompt will appear. Click "Generate key" (or "Generate new private key") again to confirm. Your browser will then automatically download a JSON file. This is your service-account.json file (it might have a slightly different name initially, like bg-photo-web-firebase-adminsdk-xxxxx-xxxxxx.json). Copy this file to `auth/firebase-secrets/service-account.json`
+
+### Start the App
+
+Go to the `photo-web/ui` folder and run the following commands from the terminal:
+
+```bash
+npm run build
+docker compose build
+docker compose up -d
+docker compose logs
+```
+
+Check the log for errors. If everything goes well, you should be able to access the app from anywhere in the world under the domain you purchased, e.g. `https://example.com`.
+
+Optionally (and for better efficiency), set up a local DNS server to point your domain to the server photo-web is running on. Many routers have build-in DNS servers that can do this. Now when accessing photo-web locally, all traffic is handled locally. Depending on your internet connection you may see faster speed. Away from home Cloudflare takes care of forwarding access from the internet to your server.
+
+Optionally build the documentation. From the project root run
+
+```bash
+mkdocs build
+```
+
+The documentation will be available at `https://<your-domain>/static/docs/`.
 
 ## Architecture
 
