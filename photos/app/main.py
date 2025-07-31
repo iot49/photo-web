@@ -10,9 +10,9 @@ from models import DB
 from pillow_heif import register_heif_opener
 from read_db import read_db
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 # Register the HEIF opener to allow Pillow to read HEIC files
 register_heif_opener()

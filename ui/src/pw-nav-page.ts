@@ -54,7 +54,7 @@ export class PwNavPage extends LitElement {
     }
 
     .nav-title:hover {
-      color: #3498db;
+      color: var(--sl-color-primary-500);
     }
 
     .nav-user {
@@ -76,7 +76,7 @@ export class PwNavPage extends LitElement {
     }
 
     .navbar sl-button[slot='trigger']:hover::part(base) {
-      background: rgba(255, 255, 255, 0.1);
+      background: var(--sl-color-neutral-800);
     }
 
     .navbar sl-icon {
@@ -94,7 +94,7 @@ export class PwNavPage extends LitElement {
     }
 
     .theme-toggle:hover::part(base) {
-      background: rgba(255, 255, 255, 0.1);
+      background: var(--sl-color-neutral-800);
     }
 
     /* Icon hover effects */
@@ -109,7 +109,7 @@ export class PwNavPage extends LitElement {
     }
 
     .nav-user a:hover {
-      background: rgba(255, 255, 255, 0.1);
+      background: var(--sl-color-neutral-800);
     }
 
     /* Main Content Area */

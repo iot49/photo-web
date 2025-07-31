@@ -21,10 +21,10 @@ allow, /auth/me, public, User info endpoint
 allow, /auth/users*, admin, User management
 allow, /auth/roles-csv, admin, Testing
 
-allow, */health, admin, Health checks (auth, doc, photos, nginx)
-allow, */docs, admin, Swagger docs for all services
-allow, */redoc, admin, openapi docs for all services
-allow, *openapi.json, admin, OpenAPI schema for all services
+allow, */health, public, Health checks (auth, doc, photos, nginx)
+allow, */docs, public, Swagger docs for all services
+allow, */redoc, public, openapi docs for all services
+allow, *openapi.json, public, OpenAPI schema for all services
 
 # HACK: traefik dashboard is served at traefik subdomain.
 # A better solution would be a separate /authorization endpoint for the traefik subdomain that verifies the admin role.

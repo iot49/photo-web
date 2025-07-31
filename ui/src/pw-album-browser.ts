@@ -10,6 +10,7 @@ import { album_tree, TreeNode } from './app/album_tree.js';
  */
 @customElement('pw-album-browser')
 export class PwAlbumBrowser extends LitElement {
+
   static styles = css`
     :host {
       display: block;
@@ -78,14 +79,14 @@ export class PwAlbumBrowser extends LitElement {
     .album-card {
       background: white;
       border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 2px 8px var(--sl-color-neutral-300);
       overflow: hidden;
       transition: transform 0.3s, box-shadow 0.3s;
     }
 
     .album-card:hover {
       transform: translateY(-4px);
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+      box-shadow: 0 4px 16px var(--sl-color-neutral-400);
     }
 
     .album-card-link {
@@ -98,7 +99,7 @@ export class PwAlbumBrowser extends LitElement {
       width: 100%;
       height: 150px;
       overflow: hidden;
-      background: #f8f9fa;
+      background: var(--sl-color-neutral-50);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -117,7 +118,7 @@ export class PwAlbumBrowser extends LitElement {
 
     .no-thumbnail {
       font-size: 3rem;
-      color: lightblue;
+      color: var(--sl-color-sky-400);
     }
 
     .album-card .album-info {
@@ -128,7 +129,7 @@ export class PwAlbumBrowser extends LitElement {
     }
 
     .album-card .album-title {
-      color: #3f4245;
+      color: var(--sl-color-neutral-700);
       text-align: left;
       flex: 1;
       margin-left: 3px;
@@ -148,7 +149,7 @@ export class PwAlbumBrowser extends LitElement {
     }
 
     .album-icon-link {
-      color: #3f4245;
+      color: var(--sl-color-neutral-700);
       text-decoration: none;
       padding: 4px;
       border-radius: 4px;
@@ -157,7 +158,6 @@ export class PwAlbumBrowser extends LitElement {
 
     .album-icon-link:hover {
       color: var(--sl-color-primary-600);
-      //background-color: #f8f9fa;
     }
 
     .nav-play-icon {
@@ -173,7 +173,7 @@ export class PwAlbumBrowser extends LitElement {
     }
 
     .nav-play-icon:hover {
-      background: rgba(255, 255, 255, 0.1);
+      background: var(--sl-color-neutral-0-alpha-10);
     }
 
     .nav-play-icon sl-icon {
@@ -183,9 +183,9 @@ export class PwAlbumBrowser extends LitElement {
     .nav-controls-container {
       display: flex;
       align-items: center;
-      justify-content: space-evenly;
+      justify-content: flex-start;
       width: 100%;
-      gap: 0;
+      gap: 1rem;
     }
 
     .nav-control-item,
@@ -210,7 +210,7 @@ export class PwAlbumBrowser extends LitElement {
 
     .nav-control-item:hover,
     .nav-controls-container sl-icon:hover {
-      background: rgba(255, 255, 255, 0.1);
+      background: var(--sl-color-neutral-0-alpha-10);
     }
   `;
 
