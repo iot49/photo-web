@@ -388,13 +388,8 @@ export class PwAlbumBrowser extends LitElement {
               <div class="album-icons">
                 <sl-tooltip content="Remove album from playlist">
                   <span class="album-icon-link" @click="${(_: Event) => this.removeAlbumFromPlaylist(album.uuid)}">
-                    <sl-icon name="trash"></sl-icon>
+                    <sl-icon name="x"></sl-icon>
                   </span>
-                </sl-tooltip>
-                <sl-tooltip content="Play album without animations">
-                  <a href="/ui/slideshow?playlist=${album.uuid}&theme=carousel&autoplay=true" class="album-icon-link">
-                    <sl-icon name="play"></sl-icon>
-                  </a>
                 </sl-tooltip>
               </div>
             </div>
