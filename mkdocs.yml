@@ -1,7 +1,8 @@
 site_name: Photo Web Documentation
 site_description: Documentation for Photo Web - A web application for viewing Apple Photo Albums and documents
 site_author: Photo Web Team
-site_url: https://photo-web-docs.local
+site_url: https://${ROOT_DOMAIN}/static/docs/
+site_dir: nginx/html/static/docs
 
 theme:
   name: material
@@ -67,18 +68,12 @@ nav:
     - Authentication: services/auth.md
     - Photos: services/photos.md
     - Files: services/files.md
-    - Frontend UI: services/ui.md
-    - Nginx: services/nginx.md
-    - Traefik: services/traefik.md
   - API Reference: api-reference.md
   - Development:
     - Getting Started: development/getting-started.md
     - Guidelines: development/guidelines.md
-    - Testing: development/testing.md
   - Deployment:
     - Docker Setup: deployment/docker.md
-    - Configuration: deployment/configuration.md
-    - Troubleshooting: deployment/troubleshooting.md
 
 extra:
   social:

@@ -38,7 +38,7 @@ The application consists of:
 
 - **[Architecture](architecture/overview.md)**: System design and component overview
 - **[Services](services/auth.md)**: Detailed service documentation
-- **[API Reference](api/auth.md)**: Complete API documentation
+- **[API Reference](api-reference.md)**: Complete API documentation
 - **[Development](development/getting-started.md)**: Development setup and guidelines
 - **[Deployment](deployment/docker.md)**: Production deployment guide
 
@@ -46,6 +46,5 @@ The application consists of:
 
 For issues and questions:
 
-- Check the [Troubleshooting](deployment/troubleshooting.md) guide
 - Review the [Development Guidelines](development/guidelines.md)
 - Examine service logs with `docker-compose logs [service-name]`
