@@ -10,9 +10,9 @@ allow, /photos/api/photos/*, !photos:8000, Delegate photo access to photos servi
 allow, /photos/api/reload-db, admin, Reload photos database
 allow, /photos/api/*nginx-cache, admin, Image cache operations
 
-allow, /doc/api/root, public, List of folders user is permitted to view
-allow, /doc/api/folder/*, !doc:8000, Delegate folder listing to doc service
-allow, /doc/api/file/*, !doc:8000, Delegate file access to doc service
+allow, /files/api/root, public, List of folders user is permitted to view
+allow, /files/api/folder/*, !files:8000, Delegate folder listing to files service
+allow, /files/api/file/*, !files:8000, Delegate file access to files service
 
 allow, /auth/firebase-config, public
 allow, /auth/login*, public, Login page
@@ -21,7 +21,7 @@ allow, /auth/me, public, User info endpoint
 allow, /auth/users*, admin, User management
 allow, /auth/roles-csv, admin, Testing
 
-allow, */health, public, Health checks (auth, doc, photos, nginx)
+allow, */health, public, Health checks (auth, files, photos, nginx)
 allow, */docs, public, Swagger docs for all services
 allow, */redoc, public, openapi docs for all services
 allow, *openapi.json, public, OpenAPI schema for all services

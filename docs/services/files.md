@@ -1,4 +1,4 @@
-# Document Service
+# Files Service
 
 The Document Service provides secure access to document repositories for Photo Web, implementing role-based access control to expose different document collections based on user permissions.
 
@@ -6,8 +6,8 @@ The Document Service provides secure access to document repositories for Photo W
 
 - **Technology**: FastAPI with file system access
 - **Port**: 8000 (internal Docker network)
-- **External Access**: `https://${ROOT_DOMAIN}/doc/*`
-- **API Documentation**: Available at `/doc/docs` and `/doc/redoc`
+- **External Access**: `https://${ROOT_DOMAIN}/files/*`
+- **API Documentation**: Available at `/files/docs` and `/files/redoc`
 
 ## Architecture
 
@@ -94,7 +94,7 @@ class FolderModel(BaseModel):
 
 The Document Service provides a REST API for browsing and accessing role-based document collections.
 
-**📖 Complete API Documentation:** [https://${ROOT_DOMAIN}/doc/docs](https://${ROOT_DOMAIN}/doc/docs)
+**📖 Complete API Documentation:** [https://${ROOT_DOMAIN}/files/docs](https://${ROOT_DOMAIN}/files/docs)
 
 The interactive API documentation includes:
 
@@ -122,7 +122,7 @@ The interactive API documentation includes:
 4. **Navigate**: Use `/api/folder/{path}` to browse folder structure
 5. **Access Files**: Download files via `/api/file/{path}`
 
-For detailed examples and testing, visit the [interactive API documentation](https://${ROOT_DOMAIN}/doc/docs).
+For detailed examples and testing, visit the [interactive API documentation](https://${ROOT_DOMAIN}/files/docs).
 
 ## Role-Based Access Control
 
@@ -144,7 +144,7 @@ sequenceDiagram
     participant D as Doc Service
     participant F as File System
     
-    U->>T: Request /doc/api/folder/admin/reports
+    U->>T: Request /files/api/folder/admin/reports
     T->>A: GET /auth/authorize
     A->>A: Check roles.csv rules
     A->>D: GET /authorize (delegated)
@@ -171,10 +171,10 @@ In the auth service `roles.csv`:
 
 ```csv
 action,route_pattern,role,comment
-allow,/doc/api/*,!doc:8000,delegate to doc service
+allow,/files/api/*,!files:8000,delegate to files service
 ```
 
-This delegates all document API authorization to the doc service.
+This delegates all document API authorization to the files service.
 
 ## File System Integration
 
@@ -225,7 +225,7 @@ TZ=America/Los_Angeles             # Timezone
 ### Docker Volume Mounting
 
 ```yaml
-doc:
+files:
   volumes:
     - ${DOCS}:/docs:ro              # Read-only access to host documents
 ```
@@ -295,17 +295,17 @@ pydantic
 
 ### Auth Service Integration
 
-The doc service integrates with the auth service through:
+The files service integrates with the auth service through:
 
 1. **Header-based Role Passing**: Roles passed via `X-Forwarded-Roles` header
-2. **Delegated Authorization**: Auth service delegates doc access decisions
+2. **Delegated Authorization**: Auth service delegates files access decisions
 3. **URI-based Realm Extraction**: Realm extracted from request URI path
 
 ### UI Integration
 
 The Photo Web UI integrates document browsing through:
 
-- **Document Browser Component**: `pw-doc-browser.ts`
+- **Files Browser Component**: `pw-files-browser.ts`
 - **Role-based Navigation**: Only accessible realms shown
 - **File Preview**: Integrated file viewing capabilities
 
@@ -332,18 +332,18 @@ The Photo Web UI integrates document browsing through:
 
 ```bash
 # Check service logs
-docker-compose logs doc
+docker-compose logs files
 
 # Verify document mount
-docker-compose exec doc ls -la /docs
+docker-compose exec files ls -la /docs
 
 # Test authorization
 curl -H "X-Forwarded-Roles: admin" \
-     -H "X-Forwarded-Uri: /doc/api/folder/admin/reports" \
+     -H "X-Forwarded-Uri: /files/api/folder/admin/reports" \
      http://localhost:8000/authorize
 
 # Check role extraction
-docker-compose exec doc python -c "
+docker-compose exec files python -c "
 import os
 from main import app
 print('Document root:', os.listdir('/docs'))

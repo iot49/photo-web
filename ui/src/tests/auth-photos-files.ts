@@ -2,7 +2,7 @@ import { get_json } from '../app/api';
 import { logout } from '../app/login';
 import { PwTests } from '../pw-tests';
 
-export async function test_photos_doc(msg: PwTests) {
+export async function test_photos_files(msg: PwTests) {
   msg.out('# Testing /photos authorization...');
 
   // Initial user check and roles fetch
@@ -55,19 +55,19 @@ export async function test_photos_doc(msg: PwTests) {
     }
   }
 
-  // Docs
-  const doc_root = await get_json('/doc/api/root');
-  const doc_realms = doc_root.folders;
+  // Files
+  const files_root = await get_json('/files/api/root');
+  const files_realms = files_root.folders;
 
 
 
-  msg.out(`Found doc realms: ${doc_realms.join(', ')}`);
+  msg.out(`Found files realms: ${files_realms.join(', ')}`);
 
   // Drill down through doc folders to find files
-  for (const realm of doc_realms) {
+  for (const realm of files_realms) {
     let filesFound = 0; // Reset counter for each realm to get 2 files per realm
     try {
-      const folderUri = `/doc/api/folder/${realm}`;
+      const folderUri = `/files/api/folder/${realm}`;
       test_uri.push({uri: folderUri, realm});
 
       
@@ -76,7 +76,7 @@ export async function test_photos_doc(msg: PwTests) {
       // Add files from this realm
       if (folderData.files && folderData.files.length > 0) {
         for (const fileName of folderData.files.slice(0, 2 - filesFound)) {
-          const fileUri = `/doc/api/file/${realm}/${fileName}`;
+          const fileUri = `/files/api/file/${realm}/${fileName}`;
           test_uri.push({uri: fileUri, realm});
           filesFound++;
           if (filesFound >= 2) break; // Stop after 2 files for this realm
@@ -90,14 +90,14 @@ export async function test_photos_doc(msg: PwTests) {
           
           try {
             const subFolderPath = `${realm}/${subFolder}`;
-            const subFolderUri = `/doc/api/folder/${subFolderPath}`;
+            const subFolderUri = `/files/api/folder/${subFolderPath}`;
             test_uri.push({uri: subFolderUri, realm});
             
             const subFolderData = await get_json(subFolderUri);
             
             if (subFolderData.files && subFolderData.files.length > 0) {
               for (const fileName of subFolderData.files.slice(0, 2 - filesFound)) {
-                const fileUri = `/doc/api/file/${subFolderPath}/${fileName}`;
+                const fileUri = `/files/api/file/${subFolderPath}/${fileName}`;
                 test_uri.push({uri: fileUri, realm});
                 filesFound++;
                 if (filesFound >= 2) break; // Stop after 2 files for this realm
@@ -109,7 +109,7 @@ export async function test_photos_doc(msg: PwTests) {
         }
       }
     } catch (error) {
-      msg.err(`Failed to access doc realm ${realm}: ${error instanceof Error ? error.message : String(error)}`);
+      msg.err(`Failed to access files realm ${realm}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

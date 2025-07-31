@@ -83,7 +83,7 @@ Access to documents is based on the name of folders in the `${DOCS}` directory. 
 
 #### Nginx
 
-The `nginx` service serves static files from the `ui` directory and proxies requests to the `auth`, `doc` and `photos` services. It is also used to cache images served by the `photos` service. The configuration is in `nginx/nginx.conf`.
+The `nginx` service serves static files from the `ui` directory and proxies requests to the `auth`, `files` and `photos` services. It is also used to cache images served by the `photos` service. The configuration is in `nginx/nginx.conf`.
 
 #### Photos
 
@@ -93,7 +93,7 @@ The service does not copy the photo library or its contents, but the `/api/photo
 
 #### Doc
 
-The `doc` service gives read-only access to the `${DOCS}` folder. It is implemented at a [FastAPI](https://fastapi.tiangolo.com/) server. Endpoint documentation is available at `https://${ROOT_DOMAIN}/auth/openapi.json` or formatted at `https://\${ROOT_DOMAIN}/auth/redoc` and `https://\${ROOT_DOMAIN}/auth/docs`.
+The `files` service gives read-only access to the `${DOCS}` folder. It is implemented at a [FastAPI](https://fastapi.tiangolo.com/) server. Endpoint documentation is available at `https://${ROOT_DOMAIN}/auth/openapi.json` or formatted at `https://\${ROOT_DOMAIN}/auth/redoc` and `https://\${ROOT_DOMAIN}/auth/docs`.
 
 #### Cloudflare Tunnel
 
@@ -107,4 +107,4 @@ The frontend is a single page application (SPA) based on [LitElement](https://li
 * `pw-nav-page`: Main look-and feel of the application. It contains the header with navigation and main content area.
 * `pw-photo-browser`: Interface for browsing and viewing albums in the Apple Photos library.
 * `pw-ken-burns`: Shows albums using the Ken Burns effect.
-* `pw-doc-browser`: The document browser that allows users to browse and view documents in the `${DOCS}` folder. Renders common formats like markdown, pdf, and images.
+* `pw-files-browser`: The files browser that allows users to browse and view documents in the `${DOCS}` folder. Renders common formats like markdown, pdf, and images.

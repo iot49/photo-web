@@ -312,7 +312,7 @@ ${escapedContent}
       
       // Check if this is a link to a document file that we should handle internally
       const url = new URL(link.href);
-      if (url.pathname.startsWith('/doc/api/file/')) {
+      if (url.pathname.startsWith('/files/api/file/')) {
         // Prevent default navigation
         event.preventDefault();
         
@@ -321,7 +321,7 @@ ${escapedContent}
         this.showFile(url.pathname);
         
         // Update the browser URL to reflect the navigation
-        // Keep the /doc/api/file/ format as that's what the router expects
+        // Keep the /files/api/file/ format as that's what the router expects
         window.history.pushState(null, '', url.pathname);
       }
     }

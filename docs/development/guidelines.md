@@ -16,7 +16,7 @@ photo-web/
 │   ├── app/                # FastAPI application
 │   ├── Dockerfile          # Container configuration
 │   └── requirements.txt    # Python dependencies
-├── doc/                    # Document service
+├── files/                 # Files service
 │   ├── app/                # FastAPI application
 │   ├── Dockerfile          # Container configuration
 │   └── requirements.txt    # Python dependencies
@@ -86,14 +86,14 @@ src/
 ├── pw-main.ts           # Main application component
 ├── pw-nav-page.ts       # Navigation and layout
 ├── pw-album-browser.ts  # Photo album interface
-├── pw-doc-browser.ts    # Document browser
+├── pw-files-browser.ts  # Files browser
 ├── app/                 # Application logic
 │   ├── api.ts           # API client
 │   ├── context.ts       # Application context
 │   ├── interfaces.ts    # TypeScript interfaces
 │   └── utilities.ts     # Helper functions
 └── tests/               # Test files
-    └── auth-photos-doc.ts
+    └── auth-photos-files.ts
 ```
 
 **Component Example:**
@@ -277,7 +277,7 @@ def test_authorization():
 ### Frontend Testing
 
 ```typescript
-// auth-photos-doc.ts
+// auth-photos-files.ts
 import { expect } from '@esm-bundle/chai';
 import './pw-main.js';
 

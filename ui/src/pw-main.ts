@@ -200,7 +200,7 @@ export class PwMain extends LitElement {
   private shouldInterceptNavigation(url: string): boolean {
     const urlObj = new URL(url);
     // Only intercept navigations within our app's UI routes
-    return urlObj.pathname.startsWith('/ui/') || urlObj.pathname.startsWith('/doc/api/file/');
+    return urlObj.pathname.startsWith('/ui/') || urlObj.pathname.startsWith('/files/api/file/');
   }
 
   /**
@@ -213,10 +213,10 @@ export class PwMain extends LitElement {
   }
 
   private getFilePathFromUri(): string | null {
-    // Check if URI matches the pattern /doc/api/file/*
-    const filePathPrefix = '/doc/api/file/';
+    // Check if URI matches the pattern /files/api/file/*
+    const filePathPrefix = '/files/api/file/';
     if (this.uri.startsWith(filePathPrefix)) {
-      // Extract the file path portion after /doc/api/file/
+      // Extract the file path portion after /files/api/file/
       return this.uri.substring(filePathPrefix.length);
     }
     return null;
@@ -299,7 +299,7 @@ export class PwMain extends LitElement {
 
   private getRouteDefinitions() {
     const filePath = this.getFilePathFromUri();
-    const selectedFilePath = filePath ? `/doc/api/file/${filePath}` : undefined;
+    const selectedFilePath = filePath ? `/files/api/file/${filePath}` : undefined;
 
     /**
      * Route definition structure:
@@ -319,11 +319,11 @@ export class PwMain extends LitElement {
         isDynamic: false,
       },
       {
-        routeId: 'doc',
-        description: 'Documentation browser with file viewer',
-        matchUris: ['/ui/doc'],
-        isActive: this.uri === '/ui/doc' || this.getFilePathFromUri() !== null,
-        componentFactory: () => html`<pw-doc-browser .selectedFilePath=${selectedFilePath}></pw-doc-browser>`,
+        routeId: 'files',
+        description: 'Files browser with file viewer',
+        matchUris: ['/ui/files'],
+        isActive: this.uri === '/ui/files' || this.getFilePathFromUri() !== null,
+        componentFactory: () => html`<pw-files-browser .selectedFilePath=${selectedFilePath}></pw-files-browser>`,
         isDynamic: false,
         selectedFilePath,
       },
@@ -376,11 +376,11 @@ export class PwMain extends LitElement {
         isDynamic: true,
       },
       {
-        routeId: 'doc-api',
-        description: 'Documentation API documentation',
-        matchUris: ['/ui/doc-api'],
-        isActive: this.matchesAnyUri(['/ui/doc-api']),
-        componentFactory: () => html`<pw-nav-page><iframe src="/doc/docs"></iframe></pw-nav-page>`,
+        routeId: 'files-api',
+        description: 'Files API documentation',
+        matchUris: ['/ui/files-api'],
+        isActive: this.matchesAnyUri(['/ui/files-api']),
+        componentFactory: () => html`<pw-nav-page><iframe src="/files/docs"></iframe></pw-nav-page>`,
         isDynamic: true,
       },
       {

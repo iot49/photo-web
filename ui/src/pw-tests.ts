@@ -1,7 +1,7 @@
 import { css, html, LitElement } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { test_authorize } from './tests/authorize.js';
-import { test_photos_doc } from './tests/auth-photos-doc.js';
+import { test_photos_files } from './tests/auth-photos-files.js';
 import { nginx_cache } from './tests/nginx-cache.js';
 
 @customElement('pw-tests')
@@ -76,9 +76,9 @@ export class PwTests extends LitElement {
 
   private async runPhotosDocTest() {
     try {
-      await test_photos_doc(this);
+      await test_photos_files(this);
     } catch (error) {
-      this.err(`Error running photos/doc authorization test: ${error instanceof Error ? error.message : String(error)}`);
+      this.err(`Error running photos/files authorization test: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

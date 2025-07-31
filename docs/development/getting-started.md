@@ -189,7 +189,7 @@ docker-compose ps
 # NAME                COMMAND                  SERVICE             STATUS
 # photo-web-auth-1    "uvicorn app.main:ap…"   auth                Up
 # photo-web-photos-1  "uvicorn app.main:ap…"   photos              Up
-# photo-web-doc-1     "uvicorn app.main:ap…"   doc                 Up
+# photo-web-files-1     "uvicorn app.main:ap…"   files              Up
 # photo-web-nginx-1   "/docker-entrypoint.…"   nginx               Up
 # photo-web-traefik-1 "/entrypoint.sh trae…"   traefik             Up
 ```
@@ -201,7 +201,7 @@ Once all services are running:
 1. **Main Application**: https://dev49.org
 2. **Auth API Docs**: https://dev49.org/auth/docs
 3. **Photos API Docs**: https://dev49.org/photos/docs
-4. **Doc API Docs**: https://dev49.org/doc/docs
+4. **Files API Docs**: https://dev49.org/files/docs
 5. **Traefik Dashboard**: https://dev49.org:8080 (if enabled)
 
 ### Frontend Development
@@ -264,7 +264,7 @@ docker-compose exec photos python -c "from app.read_db import reload_db; reload_
 # Health Checks
 curl -k https://dev49.org/auth/health
 curl -k https://dev49.org/photos/health
-curl -k https://dev49.org/doc/health
+curl -k https://dev49.org/files/health
 ```
 
 ### Testing Access

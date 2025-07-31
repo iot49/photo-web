@@ -84,7 +84,7 @@ services:
     depends_on:
       - photos
       - auth
-      - doc
+      - files
 
   auth:
     build: ./auth
@@ -114,10 +114,10 @@ services:
     networks:
       - ingress
 
-  doc:
-    build: ./doc/app
-    image: doc-service:latest
-    container_name: doc
+  files:
+    build: ./files/app
+    image: files-service:latest
+    container_name: files
     restart: unless-stopped
     env_file:
       - .env

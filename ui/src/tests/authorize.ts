@@ -18,7 +18,7 @@ export async function test_authorize(msg: PwTests) {
     return;
   }
 
-  const services = [ 'auth', 'doc', 'photos' ];
+  const services = [ 'auth', 'files', 'photos' ];
   let openapi: { [key: string]: any } = {};
   for (const service of services) {
     openapi[service] = await get_json(`/${service}/openapi.json`);

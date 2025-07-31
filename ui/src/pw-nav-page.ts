@@ -163,7 +163,7 @@ export class PwNavPage extends LitElement {
                   ? html`<sl-button variant="text" size="medium" @click="${this.handleAlbumClick}" class="theme-toggle">
                       <sl-icon name="images"></sl-icon>
                     </sl-button>`
-                  : html`<sl-button variant="text" size="medium" @click="${this.handleDocClick}" class="theme-toggle">
+                  : html`<sl-button variant="text" size="medium" @click="${this.handleFilesClick}" class="theme-toggle">
                       <sl-icon name="file-text"></sl-icon>
                     </sl-button>`}
               </sl-tooltip>
@@ -212,7 +212,7 @@ export class PwNavPage extends LitElement {
           <sl-menu-item @click=${() => this.handleNavigation('/ui/traefik-dashboard')}>Traefik Dashboard ...</sl-menu-item>
           <sl-menu-item @click=${() => this.handleNavigation('/ui/auth-api')}>Auth API ...</sl-menu-item>
           <sl-menu-item @click=${() => this.handleNavigation('/ui/photos-api')}>Photos API ...</sl-menu-item>
-          <sl-menu-item @click=${() => this.handleNavigation('/ui/doc-api')}>Doc API ...</sl-menu-item>
+          <sl-menu-item @click=${() => this.handleNavigation('/ui/files-api')}>Files API ...</sl-menu-item>
           <sl-menu-item @click=${() => this.handleNavigation('/ui/img-size-test')}>Image Size Test ...</sl-menu-item>
           <sl-menu-item @click=${this.clearCacheDialog}>Clear Photo Cache</sl-menu-item>
           <sl-menu-item @click=${this.reloadDialog}>Reload DB</sl-menu-item>
@@ -314,8 +314,8 @@ export class PwNavPage extends LitElement {
     window.location.href = '/ui/album';
   }
 
-  private handleDocClick() {
-    window.location.href = '/ui/doc';
+  private handleFilesClick() {
+    window.location.href = '/ui/files';
   }
 
   private handleNavigation(url: string) {

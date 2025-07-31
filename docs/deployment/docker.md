@@ -78,7 +78,7 @@ AUTH_COOKIE_EXPIRATION_DAYS=30
 
 # Data Sources
 PHOTOS_LIBRARY_PATH=/data/photos/Photos Library.photoslibrary
-DOCS_PATH=/data/documents
+DOCS_PATH=/data/filesuments
 
 # Security
 SESSION_SECRET_KEY=your-secure-random-key-here
@@ -101,12 +101,12 @@ CLOUDFLARE_TUNNEL_TOKEN=your-tunnel-token
 ```bash
 # Create data directories
 sudo mkdir -p /data/photos
-sudo mkdir -p /data/documents
+sudo mkdir -p /data/filesuments
 sudo mkdir -p /data/db
 
 # Set appropriate permissions
 sudo chown -R 1000:1000 /data/db
-sudo chmod 755 /data/photos /data/documents
+sudo chmod 755 /data/photos /data/filesuments
 ```
 
 #### 3. SSL Certificate Configuration
@@ -173,7 +173,7 @@ from app.database import create_user
 # Check service health
 curl https://your-domain.com/auth/health
 curl https://your-domain.com/photos/health
-curl https://your-domain.com/doc/health
+curl https://your-domain.com/files/health
 
 # Verify SSL certificate
 openssl s_client -connect your-domain.com:443 -servername your-domain.com
@@ -192,7 +192,7 @@ services:
   traefik:
     restart: unless-stopped
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/filesker.sock:/var/run/filesker.sock:ro
       - ./traefik/certificates:/certificates
     environment:
       - TRAEFIK_ACME_EMAIL=${TRAEFIK_ACME_EMAIL}
@@ -219,7 +219,7 @@ services:
           memory: 1G
           cpus: '1.0'
 
-  doc:
+  files:
     restart: unless-stopped
     environment:
       - LOG_LEVEL=INFO
@@ -284,7 +284,7 @@ networks:
 # Read-only volume mounts
 volumes:
   - ${PHOTOS_LIBRARY_PATH}:/photos:ro
-  - ${DOCS_PATH}:/documents:ro
+  - ${DOCS_PATH}:/filesuments:ro
   - ./auth/app/roles.csv:/app/roles.csv:ro
 ```
 

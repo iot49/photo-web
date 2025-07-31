@@ -12,7 +12,7 @@ interface FolderModelInterface {
 }
 
 class FolderModel implements FolderModelInterface {
-  // from doc/app/main.py
+  // from files/app/main.py
   path: string;
   folders: string[];
   files: string[];
@@ -37,8 +37,8 @@ class FolderModel implements FolderModelInterface {
   }
 }
 
-@customElement('pw-doc-browser')
-export class PwDocBrowser extends LitElement {
+@customElement('pw-files-browser')
+export class PwFilesBrowser extends LitElement {
   static styles = css`
     * {
       box-sizing: border-box;
@@ -72,7 +72,7 @@ export class PwDocBrowser extends LitElement {
 
   async connectedCallback() {
     await super.connectedCallback();
-    const rj = await get_json('/doc/api/root');
+    const rj = await get_json('/files/api/root');
     this.root = new FolderModel(rj.path, rj.folders, rj.files);
   }
 
@@ -89,7 +89,7 @@ export class PwDocBrowser extends LitElement {
       const target = event.target as SlTreeItem;
       const path = target.getAttribute('data-path');
       const name = target.getAttribute('data-folder');
-      const folder = await get_json(`/doc/api/folder/${path}/${name}`);
+      const folder = await get_json(`/files/api/folder/${path}/${name}`);
       for (const folderName of folder.folders) {
         const treeItem = document.createElement('sl-tree-item') as SlTreeItem;
         treeItem.innerText = folderName;
@@ -101,7 +101,7 @@ export class PwDocBrowser extends LitElement {
       }
       for (const fileName of folder.files) {
         const treeItem = document.createElement('sl-tree-item') as SlTreeItem;
-        const dataPath = `/doc/api/file/${path}/${name}/${fileName}`;
+        const dataPath = `/files/api/file/${path}/${name}/${fileName}`;
         // Create icon element
         const icon = document.createElement('sl-icon');
         icon.setAttribute('name', iconForFilename(fileName));
@@ -125,7 +125,7 @@ export class PwDocBrowser extends LitElement {
       target.lazy = false;
     });
 
-    this.fileRenderer.showFile(`/doc/api/file/public/index.md`);
+    this.fileRenderer.showFile(`/files/api/file/public/index.md`);
   }
 
   protected updated(changedProperties: PropertyValues): void {

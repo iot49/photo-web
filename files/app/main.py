@@ -94,7 +94,7 @@ class AuthorizationResponse(BaseModel):
 
     status: str = Field(
         description="Authorization result",
-        example="authorized /doc/api/folder/admin admin in ['admin', 'public']",
+        example="authorized /files/api/folder/admin admin in ['admin', 'public']",
     )
 
 
@@ -103,7 +103,7 @@ class ErrorResponse(BaseModel):
 
     detail: str = Field(
         description="Error message",
-        example="Access denied for /doc/api/folder/admin and roles=['public']",
+        example="Access denied for /files/api/folder/admin and roles=['public']",
     )
 
 
@@ -136,7 +136,7 @@ app = FastAPI(
     Access to a realm requires the corresponding role in the user's role list.
     """,
     version="1.0.0",
-    root_path="/doc",
+    root_path="/files",
     contact={
         "name": "Photo Web Support",
         "url": "https://github.com/your-org/photo-web",
@@ -363,8 +363,8 @@ async def authorize_access(request: Request) -> AuthorizationResponse:
     not be called directly by client applications.
 
     Recognized URI patterns:
-    - `/doc/api/folder/{realm}/{path}` - Folder access
-    - `/doc/api/file/{realm}/{path}` - File access
+    - `/files/api/folder/{realm}/{path}` - Folder access
+    - `/files/api/file/{realm}/{path}` - File access
 
     Args:
         request: HTTP request containing X-Forwarded-Uri and X-Forwarded-Roles headers
@@ -395,7 +395,7 @@ async def authorize_access(request: Request) -> AuthorizationResponse:
             for role in request.headers.get("X-Forwarded-Roles", "public").split(",")
         ]
 
-        # Extract realm from URI path: /doc/api/folder/{realm}/...
+        # Extract realm from URI path: /files/api/folder/{realm}/...
         uri_parts = os.path.normpath(uri).split(os.sep)
         if len(uri_parts) < 5:
             raise HTTPException(

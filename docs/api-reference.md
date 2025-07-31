@@ -40,9 +40,9 @@ Each service provides interactive API documentation with the following features:
 
 ## Documents Service API
 
-**Swagger UI (Recommended):** [https://${ROOT_DOMAIN}/doc/docs](https://${ROOT_DOMAIN}/doc/docs)
+**Swagger UI (Recommended):** [https://${ROOT_DOMAIN}/files/docs](https://${ROOT_DOMAIN}/files/docs)
 
-**ReDoc Alternative:** [https://${ROOT_DOMAIN}/doc/redoc](https://${ROOT_DOMAIN}/doc/redoc)
+**ReDoc Alternative:** [https://${ROOT_DOMAIN}/files/redoc](https://${ROOT_DOMAIN}/files/redoc)
 
 ### Key Endpoints:
 - `GET /api/health` - Service health check
@@ -88,15 +88,15 @@ curl https://${ROOT_DOMAIN}/photos/api/photos/{photo-uuid}/img-md \
   -o photo-medium.jpg
 
 # Get accessible document realms
-curl https://${ROOT_DOMAIN}/doc/api/root \
+curl https://${ROOT_DOMAIN}/files/api/root \
   -H "Cookie: session=your-session-cookie"
 
 # Browse documents in a realm
-curl https://${ROOT_DOMAIN}/doc/api/folder/admin/reports \
+curl https://${ROOT_DOMAIN}/files/api/folder/admin/reports \
   -H "Cookie: session=your-session-cookie"
 
 # Download a document
-curl https://${ROOT_DOMAIN}/doc/api/file/admin/reports/summary.pdf \
+curl https://${ROOT_DOMAIN}/files/api/file/admin/reports/summary.pdf \
   -H "Cookie: session=your-session-cookie" \
   -o summary.pdf
 ```
