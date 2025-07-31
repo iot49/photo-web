@@ -34,7 +34,7 @@ cp .env.example .env
 
 #### Get a Domain Name
 
-Login to [Cloudflare](https://www.cloudflare.com/) and purchase a domain name. Update `ROOT_DOMAIN` in the `.env` file.
+Login to [Cloudflare](https://www.cloudflare.com/) and purchase a domain name, e.g. `your-domain.com`. Update `ROOT_DOMAIN` in the `.env` file.
 
 > [!NOTE]
 > All access to photo web is encrypted (i.e. https). Because of this a domain name is required even for local access.
@@ -66,7 +66,7 @@ Login to [Cloudflare](https://www.cloudflare.com/) and purchase a domain name. U
 7. In the "Install and run a connector" section, copy the token from the command shown (it's the long string after `--token`)
 8. Update `CF_TUNNEL_TOKEN` in your `.env` file with this token
 9. In the "Route tunnel" section, configure:
-   - **Public hostname**: your domain (e.g., `example.com`)
+   - **Public hostname**: your domain (e.g., `your-domain.com`)
    - **Service**: `http://traefik:81` (note: port 81, not 80)
 10. Click "Save tunnel"
 11. Add a second public hostname for subdomain `traefik` that also points to `http://traefik:81`
@@ -167,7 +167,13 @@ docker compose up -d
 docker compose logs
 ```
 
-Check the log for errors. If everything goes well, you should be able to access the app from anywhere in the world under the domain you purchased, e.g. `https://example.com`.
+Check the log for errors. If everything goes well, you should be able to access the app from anywhere in the world under the domain you purchased, e.g. `https://your-domain.com`.
+
+Repeat these steps to restart the app. For shutting down, run
+
+```bash
+docker compose down
+```
 
 Optionally (and for better efficiency), set up a local DNS server to point your domain to the server photo-web is running on. Many routers have build-in DNS servers that can do this. Now when accessing photo-web locally, all traffic is handled locally. Depending on your internet connection you may see faster speed. Away from home Cloudflare takes care of forwarding access from the internet to your server.
 
