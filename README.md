@@ -10,7 +10,9 @@ Photo Web provides a secure, web-based interface for accessing your Apple Photos
 
 **Note:** all accounts are **free**, except for the need to purchase a domain name (about \$10/year, depending on name).
 
-1. Server with access to Apple Photos library. On MacOS the library is usually at `/Users/<user-name>/Pictures/Photos Library.photoslibrary` and synchronized automatically via [iCloud](https://www.icloud.com/). Serving from e.g. Linux should be possible, but I have not tried it (iCloud is a bit special :smile:). A (recycled) Mac Mini works well.
+1. Server with access to Apple Photos library. On MacOS the library is usually at `/Users/<user-name>/Pictures/Photos Library.photoslibrary` and synchronized automatically via [iCloud](https://www.icloud.com/). Serving from e.g. Linux should be possible, but I have not tried it (iCloud is a bit special :smile:, perhaps [icloud-docker](https://github.com/mandarons/icloud-docker) could be used). A (recycled) Mac Mini works well.
+   
+   On the Mac, go to settings, Privacy & Security, Full Disk Access and **give Docker full access**. The photos library is mounted read-only (into the photos container), but Docker needs full access for this to work.
 
 2. Docker and docker compose (installed on the server). E.g. [Docker Desktop](https://docs.docker.com/desktop/) on the Mac.
 
