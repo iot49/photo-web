@@ -137,9 +137,6 @@ export class PwAlbumBrowser extends LitElement {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-    }
-
-    .album-title {
       font-size: var(--sl-font-size-small);
     }
 
@@ -173,7 +170,7 @@ export class PwAlbumBrowser extends LitElement {
     }
 
     .nav-play-icon:hover {
-      background: var(--sl-color-neutral-0-alpha-10);
+      background: rgba(255, 255, 255, 0.1);
     }
 
     .nav-play-icon sl-icon {
@@ -210,7 +207,12 @@ export class PwAlbumBrowser extends LitElement {
 
     .nav-control-item:hover,
     .nav-controls-container sl-icon:hover {
-      background: var(--sl-color-neutral-0-alpha-10);
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .nav-control-item.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
   `;
 
@@ -239,10 +241,15 @@ export class PwAlbumBrowser extends LitElement {
   }
 
   private navTemplate() {
+    // BUG: tooltip does not show when isPlayDisabled is true
+    const isPlayDisabled = this.playList.size <= 0;
     return html`
       <div class="nav-controls-container" slot="nav-controls">
-        <sl-tooltip content="Play selected albums">
-          <a class="nav-control-item" href="/ui/slideshow?playlist=${Array.from(this.playList).join(':')}">Play</a>
+        <sl-tooltip content="${isPlayDisabled ? 'Select at least one album from the browser on the left' : 'Play selected albums'}">
+          ${isPlayDisabled
+            ? html`<div class="nav-control-item disabled">Play</div>`
+            : html`<a class="nav-control-item" href="/ui/slideshow?playlist=${Array.from(this.playList).join(':')}">Play</a>`
+          }
         </sl-tooltip>
         <sl-tooltip content="Clear playlist">
           <div class="nav-control-item" @click=${(_: Event) => (this.playList = new Set<string>())}>Clear</div>
