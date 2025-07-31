@@ -81,6 +81,9 @@ Access to photo albums and individual photos works as follows: Albums in folder 
 
 Access to documents is based on the name of folders in the `${FILES}` directory. Only users with roles that match the folder name can access the documents in that folder. Matching is case insensitive. For example, a user with the `private` role can access documents in the `Private` folder, but not in the `Public` or `Protected` folders. The `public` role gives access to documents in the `Public` folder.
 
+> [!TIP]
+> Create a folder `family` in the `${FILES}` directory and add to it information you want to share with family members only. Then add the role `family` to users that should have access. To edit users and roles, login to an account with the `admin` role (e.g. the `SUPER_USER_EMAIL` specified in the `.env` file). Click on the three dots to the left of your avatar and choose `Users ...` from the menu.
+
 #### Nginx
 
 The `nginx` service serves static files from the `ui` directory and proxies requests to the `auth`, `files` and `photos` services. It is also used to cache images served by the `photos` service. The configuration is in `nginx/nginx.conf`.
