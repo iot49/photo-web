@@ -31,7 +31,7 @@ The backend is a docker stack orchestrated by `docker-compose`. It comprises the
 #### Auth
 
 The `auth` service uses [firebase](https://firebase.google.com/) for authentication and a custom implementation of role-based access to specific URIs and authorization.
-It is implemented at a [FastAPI](https://fastapi.tiangolo.com/) server. Endpoint documentation is available at `https://${ROOT_DOMAIN}/auth/openapi.json` or formatted at `https://\${ROOT_DOMAIN}/auth/redoc` and `https://\${ROOT_DOMAIN}/auth/docs`.
+It is implemented at a [FastAPI](https://fastapi.tiangolo.com/) server. Endpoint documentation is available at `https://${ROOT_DOMAIN}/auth/openapi.json` or formatted at `https://${ROOT_DOMAIN}/auth/redoc` and `https://${ROOT_DOMAIN}/auth/docs`.
 
 ##### Authentication
 
@@ -87,13 +87,13 @@ The `nginx` service serves static files from the `ui` directory and proxies requ
 
 #### Photos
 
-The `photos` service serves album indices and photos directly from the Apple Photos library (mounted into the service with read-only access) extracted with [OSXPhotos](https://github.com/RhetTbull/osxphotos). It is implemented at a [FastAPI](https://fastapi.tiangolo.com/) server. Endpoint documentation is available at `https://${ROOT_DOMAIN}/photos/openapi.json` or formatted at `https://\${ROOT_DOMAIN}/photos/redoc` and `https://\${ROOT_DOMAIN}/photos/docs`.
+The `photos` service serves album indices and photos directly from the Apple Photos library (mounted into the service with read-only access) extracted with [OSXPhotos](https://github.com/RhetTbull/osxphotos). It is implemented at a [FastAPI](https://fastapi.tiangolo.com/) server. Endpoint documentation is available at `https://${ROOT_DOMAIN}/photos/openapi.json` or formatted at `https://${ROOT_DOMAIN}/photos/redoc` and `https://${ROOT_DOMAIN}/photos/docs`.
 
 The service does not copy the photo library or its contents, but the `/api/photos/{photo_id}/img{size_suffix}` scales images to common sizes and converts `heic` images to `jpg` on the fly. Nginx caching can be used to speed up access to frequently accessed images.
 
 #### Files
 
-The `files` service gives read-only access to the `${FILES}` folder. It is implemented at a [FastAPI](https://fastapi.tiangolo.com/) server. Endpoint documentation is available at `https://${ROOT_DOMAIN}/auth/openapi.json` or formatted at `https://\${ROOT_DOMAIN}/auth/redoc` and `https://\${ROOT_DOMAIN}/auth/docs`.
+The `files` service gives read-only access to the `${FILES}` folder. It is implemented at a [FastAPI](https://fastapi.tiangolo.com/) server. Endpoint documentation is available at `https://${ROOT_DOMAIN}/auth/openapi.json` or formatted at `https://${ROOT_DOMAIN}/auth/redoc` and `https://${ROOT_DOMAIN}/auth/docs`.
 
 #### Cloudflare Tunnel
 
