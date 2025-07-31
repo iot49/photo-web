@@ -1,14 +1,24 @@
 import logging
-import os
 from contextlib import asynccontextmanager
 
 # Import API modules
 from api import albums, authorize, cache, photos
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, HTTPException
 from models import DB
 from pillow_heif import register_heif_opener
-from read_db import read_db
+
+# Initialize database and scheduler at module import time (during Gunicorn preload)
+from shared_db import (
+    get_shared_db,
+    initialize_shared_db,
+    initialize_shared_scheduler,
+    reload_shared_db,
+    shutdown_shared_scheduler,
+    start_shared_scheduler,
+)
+
+initialize_shared_db()
+initialize_shared_scheduler()
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -17,64 +27,31 @@ logger.setLevel(logging.DEBUG)
 # Register the HEIF opener to allow Pillow to read HEIC files
 register_heif_opener()
 
-# Initialize the scheduler
-scheduler = AsyncIOScheduler()
-
-# In-memory database (populated from Apple Photos library)
-db: DB = DB(albums={}, photos={})
-
 
 async def get_db() -> DB:
     """Photos database."""
-    return db
+    return get_shared_db()
 
 
 async def load_db() -> DB:
-    """Load the database from the in-memory store."""
-    global db
-    photos_db_path = os.getenv("PHOTOS_LIBRARY_MOUNT", "/photo_db")
-    photos_db_filters = os.getenv("PHOTOS_DB_FILTERS", "Public:Protected:Private")
-
+    """Load the database from the shared store."""
     try:
-        logger.debug(
-            f"Loading photos database from {photos_db_path} with filters {photos_db_filters} ..."
-        )
-        db = read_db(photos_db_path, photos_db_filters)
-        logger.info(
-            f"Database with {len(db.albums)} albums and {len(db.photos)} photos loaded successfully."
-        )
+        return reload_shared_db()
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to load photos database from {photos_db_path}: {e}",
+            detail=f"Failed to load photos database: {e}",
         )
-    return db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Load database on startup
-    await load_db()
-
-    # Start the scheduler
-    scheduler.start()
-
-    # Schedule daily database reload at 2am
-    scheduler.add_job(
-        load_db,
-        "cron",
-        hour=2,
-        minute=0,
-        id="daily_db_reload",
-        name="Daily database reload at 2am",
-        replace_existing=True,
-    )
-
-    logger.info("Starting server with scheduled daily database reload at 2am...")
+    # Database is initialized at module import time, start scheduler now
+    logger.info("FastAPI lifespan starting - database loaded, starting scheduler")
+    start_shared_scheduler()
     yield
-
-    # Shutdown the scheduler
-    scheduler.shutdown()
+    # Shutdown the shared scheduler
+    shutdown_shared_scheduler()
 
 
 app = FastAPI(
