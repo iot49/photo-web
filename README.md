@@ -164,10 +164,11 @@ Login to [Cloudflare](https://www.cloudflare.com/) and purchase a domain name, e
 Go to the `photo-web/ui` folder and run the following commands from the terminal:
 
 ```bash
+npm install
 npm run build
 docker compose build
 docker compose up -d
-docker compose logs
+docker compose logs -f
 ```
 
 Check the log for errors. If everything goes well, you should be able to access the app from anywhere in the world under the domain you purchased, e.g. `https://your-domain.com`.
