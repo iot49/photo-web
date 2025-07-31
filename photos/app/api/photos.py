@@ -28,45 +28,179 @@ async def get_db() -> DB:
     raise NotImplementedError("Database dependency not configured")
 
 
-@router.get("/api/photos/{photo_id}/img")
-@router.get("/api/photos/{photo_id}/img{size_suffix}")
+@router.get(
+    "/api/photos/{photo_id}/img",
+    tags=["photos"],
+    summary="Serve Photo Image (Original)",
+    description="""
+    Serve the original full-resolution photo image.
+    
+    Returns the photo in its original resolution and format, with optional
+    format conversion from HEIC to JPEG for browser compatibility.
+    
+    **Access Control:** Photo access inherited from most permissive album
+    
+    **Format Handling:**
+    - HEIC images automatically converted to JPEG
+    - Other formats served as-is when possible
+    - Quality parameter applies only to JPEG conversion
+    
+    **Performance Notes:**
+    - Original images may be very large (10MB+)
+    - Consider using size variants for better performance
+    - Images are cached after first processing
+    """,
+    responses={
+        200: {
+            "description": "Photo image successfully served",
+            "content": {"image/jpeg": {}, "image/png": {}, "image/tiff": {}},
+            "headers": {
+                "Content-Type": {
+                    "description": "Image MIME type",
+                    "schema": {"type": "string"},
+                },
+                "Cache-Control": {
+                    "description": "Cache control header",
+                    "schema": {"type": "string"},
+                },
+                "ETag": {
+                    "description": "Entity tag for caching",
+                    "schema": {"type": "string"},
+                },
+            },
+        },
+        404: {
+            "description": "Photo not found",
+            "content": {"application/json": {"example": {"detail": "Photo not found"}}},
+        },
+        403: {
+            "description": "Access denied - insufficient permissions",
+            "content": {"application/json": {"example": {"detail": "Access denied"}}},
+        },
+        500: {
+            "description": "Image processing error",
+            "content": {
+                "application/json": {"example": {"detail": "Error processing image"}}
+            },
+        },
+    },
+)
+@router.get(
+    "/api/photos/{photo_id}/img{size_suffix}",
+    tags=["photos"],
+    summary="Serve Photo Image (Sized)",
+    description="""
+    Serve a photo image scaled to specific screen sizes for responsive design.
+    
+    Returns the photo scaled to the specified size with optimized quality
+    settings for each size variant. No upscaling is performed - images
+    smaller than the target size are returned at original dimensions.
+    
+    **Size Variants:**
+    - **-sm**: 480px width (small mobile)
+    - **-md**: 768px width (tablet)
+    - **-lg**: 1024px width (desktop)
+    - **-xl**: 1440px width (large desktop)
+    - **-xxl**: 1920px width (4K desktop)
+    - **-xxxl**: 3860px width (8K desktop)
+    
+    **Quality Optimization:**
+    - Smaller sizes use lower quality for faster loading
+    - Larger sizes maintain higher quality for detail
+    - HEIC images always converted to JPEG
+    
+    **Caching:**
+    - Processed images cached at multiple levels
+    - Browser cache: 24 hours
+    - Nginx cache: 7 days
+    - In-memory cache: 1 hour
+    
+    **Test Mode:**
+    When `test=true`, adds a text overlay showing the size suffix
+    for debugging responsive image implementations.
+    """,
+    responses={
+        200: {
+            "description": "Scaled photo image successfully served",
+            "content": {"image/jpeg": {}},
+            "headers": {
+                "Content-Type": {
+                    "description": "Always image/jpeg for scaled images",
+                    "schema": {"type": "string", "example": "image/jpeg"},
+                },
+                "Cache-Control": {
+                    "description": "Cache control header",
+                    "schema": {"type": "string", "example": "public, max-age=604800"},
+                },
+                "ETag": {
+                    "description": "Entity tag including size suffix",
+                    "schema": {"type": "string", "example": "photo-uuid-456-img50"},
+                },
+            },
+        },
+        400: {
+            "description": "Invalid size suffix",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Invalid size suffix '-invalid'. Valid options: '', ['-sm', '-md', '-lg', '-xl', '-xxl', '-xxxl']"
+                    }
+                }
+            },
+        },
+        404: {
+            "description": "Photo not found or file missing",
+            "content": {
+                "application/json": {"example": {"detail": "Photo file not found"}}
+            },
+        },
+        500: {
+            "description": "Image processing error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Error processing image: Invalid image format"
+                    }
+                }
+            },
+        },
+    },
+)
 async def serve_photo_image_sized(
     photo_id: str,
     request: Request,
     size_suffix: str = "",
-    quality: Optional[int] = Query(75, ge=1, le=100),
+    quality: Optional[int] = Query(
+        75, ge=1, le=100, description="JPEG quality (1-100)"
+    ),
     test: bool = Query(
-        False, description="When true, embed size-suffix text overlay in image"
+        False,
+        description="When true, embed size-suffix text overlay in image for debugging",
     ),
     db: DB = Depends(get_db),
 ):
     """
     Serve a photo image scaled to common screen sizes.
 
-    Access rules handled by /authorize
-
-    Size suffixes:
-    - "" (empty): Original full-size image
-    - "-sm": Small mobile (480px width)
-    - "-md": Tablet (768px width)
-    - "-lg": Desktop (1024px width)
-    - "-xl": Large desktop (1440px width)
-    - "-xxl": 4K desktop (1920px width)
-    - "-xxxl": 8K desktop (3860px width)
-
-    Access rules same as /api/photo/{photo_uuid}/image endpoint.
+    Provides responsive image serving with automatic scaling and format
+    conversion. Supports multiple size variants optimized for different
+    screen sizes and use cases.
 
     Args:
-        photo_id (str): The UUID of the photo
-        size_suffix (str): Size suffix like "-sm", "-md", etc.
-        quality (int): JPEG quality (1-100, default 75)
-        test (bool): When true, embed size-suffix text overlay in image
+        photo_id: The UUID of the photo to serve
+        size_suffix: Size suffix like "-sm", "-md", etc. (empty for original)
+        quality: JPEG quality (1-100, default 75)
+        test: When true, embed size-suffix text overlay for debugging
+        db: Photos database dependency
 
     Returns:
-        Image scaled to the number of width pixels specified by the suffix with correct MIME type.
-        No up-scaling: if the original image width is smaller than the specified width, the unscaled original is returned.
-        Without suffix, returns the unscaled original (may be huge).
-        When test=True, adds size-suffix text overlay in lower right corner.
+        Image scaled to the specified dimensions with appropriate MIME type.
+        No upscaling is performed - smaller originals returned at native size.
+        Test mode adds size-suffix text overlay in lower right corner.
+
+    Raises:
+        HTTPException: 400 for invalid size suffix, 404 for missing photo/file,
+                      500 for processing errors
     """
     # Validate size suffix (empty string is valid for original size)
     if size_suffix != "" and size_suffix not in SCREEN_SIZES:
@@ -237,26 +371,58 @@ async def serve_photo_image_sized(
         raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
 
 
-@router.get("/api/photos/srcset")
+@router.get(
+    "/api/photos/srcset",
+    tags=["photos"],
+    summary="Get Responsive Image Sizes",
+    description="""
+    Get information about available responsive image sizes.
+    
+    Returns metadata about all supported image size variants that can be
+    used with the `/api/photos/{photo_id}/img{size_suffix}` endpoint.
+    This information is useful for building responsive image implementations
+    with HTML `srcset` attributes.
+    
+    **Use Cases:**
+    - Building responsive image components
+    - Generating HTML `srcset` attributes
+    - Understanding available size options
+    - Performance optimization planning
+    
+    **Size Information:**
+    Each size variant includes:
+    - Suffix string for URL construction
+    - Target width in pixels
+    - Human-readable description
+    - Intended use case
+    """,
+    responses={
+        200: {
+            "description": "Available image sizes successfully retrieved",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "-sm": {"width": 480, "description": "Small mobile"},
+                        "-md": {"width": 768, "description": "Tablet"},
+                        "-lg": {"width": 1024, "description": "Desktop"},
+                        "-xl": {"width": 1440, "description": "Large desktop"},
+                        "-xxl": {"width": 1920, "description": "4K desktop"},
+                        "-xxxl": {"width": 3860, "description": "8K desktop"},
+                    }
+                }
+            },
+        }
+    },
+)
 async def get_photos_srcset():
     """
-    Get srcset string for a specific photo in the format expected by HTML img srcset attribute.
+    Get information about available responsive image sizes.
 
-    Returns the image sizes that /api/photos/{photo_id}/img{-XXX} returns.
-
-    Args:
-        photo_id (str): The UUID of the photo to generate srcset for
+    Returns metadata for all supported image size variants that can be
+    used for responsive image implementations. This endpoint helps clients
+    understand what size options are available and their characteristics.
 
     Returns:
-        JSON object with an array of supported sizes, e.g.
-        ```json
-        [
-            {
-                "suffix": "-xxl",
-                "width": 1920,
-                "description": "4K desktop"
-            }
-        ]
-        ```
+        dict: Dictionary of size variants with width and description info
     """
     return SCREEN_SIZES

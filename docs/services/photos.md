@@ -91,154 +91,54 @@ class PhotosDatabase:
         """Get detailed photo metadata"""
 ```
 
-## API Endpoints
+## API Documentation
 
-### Album Endpoints
+The Photos Service provides a comprehensive REST API for album browsing, photo serving, and image processing with real-time scaling and format conversion.
 
-#### GET `/photos/api/albums`
+**📖 Complete API Documentation:** [https://${ROOT_DOMAIN}/photos/docs](https://${ROOT_DOMAIN}/photos/docs)
 
-Get list of all accessible albums.
+The interactive API documentation includes:
 
-**Query Parameters:**
-- `access_level` (optional): Filter by access level (public, protected, private)
+- **Complete endpoint reference** with request/response examples
+- **Image processing pipeline** documentation
+- **Responsive image sizing** with all available variants
+- **Access control rules** for album-based permissions
+- **Interactive testing** with real photo data
+- **Performance optimization** guidelines
 
-**Response:**
-```json
-{
-  "albums": [
-    {
-      "uuid": "album-uuid-123",
-      "title": "Family Vacation 2024",
-      "folder": "Protected/Family",
-      "access_level": "protected",
-      "photo_count": 45,
-      "cover_photo_uuid": "photo-uuid-456",
-      "created_date": "2024-01-15T00:00:00Z",
-      "modified_date": "2024-01-20T12:30:00Z"
-    }
-  ]
-}
-```
+### Key API Endpoints
 
-#### GET `/photos/api/albums/{album_uuid}`
+| Endpoint | Method | Purpose | Access |
+|----------|--------|---------|---------|
+| `/api/albums` | GET | List accessible albums | Role-based |
+| `/api/albums/{uuid}` | GET | Album photos and metadata | Role-based |
+| `/api/photos/{id}/img` | GET | Original photo image | Role-based |
+| `/api/photos/{id}/img{size}` | GET | Responsive image variants | Role-based |
+| `/api/photos/srcset` | GET | Available image sizes | Public |
+| `/api/reload-db` | POST | Refresh photo database | Admin |
+| `/api/health` | GET | Service health check | Public |
 
-Get detailed album information with photo list.
+### Image Size Variants
 
-**Response:**
-```json
-{
-  "uuid": "album-uuid-123",
-  "title": "Family Vacation 2024",
-  "folder": "Protected/Family",
-  "access_level": "protected",
-  "photo_count": 45,
-  "photos": [
-    {
-      "uuid": "photo-uuid-456",
-      "filename": "IMG_1234.HEIC",
-      "date_taken": "2024-01-15T14:30:00Z",
-      "location": {
-        "latitude": 37.7749,
-        "longitude": -122.4194,
-        "address": "San Francisco, CA"
-      },
-      "dimensions": {
-        "width": 4032,
-        "height": 3024
-      }
-    }
-  ]
-}
-```
+The service provides multiple responsive image sizes optimized for different use cases:
 
-### Photo Endpoints
+| Size | Width | Quality | Use Case |
+|------|-------|---------|----------|
+| `-sm` | 480px | 75% | Mobile phones |
+| `-md` | 768px | 75% | Tablets |
+| `-lg` | 1024px | 80% | Desktop |
+| `-xl` | 1440px | 85% | Large desktop |
+| `-xxl` | 1920px | 90% | 4K displays |
+| `-xxxl` | 3860px | 95% | 8K displays |
 
-#### GET `/photos/api/photos/{photo_uuid}/metadata`
+### Quick Start
 
-Get detailed photo metadata.
+1. **List Albums**: Get accessible albums from `/api/albums`
+2. **Browse Photos**: Get album contents from `/api/albums/{uuid}`
+3. **Display Images**: Use responsive variants like `/api/photos/{id}/img-md`
+4. **Optimize Performance**: Implement srcset for responsive images
 
-**Response:**
-```json
-{
-  "uuid": "photo-uuid-456",
-  "filename": "IMG_1234.HEIC",
-  "original_filename": "IMG_1234.HEIC",
-  "date_taken": "2024-01-15T14:30:00Z",
-  "date_modified": "2024-01-15T14:30:00Z",
-  "dimensions": {
-    "width": 4032,
-    "height": 3024
-  },
-  "file_size": 2048576,
-  "camera_make": "Apple",
-  "camera_model": "iPhone 15 Pro",
-  "location": {
-    "latitude": 37.7749,
-    "longitude": -122.4194,
-    "address": "San Francisco, CA"
-  },
-  "albums": ["album-uuid-123", "album-uuid-789"],
-  "access_level": "protected"
-}
-```
-
-#### GET `/photos/api/photos/{photo_uuid}/img{size}`
-
-Get processed image in specified size.
-
-**Size Options:**
-- `img10`: 100px max dimension, 85% quality
-- `img30`: 300px max dimension, 85% quality  
-- `img50`: 500px max dimension, 85% quality
-- `img85`: 850px max dimension, 90% quality
-- `img100`: Original size, 95% quality
-
-**Response:** Binary image data (JPEG format)
-
-**Headers:**
-- `Content-Type: image/jpeg`
-- `Cache-Control: public, max-age=604800`
-- `ETag: "photo-uuid-456-img50"`
-
-#### GET `/photos/api/photos/srcset`
-
-Get responsive image srcset for multiple photos.
-
-**Query Parameters:**
-- `photos`: Comma-separated list of photo UUIDs
-- `sizes`: Comma-separated list of size suffixes
-
-**Response:**
-```json
-{
-  "srcsets": {
-    "photo-uuid-456": {
-      "img30": "/photos/api/photos/photo-uuid-456/img30",
-      "img50": "/photos/api/photos/photo-uuid-456/img50",
-      "img85": "/photos/api/photos/photo-uuid-456/img85"
-    }
-  }
-}
-```
-
-### Administrative Endpoints
-
-#### POST `/photos/api/reload-db` (Admin only)
-
-Reload the photos database to pick up new albums and photos.
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Database reloaded successfully",
-  "stats": {
-    "albums_loaded": 25,
-    "photos_loaded": 1250,
-    "processing_time": "2.3s"
-  }
-}
-```
+For detailed examples, testing, and complete schema documentation, visit the [interactive API documentation](https://${ROOT_DOMAIN}/photos/docs).
 
 ## Image Processing Pipeline
 

@@ -70,10 +70,7 @@ nav:
     - Frontend UI: services/ui.md
     - Nginx: services/nginx.md
     - Traefik: services/traefik.md
-  - API Reference:
-    - Authentication API: api/auth.md
-    - Photos API: api/photos.md
-    - Documents API: api/doc.md
+  - API Reference: api-reference.md
   - Development:
     - Getting Started: development/getting-started.md
     - Guidelines: development/guidelines.md

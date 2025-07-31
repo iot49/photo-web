@@ -86,129 +86,40 @@ class Session(BaseModel):
     expires_at: datetime
 ```
 
-## API Endpoints
+## API Documentation
 
-### Authentication Endpoints
+The Authentication Service provides a comprehensive REST API for user authentication, session management, and authorization.
 
-#### POST `/auth/login`
+**📖 Complete API Documentation:** [https://${ROOT_DOMAIN}/auth/docs](https://${ROOT_DOMAIN}/auth/docs)
 
-Authenticate user with Firebase token and create session.
+The interactive API documentation includes:
 
-**Request:**
-```json
-{
-  "firebase_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
+- **Complete endpoint reference** with request/response examples
+- **Interactive testing** - try API calls directly from your browser
+- **Authentication flows** with step-by-step examples
+- **Error handling** documentation with all possible error codes
+- **Data models** with complete schema definitions
 
-**Response:**
-```json
-{
-  "success": true,
-  "user": {
-    "id": "firebase-uid-123",
-    "email": "user@example.com",
-    "name": "John Doe",
-    "roles": ["public", "protected"]
-  }
-}
-```
+### Key API Endpoints
 
-**Side Effects:**
-- Creates or updates user record in database
-- Sets secure session cookie
-- Updates last login timestamp
+| Endpoint | Method | Purpose | Access |
+|----------|--------|---------|---------|
+| `/login` | POST | User authentication with Firebase tokens | Public |
+| `/logout` | POST | Session termination | Authenticated |
+| `/me` | GET | Current user information | Authenticated |
+| `/authorize` | GET | Internal Traefik authorization | Internal |
+| `/users` | GET | List all users | Admin |
+| `/users/{email}` | GET/PUT/DELETE | User management | Admin |
+| `/firebase-config` | GET | Frontend Firebase configuration | Public |
 
-#### POST `/auth/logout`
+### Quick Start
 
-Terminate user session and clear cookies.
+1. **Authentication**: Send Firebase ID token to `/login`
+2. **Session**: Secure cookie automatically set for subsequent requests
+3. **User Info**: Get current user details from `/me`
+4. **Authorization**: All requests automatically authorized via Traefik
 
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Logged out successfully"
-}
-```
-
-#### GET `/auth/me`
-
-Get current user information.
-
-**Response:**
-```json
-{
-  "id": "firebase-uid-123",
-  "email": "user@example.com",
-  "name": "John Doe",
-  "roles": ["public", "protected"],
-  "last_login": "2024-01-15T10:30:00Z"
-}
-```
-
-### Configuration Endpoints
-
-#### GET `/auth/firebase-config`
-
-Get Firebase configuration for frontend.
-
-**Response:**
-```json
-{
-  "apiKey": "your-api-key",
-  "authDomain": "your-project.firebaseapp.com",
-  "projectId": "your-project-id"
-}
-```
-
-### Authorization Endpoints
-
-#### GET `/auth/authorize`
-
-Internal endpoint for Traefik forward auth.
-
-**Headers:**
-- `X-Original-URL`: Original request URL
-- `X-Original-Method`: Original request method
-- `Cookie`: Session cookie
-
-**Response:**
-- `200 OK`: Access granted
-- `403 Forbidden`: Access denied
-- `401 Unauthorized`: Authentication required
-
-### Admin Endpoints
-
-#### GET `/auth/users` (Admin only)
-
-List all users in the system.
-
-**Response:**
-```json
-{
-  "users": [
-    {
-      "id": "firebase-uid-123",
-      "email": "user@example.com",
-      "name": "John Doe",
-      "roles": ["public", "protected"],
-      "created_at": "2024-01-01T00:00:00Z",
-      "last_login": "2024-01-15T10:30:00Z"
-    }
-  ]
-}
-```
-
-#### PUT `/auth/users/{user_id}/roles` (Admin only)
-
-Update user roles.
-
-**Request:**
-```json
-{
-  "roles": ["public", "protected", "private"]
-}
-```
+For detailed examples and testing, visit the [interactive API documentation](https://${ROOT_DOMAIN}/auth/docs).
 
 ## Role-Based Access Control
 

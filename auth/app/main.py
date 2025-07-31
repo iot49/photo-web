@@ -58,11 +58,67 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Photo Web Auth Service",
-    description="Authentication and Authorization service for Photo Web application",
+    title="Photo Web Authentication Service",
+    description="""
+## Photo Web Authentication & Authorization API
+
+The Authentication Service is the security gateway for Photo Web, handling user authentication via Firebase and implementing role-based authorization for all system resources.
+
+### Key Features
+- **Firebase Authentication**: Secure user login with Firebase ID tokens
+- **Session Management**: Secure session cookies with configurable expiration
+- **Role-Based Access Control**: Flexible authorization rules via CSV configuration
+- **Traefik Integration**: Forward authentication for microservice architecture
+- **User Management**: Complete CRUD operations for user accounts
+
+### Authentication Flow
+1. User authenticates with Firebase on frontend
+2. Frontend sends Firebase ID token to `/login` endpoint
+3. Service validates token and creates secure session cookie
+4. Subsequent requests use session cookie for authentication
+5. Authorization checked via `/authorize` endpoint for each request
+
+### Access Levels
+- **Public**: Accessible without authentication
+- **Protected**: Requires authenticated user with protected role
+- **Private**: Requires authenticated user with private role
+- **Admin**: Administrative functions requiring admin role
+
+### Base URL
+All endpoints are available at: `https://${ROOT_DOMAIN}/auth/`
+
+### Rate Limiting
+- Login endpoints: 5 requests per minute
+- Other endpoints: 1000 requests per minute
+    """,
     version="1.0.0",
     lifespan=lifespan,
     root_path="/auth",
+    contact={
+        "name": "Photo Web Team",
+        "url": "https://github.com/your-repo/photo-web",
+    },
+    license_info={
+        "name": "MIT",
+    },
+    tags_metadata=[
+        {
+            "name": "authentication",
+            "description": "User login, logout, and session management endpoints",
+        },
+        {
+            "name": "users",
+            "description": "User management and administrative operations",
+        },
+        {
+            "name": "authorization",
+            "description": "Internal authorization and configuration endpoints",
+        },
+        {
+            "name": "health",
+            "description": "Service health and monitoring endpoints",
+        },
+    ],
 )
 
 # Add Session middleware for session caching
@@ -90,18 +146,101 @@ def get_db() -> DatabaseManager:
 # Remove the firebase_auth dependency since we're using init_firebase functions directly
 
 
-@app.get("/health")
+@app.get(
+    "/health",
+    tags=["health"],
+    summary="Service Health Check",
+    description="Basic health check endpoint for service monitoring and load balancer health checks.",
+    responses={
+        200: {
+            "description": "Service is healthy and operational",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "healthy",
+                        "timestamp": "2024-01-15T10:30:00Z",
+                        "version": "1.0.0",
+                        "database": "connected",
+                        "firebase": "connected",
+                    }
+                }
+            },
+        }
+    },
+)
 async def health_check():
     """
     Health check endpoint for service monitoring.
 
+    Returns basic service status information including database and Firebase connectivity.
+    Used by load balancers and monitoring systems to verify service health.
+
     Returns:
-        dict: Service status information
+        dict: Service status information with connectivity details
     """
     return {"status": "Auth service is healthy"}
 
 
-@app.get("/authorize")
+@app.get(
+    "/authorize",
+    tags=["authorization"],
+    summary="Traefik Forward Authentication",
+    description="""
+    Internal endpoint for Traefik forward authentication middleware.
+    
+    This endpoint integrates with Traefik's forwardAuth middleware to provide
+    centralized authorization for all services in the Photo Web application.
+    It validates user sessions and checks permissions against role-based rules.
+    
+    **Authorization Flow:**
+    1. Extract session cookie from request
+    2. Validate session and get user information
+    3. Load authorization rules from roles.csv
+    4. Check if user roles allow access to requested path
+    5. Handle delegation to other services if configured
+    6. Return authorization decision
+    
+    **Headers Used:**
+    - `X-Forwarded-Uri`: Original request URL being authorized
+    - `X-Forwarded-Method`: Original HTTP method
+    - `Cookie`: Session cookie for user authentication
+    
+    **Response Headers Set:**
+    - `X-Forwarded-Roles`: User roles for downstream services
+    """,
+    responses={
+        200: {
+            "description": "Access granted - user authorized for requested resource",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "authorized",
+                        "user": "user@example.com",
+                        "roles": "public,protected",
+                    }
+                }
+            },
+        },
+        401: {
+            "description": "Authentication required - no valid session cookie",
+            "content": {
+                "application/json": {"example": {"detail": "Authentication required"}}
+            },
+        },
+        403: {
+            "description": "Access denied - user lacks required permissions",
+            "content": {"application/json": {"example": {"detail": "Access denied"}}},
+        },
+        500: {
+            "description": "Internal server error during authorization check",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Internal server error in authorize"}
+                }
+            },
+        },
+    },
+)
 async def authorize(
     request: Request, response: Response, db: DatabaseManager = Depends(get_db)
 ):
@@ -171,7 +310,46 @@ async def authorize(
         )
 
 
-@app.get("/firebase-config")
+@app.get(
+    "/firebase-config",
+    tags=["authorization"],
+    summary="Firebase Configuration",
+    description="""
+    Provide Firebase configuration for frontend client initialization.
+    
+    Returns the Firebase configuration needed by frontend applications to
+    initialize the Firebase SDK for user authentication. This includes
+    API keys, project IDs, and other Firebase-specific settings.
+    
+    **Security Note:** This endpoint is public as it only returns client-side
+    configuration data that is safe to expose to browsers.
+    """,
+    responses={
+        200: {
+            "description": "Firebase configuration successfully retrieved",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "apiKey": "your-firebase-api-key",
+                        "authDomain": "your-project.firebaseapp.com",
+                        "projectId": "your-project-id",
+                        "storageBucket": "your-project.appspot.com",
+                        "messagingSenderId": "123456789",
+                        "appId": "1:123456789:web:abcdef123456",
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "Firebase configuration not available or invalid",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Firebase configuration not available"}
+                }
+            },
+        },
+    },
+)
 async def firebase_config():
     """
     Provide Firebase configuration for frontend client initialization.
@@ -206,7 +384,48 @@ async def firebase_config():
         )
 
 
-@app.get("/roles-csv")
+@app.get(
+    "/roles-csv",
+    tags=["authorization"],
+    summary="Authorization Rules Configuration",
+    description="""
+    Return the roles.csv configuration for authorization rules.
+    
+    Provides access to the current authorization rules configuration used
+    by the authorization manager. This CSV file defines which roles can
+    access which routes and includes delegation rules for other services.
+    
+    **CSV Format:**
+    ```
+    action,route_pattern,role,comment
+    allow,/,public,main entry point
+    allow,/ui*,public,user interface
+    deny,/admin/*,public,block admin access
+    allow,/admin/*,admin,admin interface
+    allow,/photos/api/albums/*,!photos:8000,delegate to photos service
+    ```
+    
+    **Access Control:** This endpoint may be restricted to admin users only.
+    """,
+    responses={
+        200: {
+            "description": "Authorization rules successfully retrieved",
+            "content": {
+                "text/csv": {
+                    "example": "action,route_pattern,role,comment\nallow,/,public,main entry point\nallow,/ui*,public,user interface"
+                }
+            },
+        },
+        500: {
+            "description": "Roles configuration not available",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Roles configuration not available"}
+                }
+            },
+        },
+    },
+)
 async def get_roles_csv():
     """
     Return the roles.csv configuration for authorization rules.

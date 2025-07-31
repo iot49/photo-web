@@ -20,7 +20,61 @@ def get_db() -> DatabaseManager:
 router = APIRouter(tags=["authentication"])
 
 
-@router.post("/login", response_class=RedirectResponse)
+@router.post(
+    "/login",
+    response_class=RedirectResponse,
+    summary="User Login with Firebase Token",
+    description="""
+    Authenticate user with Firebase ID token and create secure session.
+    
+    This endpoint validates a Firebase ID token received from the frontend,
+    creates or updates the user record in the database, and establishes a
+    secure session cookie for subsequent requests.
+    
+    **Authentication Flow:**
+    1. Frontend authenticates user with Firebase
+    2. Frontend sends Firebase ID token to this endpoint
+    3. Service validates token with Firebase Admin SDK
+    4. User record created/updated in database
+    5. Secure session cookie set with configurable expiration
+    6. User redirected to specified URI
+    
+    **Session Security:**
+    - HttpOnly cookies prevent XSS attacks
+    - Secure flag ensures HTTPS-only transmission
+    - SameSite=Strict prevents CSRF attacks
+    - Configurable expiration (default 14 days)
+    
+    **Rate Limiting:** 5 requests per minute per IP
+    """,
+    responses={
+        302: {
+            "description": "Login successful - redirecting to specified URI",
+            "headers": {
+                "Set-Cookie": {
+                    "description": "Secure session cookie",
+                    "schema": {"type": "string"},
+                },
+                "Location": {
+                    "description": "Redirect URI",
+                    "schema": {"type": "string"},
+                },
+            },
+        },
+        400: {
+            "description": "Invalid Firebase ID token",
+            "content": {
+                "application/json": {"example": {"detail": "Invalid Firebase token"}}
+            },
+        },
+        500: {
+            "description": "Internal server error during login process",
+            "content": {
+                "application/json": {"example": {"detail": "Login process failed"}}
+            },
+        },
+    },
+)
 async def session_login(
     request: Request,
     id_token: str,
@@ -117,7 +171,47 @@ async def session_login(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/logout", response_class=RedirectResponse)
+@router.post(
+    "/logout",
+    response_class=RedirectResponse,
+    summary="User Logout",
+    description="""
+    Terminate user session and clear authentication cookies.
+    
+    This endpoint invalidates the current user session by:
+    - Clearing the session cookie (expires immediately)
+    - Removing cached session data from server-side store
+    - Redirecting user to specified URI
+    
+    **Security Features:**
+    - Immediate cookie expiration prevents session reuse
+    - Server-side cache cleanup ensures complete logout
+    - Safe redirect to prevent open redirect vulnerabilities
+    
+    **Rate Limiting:** 10 requests per minute per IP
+    """,
+    responses={
+        302: {
+            "description": "Logout successful - redirecting to specified URI",
+            "headers": {
+                "Set-Cookie": {
+                    "description": "Expired session cookie",
+                    "schema": {"type": "string"},
+                },
+                "Location": {
+                    "description": "Redirect URI",
+                    "schema": {"type": "string"},
+                },
+            },
+        },
+        500: {
+            "description": "Internal server error during logout",
+            "content": {
+                "application/json": {"example": {"detail": "Internal server error"}}
+            },
+        },
+    },
+)
 async def logout(request: Request, redirect_uri: str = "/") -> RedirectResponse:
     """
     Handle user logout by clearing session data and cookies.
@@ -174,7 +268,57 @@ async def logout(request: Request, redirect_uri: str = "/") -> RedirectResponse:
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get(
+    "/me",
+    response_model=UserResponse,
+    summary="Get Current User",
+    description="""
+    Get current authenticated user information from session.
+    
+    Extracts and validates the session cookie to return comprehensive user
+    details including email, name, picture, roles, and timestamps.
+    
+    **Behavior:**
+    - Returns full user details for authenticated users
+    - Returns `{"roles": "public"}` for unauthenticated users
+    - Does not raise errors for missing sessions (graceful degradation)
+    
+    **Use Cases:**
+    - Frontend user profile display
+    - Role-based UI rendering
+    - Session validation checks
+    - User state management
+    
+    **Rate Limiting:** 1000 requests per minute per IP
+    """,
+    responses={
+        200: {
+            "description": "User information successfully retrieved",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "authenticated_user": {
+                            "summary": "Authenticated user",
+                            "value": {
+                                "id": "firebase-uid-123",
+                                "email": "user@example.com",
+                                "name": "John Doe",
+                                "picture": "https://example.com/avatar.jpg",
+                                "roles": "public,protected",
+                                "created_at": "2024-01-01T00:00:00Z",
+                                "last_login": "2024-01-15T10:30:00Z",
+                            },
+                        },
+                        "unauthenticated_user": {
+                            "summary": "Unauthenticated user",
+                            "value": {"roles": "public"},
+                        },
+                    }
+                }
+            },
+        }
+    },
+)
 async def get_current_user(request: Request):
     """
     Get current authenticated user information from session.
