@@ -1,3 +1,13 @@
+"""
+This module manages a shared database instance and a scheduler for the photo application.
+
+It provides a singleton `SharedDB` class that:
+- Initializes and manages a database instance loaded from a specified path with filters.
+- Initializes and manages an `AsyncIOScheduler` instance for background tasks.
+- Ensures the scheduler is started by only one worker process using a robust, PID-aware file lock.
+- Schedules a daily reload of the photo database at 2 AM.
+"""
+
 import logging
 import os
 from typing import Optional
@@ -8,130 +18,137 @@ from read_db import read_db
 
 logger = logging.getLogger(__name__)
 
-# Global variables for shared database and scheduler
-_shared_db: Optional[DB] = None
-_shared_scheduler: Optional[AsyncIOScheduler] = None
 
+class SharedDB:
+    """
+    A singleton class to manage a shared database and scheduler instance.
 
-def initialize_shared_db() -> None:
-    """Initialize the shared database if not already loaded."""
-    global _shared_db
+    This class ensures that the database and scheduler are initialized only once
+    and provides a robust mechanism for starting the scheduler in a multi-worker
+    environment.
+    """
 
-    if _shared_db is not None:
-        logger.debug("Database already loaded, skipping initialization")
-        return
+    _instance: Optional["SharedDB"] = None
+    _db: Optional[DB] = None
+    _scheduler: Optional[AsyncIOScheduler] = None
 
-    photos_db_path = os.getenv("PHOTOS_LIBRARY_MOUNT", "/photo_db")
-    photos_db_filters = os.getenv("PHOTOS_DB_FILTERS", "Public:Protected:Private")
+    _lock_file = "/tmp/photos_scheduler.lock"
 
-    logger.info(
-        f"Loading shared photos database from {photos_db_path} with filters {photos_db_filters}..."
-    )
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
 
-    try:
-        _shared_db = read_db(photos_db_path, photos_db_filters)
+    def __init__(self):
+        if self._db is None:
+            self.reload_db()  # Initial load
+        if self._scheduler is None:
+            self._scheduler = AsyncIOScheduler()
+            logger.info("Shared scheduler created.")
+
+    def get_db(self) -> DB:
+        """Returns the shared database instance, loading it if necessary."""
+        return self._db
+
+    def get_scheduler(self) -> AsyncIOScheduler:
+        """Returns the shared scheduler instance."""
+        return self._scheduler
+
+    def reload_db(self) -> None:
+        """Loads or reloads the shared database from the configured path."""
+        photos_db_path = os.getenv("PHOTOS_LIBRARY_MOUNT", "/photo_db")
+        photos_db_filters = os.getenv("PHOTOS_DB_FILTERS", "Public:Protected:Private")
+
         logger.info(
-            f"Shared database with {len(_shared_db.albums)} albums and {len(_shared_db.photos)} photos loaded successfully."
+            f"Loading photos database from {photos_db_path} with filters {photos_db_filters}..."
         )
-    except Exception as e:
-        logger.error(f"Failed to load shared photos database: {e}")
-        raise
+        try:
+            self._db = read_db(photos_db_path, photos_db_filters)
+            logger.info(
+                f"Database with {len(self._db.albums)} albums and {len(self._db.photos)} photos loaded."
+            )
+        except Exception as e:
+            logger.error(f"Failed to load photos database: {e}")
+            raise
+
+    def start_scheduler(self) -> None:
+        """
+        Starts the scheduler if this worker acquires the lock.
+
+        Uses a file-based lock that checks the PID to prevent stale locks
+        from a crashed worker.
+        """
+        if self._is_lock_held_by_other():
+            return
+
+        try:
+            with open(self._lock_file, "x") as f:
+                f.write(str(os.getpid()))
+
+            if not self._scheduler.running:
+                self._scheduler.start()
+                self._scheduler.add_job(
+                    self.reload_db,
+                    "cron",
+                    hour=2,
+                    minute=0,
+                    id="daily_db_reload",
+                    name="Daily database reload at 2am",
+                    replace_existing=True,
+                )
+                logger.info("Scheduler started with daily database reload job.")
+        except FileExistsError:
+            logger.debug("Another worker acquired the lock just now.")
+        except Exception as e:
+            logger.error(f"Failed to start scheduler: {e}")
+            self._release_lock()
+
+    def _is_lock_held_by_other(self) -> bool:
+        """Checks if a valid, non-stale lock is held by another process."""
+        try:
+            with open(self._lock_file, "r") as f:
+                pid_str = f.read().strip()
+
+            if not pid_str:
+                return False
+
+            pid = int(pid_str)
+            os.kill(pid, 0)  # Check if process exists
+
+            if pid != os.getpid():
+                logger.info(f"Scheduler lock held by running process {pid}.")
+                return True
+
+        except (FileNotFoundError, ValueError):
+            return False  # No lock or invalid PID
+        except OSError:
+            logger.warning(
+                f"Stale lock file found (process {pid_str} not running). Removing lock."
+            )
+            self._release_lock()
+            return False
+
+        return False
+
+    def _release_lock(self):
+        """Removes the lock file if it exists."""
+        if os.path.exists(self._lock_file):
+            os.remove(self._lock_file)
+
+    def shutdown_scheduler(self) -> None:
+        """Shuts down the scheduler and releases the lock if this process held it."""
+        if self._scheduler and self._scheduler.running:
+            # Only the process that holds the lock should shut down and release
+            try:
+                with open(self._lock_file, "r") as f:
+                    pid = int(f.read().strip())
+                if pid == os.getpid():
+                    self._scheduler.shutdown()
+                    self._release_lock()
+                    logger.info("Scheduler shut down and lock released.")
+            except (FileNotFoundError, ValueError):
+                pass  # Lock already gone
 
 
-def initialize_shared_scheduler() -> None:
-    """Initialize the shared scheduler and schedule database reload."""
-    global _shared_scheduler
-
-    if _shared_scheduler is not None:
-        logger.debug("Scheduler already initialized, skipping")
-        return
-
-    # Create scheduler but don't start it yet (no event loop during preload)
-    _shared_scheduler = AsyncIOScheduler()
-    logger.info(
-        "Shared scheduler created (will be started when event loop is available)"
-    )
-
-
-def start_shared_scheduler() -> None:
-    """Start the shared scheduler and schedule jobs (only in worker 0)."""
-    global _shared_scheduler
-
-    # Use a simple file-based approach to ensure only one worker starts scheduler
-    lock_file = "/tmp/photos_scheduler_started"
-
-    try:
-        # Try to create the lock file exclusively
-        with open(lock_file, "x") as f:
-            f.write(str(os.getpid()))
-
-        # This worker got the lock, start the scheduler
-        logger.info(f"PID {os.getpid()}: Starting scheduler (first worker)")
-
-    except FileExistsError:
-        # Another worker already started the scheduler
-        logger.info(
-            f"PID {os.getpid()}: Scheduler already started by another worker, skipping"
-        )
-        return
-
-    if _shared_scheduler is None:
-        initialize_shared_scheduler()
-
-    if not _shared_scheduler.running:
-        _shared_scheduler.start()
-
-        # Schedule daily database reload at 2am
-        _shared_scheduler.add_job(
-            reload_shared_db,
-            "cron",
-            hour=2,
-            minute=0,
-            id="daily_db_reload",
-            name="Daily database reload at 2am",
-            replace_existing=True,
-        )
-
-        logger.info("Shared scheduler started with daily database reload at 2am")
-    else:
-        logger.debug("Scheduler already running, skipping start")
-
-
-def get_shared_db() -> DB:
-    """Get the shared database instance."""
-    global _shared_db
-
-    if _shared_db is None:
-        initialize_shared_db()
-
-    return _shared_db
-
-
-def get_shared_scheduler() -> AsyncIOScheduler:
-    """Get the shared scheduler instance."""
-    global _shared_scheduler
-
-    if _shared_scheduler is None:
-        initialize_shared_scheduler()
-
-    return _shared_scheduler
-
-
-def reload_shared_db() -> DB:
-    """Reload the shared database."""
-    global _shared_db
-
-    logger.info("Reloading shared database...")
-    _shared_db = None
-    initialize_shared_db()
-
-    return _shared_db
-
-
-def shutdown_shared_scheduler() -> None:
-    """Shutdown the shared scheduler."""
-    global _shared_scheduler
-
-    if _shared_scheduler is not None:
-        _shared_scheduler.shutdown()
-        logger.info("Shared scheduler shutdown")
+# Singleton instance
+shared_db_manager = SharedDB()

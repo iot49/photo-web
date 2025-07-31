@@ -8,18 +8,8 @@ from fastapi import FastAPI, HTTPException
 from models import DB
 from pillow_heif import register_heif_opener
 
-# Initialize database and scheduler at module import time (during Gunicorn preload)
-from shared_db import (
-    get_shared_db,
-    initialize_shared_db,
-    initialize_shared_scheduler,
-    reload_shared_db,
-    shutdown_shared_scheduler,
-    start_shared_scheduler,
-)
-
-initialize_shared_db()
-initialize_shared_scheduler()
+# Import the shared DB manager
+from shared_db import shared_db_manager
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -31,13 +21,14 @@ register_heif_opener()
 
 async def get_db() -> DB:
     """Photos database."""
-    return get_shared_db()
+    return shared_db_manager.get_db()
 
 
 async def load_db() -> DB:
     """Load the database from the shared store."""
     try:
-        return reload_shared_db()
+        shared_db_manager.reload_db()
+        return shared_db_manager.get_db()
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -49,10 +40,10 @@ async def load_db() -> DB:
 async def lifespan(app: FastAPI):
     # Database is initialized at module import time, start scheduler now
     logger.info("FastAPI lifespan starting - database loaded, starting scheduler")
-    start_shared_scheduler()
+    shared_db_manager.start_scheduler()
     yield
     # Shutdown the shared scheduler
-    shutdown_shared_scheduler()
+    shared_db_manager.shutdown_scheduler()
 
 
 app = FastAPI(
