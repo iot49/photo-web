@@ -183,19 +183,32 @@ export class PwAlbumBrowser extends LitElement {
     .nav-controls-container {
       display: flex;
       align-items: center;
-      gap: 1rem;
-      justify-content: space-between;
+      justify-content: space-evenly;
       width: 100%;
+      gap: 0;
     }
 
+    .nav-control-item,
     .nav-controls-container sl-icon {
       color: white;
       cursor: pointer;
       padding: 22px;
       border-radius: 4px;
       transition: background-color 0.3s;
+      text-decoration: none;
     }
 
+    .nav-control-item {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 1rem;
+      font-weight: 500;
+      text-align: center;
+    }
+
+    .nav-control-item:hover,
     .nav-controls-container sl-icon:hover {
       background: rgba(255, 255, 255, 0.1);
     }
@@ -221,32 +234,30 @@ export class PwAlbumBrowser extends LitElement {
 
   protected override firstUpdated(_changedProperties: PropertyValues): void {
     super.firstUpdated(_changedProperties);
-    const since = new Date(new Date().setFullYear(new Date().getFullYear() - 1));
-    this.createdFilter(since);
+    // Load recent albums initially
+    this.recentFilter(12);
+  }
+
+  private navTemplate() {
+    return html`
+      <div class="nav-controls-container" slot="nav-controls">
+        <sl-tooltip content="Play selected albums">
+          <a class="nav-control-item" href="/ui/slideshow?playlist=${Array.from(this.playList).join(':')}">Play</a>
+        </sl-tooltip>
+        <sl-tooltip content="Clear playlist">
+          <div class="nav-control-item" @click=${(_: Event) => (this.playList = new Set<string>())}>Clear</div>
+        </sl-tooltip>
+        <sl-tooltip content="Show recent albums">
+          <div class="nav-control-item" @click=${(_: Event) => this.recentFilter(6)}>Recent</div>
+        </sl-tooltip>
+      </div>
+    `;
   }
 
   override render() {
     return html`
       <pw-nav-page>
-        <div class="nav-controls-container" slot="nav-controls">
-          <sl-tooltip content="Play selected albums with Ken Burns style animation">
-            <a href="/ui/slideshow?playlist=${Array.from(this.playList).join(':')}&theme=ken-burns&autoplay=true" class="nav-play-icon">
-              <sl-icon name="arrow-right-circle"></sl-icon>
-            </a>
-          </sl-tooltip>
-          <sl-tooltip content="Play selected albums without animations">
-            <a href="/ui/slideshow?playlist=${Array.from(this.playList).join(':')}&theme=carousel&autoplay=true" class="nav-play-icon">
-              <sl-icon name="play"></sl-icon>
-            </a>
-          </sl-tooltip>
-          <sl-tooltip content="Select recently added albums">
-            <sl-icon name="calendar-range" @click="${(_: Event) => this.createdFilter(new Date(new Date().setMonth(new Date().getMonth() - 1)))}"></sl-icon>
-          </sl-tooltip>
-          <sl-tooltip content="Clear selected albums">
-            <sl-icon name="x-lg" @click="${(_: Event) => (this.playList = new Set<string>())}"></sl-icon>
-          </sl-tooltip>
-        </div>
-
+        ${this.navTemplate()}
         <sl-split-panel position-in-pixels="250">
           <!-- Left Pane: Album Tree -->
           <div class="left-pane" slot="start">
@@ -284,12 +295,19 @@ export class PwAlbumBrowser extends LitElement {
     this.playList = newPlaylist;
   }
 
-  private createdFilter(since: Date) {
-    // add albums created since to playlist
+  private recentFilter(size: number) {
+    // add up to "size" most recently created albums to playlist
     const newPlaylist = new Set(this.playList);
-    Object.values(this.albums).forEach((album) => {
-      if (new Date(album.created) > since) newPlaylist.add(album.uuid);
+    
+    // Get all albums, sort by creation date (most recent first), and take the first "size" albums
+    const recentAlbums = Object.values(this.albums)
+      .sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime())
+      .slice(0, size);
+    
+    recentAlbums.forEach((album) => {
+      newPlaylist.add(album.uuid);
     });
+    
     // make it reactive
     this.playList = newPlaylist;
   }
