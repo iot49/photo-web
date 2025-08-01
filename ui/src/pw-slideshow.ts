@@ -20,8 +20,8 @@ to achieve alternate behaviors.
     Uses dissolve to transition between images.
 */
 
-const TRANSITION_MS = 1500; // duration of slide transition in [ms]
-const SLIDE_MS = 4200; // time each slide is shown in [ms]; note: extra wide or tall slides take more time
+const TRANSITION_MS = 1100; // duration of slide transition in [ms]
+const SLIDE_MS = 3100; // time each slide is shown in [ms]; note: extra wide or tall slides take more time
 const PANORAMA_TIME = 2.4; // increase parnorama image animation time by up to this factor
 const SCALE_FACTOR = 1.2; // factor by which the image is scaled during translation
 
@@ -289,7 +289,7 @@ export class PwSlideshow extends LitElement {
           <sl-icon name="x-lg"></sl-icon>
         </div>
         <div class="overlay bottom-overlay" @click=${() => this.toggleTheme()}>
-          <p>apply <q>${this.theme === 'carousel' ? 'ken burns' : 'carousel'}</q> theme</p>
+          <p>${this.theme === 'carousel' ? 'ken burns' : 'carousel'}</p>
         </div>
       </div>
     `;
@@ -300,7 +300,9 @@ export class PwSlideshow extends LitElement {
     const uri = `/photos/api/photos/${photo.uuid}/img`;
     if (mime_type.startsWith('image')) {
       if (mime_type === 'image/x-adobe-dng') {
-        return html`<div class="title"><p>No render for MIME type<br/>${mime_type}</p></div>`;
+        return html`<div class="title">
+          <p>No render for MIME type<br />${mime_type}</p>
+        </div>`;
       }
 
       // Calculate dynamic slide time factor and store as CSS custom property
@@ -323,7 +325,9 @@ export class PwSlideshow extends LitElement {
         </video>
       `;
     } else {
-      return html`<div class="title"><p>No render for MIME type<br/>${mime_type}</p></div>`;
+      return html`<div class="title">
+        <p>No render for MIME type<br />${mime_type}</p>
+      </div>`;
     }
   }
 
@@ -540,46 +544,57 @@ export class PwSlideshow extends LitElement {
         bottom: 20px;
         left: 20px;
         z-index: 10;
-        /* border: 1px solid yellow; */
       }
 
-      /* individual overlay placements */
+      /* Base overlay styles - common properties inherited by all overlays */
       .overlay {
         position: absolute;
-        top: 50%;
-        left: 50%;
-        width: 25%;
-        height: 45%;
         background: transparent;
         cursor: pointer;
-        /* border: 1px solid white; */
+        width: 31%;
+        height: 31%;
+        transition: background-color 0.3s ease;
+      }
+
+      /* Show transparent background when hovering over #overlays (when sl-icon elements become visible) */
+      #overlays:hover .overlay {
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      /* Side overlays - share common positioning pattern */
+      .prev-overlay,
+      .next-overlay {
+        top: 0;
+        height: 100%;
       }
 
       .prev-overlay {
-        left: 1%;
-        transform: translateY(-50%);
+        left: 0;
       }
+
       .next-overlay {
-        left: auto;
-        right: 1%;
-        transform: translateY(-50%);
+        right: 0;
       }
-      .center-overlay {
-        width: 35%;
-        transform: translateX(-50%) translateY(-50%);
-      }
-      .top-overlay {
-        top: 1%;
-        height: 25%;
-        width: 98%;
-        transform: translateX(-50%);
-      }
+
+      /* Centered overlays - share common horizontal centering */
+      .center-overlay,
+      .top-overlay,
       .bottom-overlay {
-        top: auto;
-        bottom: 1%;
-        height: 25%;
-        width: 98%;
+        left: 50%;
         transform: translateX(-50%);
+      }
+
+      .center-overlay {
+        top: 50%;
+        transform: translate(-50%, -50%);
+      }
+
+      .top-overlay {
+        top: 0;
+      }
+
+      .bottom-overlay {
+        bottom: 0;
       }
 
       /* sl-icon sizing is now handled by the more specific #overlays sl-icon selector below */
@@ -602,8 +617,9 @@ export class PwSlideshow extends LitElement {
 
       /* Show overlay content when hovering over #overlays with auto-fade */
       #overlays:hover sl-icon,
-      #overlays:hover p {
-        opacity: 0.8;
+      #overlays:hover p,
+      #overlays:hover  {
+        opacity: 0.9;
         animation: overlay-auto-fade 2.5s ease-out forwards;
       }
 
