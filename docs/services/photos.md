@@ -42,21 +42,14 @@ graph TB
 
 ## Core Components
 
-### Image Processor (`image_processor.py`)
+### Image Processing
 
-Handles real-time image processing:
+The Photos Service handles real-time image processing directly in the API endpoints with:
 
-```python
-class ImageProcessor:
-    def scale_image(self, image_path: str, max_size: int) -> bytes:
-        """Scale image to maximum dimension"""
-        
-    def convert_heic_to_jpeg(self, image_path: str) -> bytes:
-        """Convert HEIC images to JPEG format"""
-        
-    def optimize_quality(self, image_data: bytes, quality: int) -> bytes:
-        """Optimize image quality and compression"""
-```
+- **Format Conversion**: Automatic HEIC to JPEG conversion for web compatibility
+- **Responsive Scaling**: Multiple size variants for different screen sizes
+- **Quality Optimization**: Adaptive compression based on image size
+- **Performance**: OpenCV acceleration with PIL fallback
 
 ### Album Access Control
 
@@ -365,9 +358,6 @@ async def health_check():
 ```bash
 # Check library access
 docker-compose exec photos python -c "from app.read_db import check_library; check_library()"
-
-# Test image processing
-docker-compose exec photos python -c "from app.image_processor import test_processing; test_processing()"
 
 # View cache statistics
 docker-compose exec photos curl http://localhost:8000/health
