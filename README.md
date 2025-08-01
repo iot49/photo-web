@@ -10,15 +10,19 @@ Photo Web provides a secure, web-based interface for accessing your Apple Photos
 
 **Note:** all accounts are **free**, except for the need to purchase a domain name (about \$10/year, depending on name).
 
-1. Server with access to Apple Photos library. On MacOS the library is usually at `/Users/<user-name>/Pictures/Photos Library.photoslibrary` and synchronized automatically via [iCloud](https://www.icloud.com/). Serving from e.g. Linux should be possible, but I have not tried it (iCloud is a bit special :smile:). A (recycled) Mac Mini works well.
+1. Server with access to Apple Photos library. On MacOS the library is usually at `/Users/<user-name>/Pictures/Photos Library.photoslibrary` and synchronized automatically via [iCloud](https://www.icloud.com/). Serving from e.g. Linux should be possible, but I have not tried it (iCloud is a bit special :smile:, perhaps [icloud-docker](https://github.com/mandarons/icloud-docker) could be used). A (recycled) Mac Mini works well.
+   
+   On the Mac, go to settings, Privacy & Security, Full Disk Access and **give Docker full access**. The photos library is mounted read-only (into the photos container), but Docker needs full access for this to work.
 
 2. Docker and docker compose (installed on the server). E.g. [Docker Desktop](https://docs.docker.com/desktop/) on the Mac.
 
-3. A [Cloudflare Account](https://www.cloudflare.com/). Used for domain name registration and global access to the app (if desired).
+3. `npm`. Install with `brew install node`.
 
-4. A [Firebase Account](https://firebase.google.com/). Used for user authentication (with Google).
+4. A [Cloudflare Account](https://www.cloudflare.com/). Used for domain name registration and global access to the app (if desired).
 
-5. [Mkdocs](https://www.mkdocs.org/user-guide/installation/) installation (to create the documentation, if desired).
+5. A [Firebase Account](https://firebase.google.com/). Used for user authentication (with Google).
+
+6. [Mkdocs](https://www.mkdocs.org/user-guide/installation/) installation (to create the documentation, if desired).
 
 ### Steps
 
@@ -112,6 +116,7 @@ Login to [Cloudflare](https://www.cloudflare.com/) and purchase a domain name, e
 3. Click **Add app** and select the **Web** platform (</> icon)
 4. Register your app with a nickname (e.g., "photo-web-client")
 5. Copy the Firebase configuration object that looks like this:
+
    ```javascript
    const firebaseConfig = {
       apiKey: "your-api-key",
@@ -122,7 +127,9 @@ Login to [Cloudflare](https://www.cloudflare.com/) and purchase a domain name, e
       appId: "1:123456789:web:abcdef123456"
    };
    ```
+
 6. Create a file `auth/firebase-secrets/firebase-config.json` with this configuration:
+
    ```json
    {
      "apiKey": "your-api-key",
@@ -134,12 +141,10 @@ Login to [Cloudflare](https://www.cloudflare.com/) and purchase a domain name, e
    }
    ```
 
-
 #### Configure Authorized Domains
 
 > [!TIP]
 > If you can't find the right section, try asking Gemini. I find it exceedingly difficult to navigate the Firebase console.
-
 
 1. In the Firebase Console, go to **Overview** → **Authentication** → **Get Started** → **Settings** → **Authorized domains**
 2. Add your domain (the one you registered with Cloudflare) to the authorized domains list
@@ -161,10 +166,11 @@ Login to [Cloudflare](https://www.cloudflare.com/) and purchase a domain name, e
 Go to the `photo-web/ui` folder and run the following commands from the terminal:
 
 ```bash
+npm install
 npm run build
 docker compose build
 docker compose up -d
-docker compose logs
+docker compose logs -f
 ```
 
 Check the log for errors. If everything goes well, you should be able to access the app from anywhere in the world under the domain you purchased, e.g. `https://your-domain.com`.
@@ -180,7 +186,10 @@ Optionally (and for better efficiency), set up a local DNS server to point your 
 Optionally build the documentation. From the project root run
 
 ```bash
-mkdocs build
+pip install mkdocs>=1.5.0
+pip install mkdocs-material>=9.0.0
+pip install pymdownx-extensions>=10.0.0
+mkdocs build --clean
 ```
 
 The documentation will be available at `https://<your-domain>/static/docs/`.
