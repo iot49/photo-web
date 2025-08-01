@@ -200,9 +200,10 @@ To update to the lastest version availabe on github, run the following commands 
 
 ```bash
 git pull
-cd ui && npm install && npm run build
 docker compose build
 docker compose up -d
+mkdocs build
+cd ui && npm install && npm run build
 ```
 
 ## Architecture

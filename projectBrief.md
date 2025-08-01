@@ -86,7 +86,22 @@ Access to documents is based on the name of folders in the `${FILES}` directory.
 
 #### Nginx
 
-The `nginx` service serves static files from the `ui` directory and proxies requests to the `auth`, `files` and `photos` services. It is also used to cache images served by the `photos` service. The configuration is in `nginx/nginx.conf`.
+The `nginx` service serves static files from the `ui` directory and proxies requests to the `auth`, `files` and `photos` services. It is also used to cache images served by the `photos` service. The configuration is in `nginx/nginx-proxy.conf`.
+
+Processing photos (conversion from `heic` to `jpeg` and scaling) is quite compute intensive. To partially mitigate this issue (short of getting a more powerful server), nginx caches images:
+
+```nginx
+# Cache settings for photos - optimized for slow server performance
+proxy_cache_path  /var/cache/nginx/photos
+                  levels=1:2
+                  keys_zone=photos_cache:50m
+                  max_size=4g
+                  inactive=720h
+                  use_temp_path=off
+                  manager_files=100
+                  manager_threshold=200
+                  manager_sleep=300;
+```
 
 #### Photos
 
