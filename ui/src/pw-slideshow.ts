@@ -272,7 +272,7 @@ export class PwSlideshow extends LitElement {
           `;
         })}
         <div class="slide-wrapper">
-          <div class="title"><p>The End</p></div>
+          <div class="title"><p>...</p></div>
         </div>
       </div>
       <div id="overlays">

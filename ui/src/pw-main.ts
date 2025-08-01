@@ -5,6 +5,7 @@ import { Albums, Me, SrcsetInfo } from './app/interfaces';
 import { provide } from '@lit/context';
 import { albumsContext, meContext, srcsetInfoContext } from './app/context';
 import { get_json } from './app/api';
+import { recentAlbums } from './pw-album-browser';
 
 const DEBUG = false;
 
@@ -311,10 +312,18 @@ export class PwMain extends LitElement {
      */
     return [
       {
+        routeId: 'splash',
+        description: 'Splash screen: show recently created albums - main landing page',
+        matchUris: ['/ui/splash', '/ui', '/ui/'],
+        isActive: this.matchesAnyUri(['/ui/splash', '/ui', '/ui/']),
+        componentFactory: () => html`<pw-slideshow playlist=${recentAlbums(this.albums, 3).join(':')} theme="ken-burns" autoplay></pw-slideshow>`,
+        isDynamic: false,
+      },
+      {
         routeId: 'album',
-        description: 'Photo album browser - main landing page',
-        matchUris: ['/ui/album', '/ui', '/ui/'],
-        isActive: this.matchesAnyUri(['/ui/album', '/ui', '/ui/']),
+        description: 'Photo album browser',
+        matchUris: ['/ui/album'],
+        isActive: this.matchesAnyUri(['/ui/album']),
         componentFactory: () => html`<pw-album-browser></pw-album-browser>`,
         isDynamic: false,
       },

@@ -10,7 +10,6 @@ import { album_tree, TreeNode } from './app/album_tree.js';
  */
 @customElement('pw-album-browser')
 export class PwAlbumBrowser extends LitElement {
-
   static styles = css`
     :host {
       display: block;
@@ -278,8 +277,7 @@ export class PwAlbumBrowser extends LitElement {
         <sl-tooltip content="${isPlayDisabled ? 'Select at least one album from the browser on the left' : 'Play selected albums'}">
           ${isPlayDisabled
             ? html`<div class="nav-control-item disabled">Play</div>`
-            : html`<a class="nav-control-item" href="/ui/slideshow?playlist=${Array.from(this.playList).join(':')}">Play</a>`
-          }
+            : html`<a class="nav-control-item" href="/ui/slideshow?playlist=${Array.from(this.playList).join(':')}">Play</a>`}
         </sl-tooltip>
         <sl-tooltip content="Clear playlist">
           <div class="nav-control-item" @click=${(_: Event) => (this.playList = new Set<string>())}>Clear</div>
@@ -332,19 +330,15 @@ export class PwAlbumBrowser extends LitElement {
     this.playList = newPlaylist;
   }
 
-  private recentFilter(size: number) {
-    // add up to "size" most recently created albums to playlist
+  private recentFilter(count: number) {
+    // add up to "count" most recently created albums to playlist
     const newPlaylist = new Set(this.playList);
-    
-    // Get all albums, sort by creation date (most recent first), and take the first "size" albums
-    const recentAlbums = Object.values(this.albums)
-      .sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime())
-      .slice(0, size);
-    
-    recentAlbums.forEach((album) => {
-      newPlaylist.add(album.uuid);
+
+    // FIX: call "global" recentAlbums defined at bottom of this file
+    recentAlbums(this.albums, count).forEach((albumUid) => {
+      newPlaylist.add(albumUid);
     });
-    
+
     // make it reactive
     this.playList = newPlaylist;
   }
@@ -401,7 +395,7 @@ export class PwAlbumBrowser extends LitElement {
     if (!this.albums) {
       return nothing;
     }
-    
+
     return html`
       ${Array.from(this.playList).map((albumUid) => {
         const album = this.albums[albumUid];
@@ -444,4 +438,18 @@ export class PwAlbumBrowser extends LitElement {
       })}
     `;
   }
+}
+
+export function recentAlbums(albums: Albums, count: number): string[] {
+  // Return UIDs of count most recently created albums
+  const recentAlbums = Object.values(albums)
+    .sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime())
+    .slice(0, count);
+
+  const albumUids: string[] = [];
+  recentAlbums.forEach((album) => {
+    albumUids.push(album.uuid);
+  });
+
+  return albumUids;
 }
