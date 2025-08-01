@@ -1,4 +1,4 @@
-import { LitElement, PropertyValues, css, html } from 'lit';
+import { LitElement, PropertyValues, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { Albums, Me, SrcsetInfo } from './app/interfaces.js';
 import { consume } from '@lit/context';
@@ -234,10 +234,41 @@ export class PwAlbumBrowser extends LitElement {
   // list of album uid's shown in right panel
   @property({ type: Object }) playList = new Set<string>();
 
+  override connectedCallback(): void {
+    super.connectedCallback();
+    // Listen for logout events to reset playlist
+    document.addEventListener('pw-logout', this.handleLogout);
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    // Clean up event listener
+    document.removeEventListener('pw-logout', this.handleLogout);
+  }
+
   protected override firstUpdated(_changedProperties: PropertyValues): void {
     super.firstUpdated(_changedProperties);
     // Load recent albums initially
     this.recentFilter(12);
+  }
+
+  private handleLogout = (_event: Event): void => {
+    // Clear the playlist immediately
+    this.playList = new Set<string>();
+    // Wait for albums data to be available, then load recent albums
+    this.waitForAlbumsAndLoadRecent();
+    this.requestUpdate();
+  };
+
+  private waitForAlbumsAndLoadRecent(): void {
+    const checkAlbums = () => {
+      if (this.albums && Object.keys(this.albums).length > 0) {
+        this.recentFilter(12);
+      } else {
+        setTimeout(checkAlbums, 100);
+      }
+    };
+    checkAlbums();
   }
 
   private navTemplate() {
@@ -367,9 +398,18 @@ export class PwAlbumBrowser extends LitElement {
   }
 
   private renderAlbumGrid() {
+    // Safety check: don't render if albums data is not available
+    if (!this.albums) {
+      return nothing;
+    }
+    
     return html`
       ${Array.from(this.playList).map((albumUid) => {
         const album = this.albums[albumUid];
+        // Safety check: skip if album is not found
+        if (!album) {
+          return nothing;
+        }
         const srcset = album.thumbnail ? this.srcsetInfo.srcsetFor(album.thumbnail) : '';
         return html`
           <div class="album-card">
