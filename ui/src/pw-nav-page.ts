@@ -172,8 +172,7 @@ export class PwNavPage extends LitElement {
                   <sl-icon name="${this.themeManager.getCurrentTheme() === 'dark' ? 'sun' : 'moon'}"></sl-icon>
                 </sl-button>
               </sl-tooltip>
-              ${this.isAdmin() ? this.renderPulldown() : ''} 
-              ${this.me?.email ? this.renderUserAvatar() : this.renderLoginButton()}
+              ${this.isAdmin() ? this.renderPulldown() : ''} ${this.me?.email ? this.renderUserAvatar() : this.renderLoginButton()}
             </div>
           </div>
         </nav>
@@ -208,14 +207,15 @@ export class PwNavPage extends LitElement {
         </sl-button>
         <sl-menu>
           <sl-menu-item @click=${() => this.handleNavigation('users')}>Users ...</sl-menu-item>
-          <sl-menu-item @click=${() => this.handleNavigation('tests')}>Tests ...</sl-menu-item>
+          <sl-menu-item @click=${this.clearCacheDialog}>Clear Photo Cache</sl-menu-item>
+          <sl-menu-item @click=${this.reloadDialog}>Reload DB</sl-menu-item>
+          <sl-divider></sl-divider>
           <sl-menu-item @click=${() => this.handleNavigation('/ui/traefik-dashboard')}>Traefik Dashboard ...</sl-menu-item>
+          <sl-menu-item @click=${() => this.handleNavigation('tests')}>Tests ...</sl-menu-item>
+          <sl-menu-item @click=${() => this.handleNavigation('/ui/img-size-test')}>Image Size Test ...</sl-menu-item>
           <sl-menu-item @click=${() => this.handleNavigation('/ui/auth-api')}>Auth API ...</sl-menu-item>
           <sl-menu-item @click=${() => this.handleNavigation('/ui/photos-api')}>Photos API ...</sl-menu-item>
           <sl-menu-item @click=${() => this.handleNavigation('/ui/files-api')}>Files API ...</sl-menu-item>
-          <sl-menu-item @click=${() => this.handleNavigation('/ui/img-size-test')}>Image Size Test ...</sl-menu-item>
-          <sl-menu-item @click=${this.clearCacheDialog}>Clear Photo Cache</sl-menu-item>
-          <sl-menu-item @click=${this.reloadDialog}>Reload DB</sl-menu-item>
         </sl-menu>
       </sl-dropdown>
     `;
