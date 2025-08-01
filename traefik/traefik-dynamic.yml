@@ -17,9 +17,9 @@ http:
     # Rate limiting middleware for Cloudflared requests
     cloudflared-throttle:
       rateLimit:
-        average: 40
+        average: 200
         period: "60s"
-        burst: 40
+        burst: 100
         sourceCriterion:
           ipStrategy:
             depth: 1
