@@ -43,10 +43,20 @@ def verify_cookie(session_cookie: str) -> UserBase:
 
         if not user:
             # default roles for logged-in user is 'public,protected'
-            user = UserBase(**user_info, roles="public,protected")
-            db.create_user(UserCreate(user))
+            user_data = UserCreate(
+                name=user_info.get("name"),
+                email=email,
+                picture=user_info.get("picture", ""),
+                roles="public,protected"
+            )
+            user = db.create_user(user_data)
 
-        return user
+        return user if user else UserBase(
+            name=user_info.get("name"),
+            email=email,
+            picture=user_info.get("picture", ""),
+            roles="public,protected"
+        )
     except (
         auth.InvalidIdTokenError,
         auth.ExpiredIdTokenError,

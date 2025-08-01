@@ -375,12 +375,12 @@ async def firebase_config():
             config = json.load(f)
         return config
     except FileNotFoundError:
-        logger.error("Firebase config file not found at firebase-config.json")
+        logger.error("Firebase config file not found at app/firebase-config.json")
         raise HTTPException(
             status_code=500, detail="Firebase configuration not available"
         )
     except json.JSONDecodeError as e:
-        logger.error(f"Invalid JSON in firebase-config.json: {e}")
+        logger.error(f"Invalid JSON in app/firebase-config.json: {e}")
         raise HTTPException(
             status_code=500, detail="Invalid Firebase configuration format"
         )
