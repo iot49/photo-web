@@ -181,7 +181,7 @@ Repeat these steps to restart the app. For shutting down, run
 docker compose down
 ```
 
-Optionally (and for better efficiency), set up a local DNS server to point your domain to the server photo-web is running on. Many routers have build-in DNS servers that can do this. Now when accessing photo-web locally, all traffic is handled locally. Depending on your internet connection you may see faster speed. Away from home Cloudflare takes care of forwarding access from the internet to your server.
+Optionally (and for better efficiency), set up a local DNS server to point your domain to the server photo-web is running on. Many routers have build-in DNS servers that can do this. Now when accessing photo-web locally, all traffic is handled locally. Depending on your internet connection you may see faster speed. Away from home Cloudflare takes care of forwarding access from the internet to your server. Point `your-domain.com` and `traefik.your-domain.com` to the server. The latter entry is only required to access the Traefik dashboard.
 
 Optionally build the documentation. From the project root run
 
