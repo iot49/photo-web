@@ -198,7 +198,7 @@ The documentation will be available at `https://<your-domain>/static/docs/`.
 
 To update to the lastest version availabe on github, run the following commands in your project folder:
 
-```{bash}
+```bash
 git pull
 cd ui && npm install && npm run build
 docker compose build
