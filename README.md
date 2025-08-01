@@ -186,7 +186,10 @@ Optionally (and for better efficiency), set up a local DNS server to point your 
 Optionally build the documentation. From the project root run
 
 ```bash
-mkdocs build
+pip install mkdocs>=1.5.0
+pip install mkdocs-material>=9.0.0
+pip install pymdownx-extensions>=10.0.0
+mkdocs build --clean
 ```
 
 The documentation will be available at `https://<your-domain>/static/docs/`.
