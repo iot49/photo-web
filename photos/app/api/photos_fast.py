@@ -1,3 +1,8 @@
+"""
+Drop-in replacement for photos.py with faster image scaling.
+Docker-compatible version using opencv-python-headless and optimized PIL.
+"""
+
 import io
 import logging
 import os
@@ -6,59 +11,13 @@ from typing import Optional
 from doc_utils import dedent_and_convert_to_html
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
+
+# Import our Docker-compatible fast scaler
+from image_scaling_docker import DockerFastImageScaler, get_optimal_resampling_for_scale
 from models import DB
 from PIL import Image, ImageDraw, ImageFont
 
 logger = logging.getLogger(__name__)
-
-# Try to import OpenCV for faster image processing
-try:
-    import cv2
-    import numpy as np
-
-    HAS_OPENCV = True
-    logger.info("OpenCV available for fast image processing")
-except ImportError:
-    HAS_OPENCV = False
-    logger.info("OpenCV not available, using PIL fallback")
-
-
-def resize_with_opencv(
-    image_path: str, width: int, height: int, quality: int = 75
-) -> bytes:
-    """Fast resize using OpenCV (2-10x faster than PIL)."""
-    if not HAS_OPENCV:
-        raise ImportError("OpenCV not available")
-
-    # Skip HEIC files - OpenCV can't read them
-    if image_path.lower().endswith(".heic"):
-        raise ValueError("HEIC format not supported by OpenCV")
-
-    img = cv2.imread(image_path)
-    if img is None:
-        raise ValueError(f"Could not read image: {image_path}")
-
-    resized = cv2.resize(img, (width, height), interpolation=cv2.INTER_LANCZOS4)
-    encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
-    success, encoded_img = cv2.imencode(".jpg", resized, encode_param)
-
-    if not success:
-        raise ValueError("Failed to encode image")
-
-    return encoded_img.tobytes()
-
-
-def get_optimal_resampling(scale_factor: float) -> Image.Resampling:
-    """Choose optimal resampling algorithm based on scale factor for better performance."""
-    if scale_factor < 0.3:
-        return Image.Resampling.NEAREST  # Very large downscaling - fastest
-    elif scale_factor < 0.6:
-        return Image.Resampling.BILINEAR  # Large downscaling - much faster than LANCZOS
-    elif scale_factor < 0.9:
-        return Image.Resampling.BICUBIC  # Medium scaling - balanced speed/quality
-    else:
-        return Image.Resampling.LANCZOS  # Small scaling - best quality
-
 
 # Define common screen sizes for responsive images
 SCREEN_SIZES = {
@@ -140,10 +99,15 @@ async def get_db() -> DB:
 @router.get(
     "/api/photos/{photo_id}/img{size_suffix}",
     tags=["photos"],
-    summary="Serve Photo Image (Sized)",
+    summary="Serve Photo Image (Sized) - OPTIMIZED",
     description=dedent_and_convert_to_html(
         """
     Serve a photo image scaled to specific screen sizes for responsive design.
+    
+    **PERFORMANCE OPTIMIZED VERSION** with:
+    - OpenCV acceleration when available (2-10x faster)
+    - Smart resampling algorithm selection
+    - Docker-compatible dependencies
     
     Returns the photo scaled to the specified size with optimized quality
     settings for each size variant. No upscaling is performed - images
@@ -157,16 +121,11 @@ async def get_db() -> DB:
     - **-xxl**: 1920px width (4K desktop)
     - **-xxxl**: 3860px width (8K desktop)
     
-    **Quality Optimization:**
-    - Smaller sizes use lower quality for faster loading
-    - Larger sizes maintain higher quality for detail
-    - HEIC images always converted to JPEG
-    
-    **Caching:**
-    - Processed images cached at multiple levels
-    - Browser cache: 24 hours
-    - Nginx cache: 7 days
-    - In-memory cache: 1 hour
+    **Performance Improvements:**
+    - Uses OpenCV for basic operations (when available)
+    - Smart resampling: NEAREST for thumbnails, BILINEAR for large downscaling
+    - Optimized PIL settings with quality-based algorithm selection
+    - Docker-compatible with opencv-python-headless
     
     **Test Mode:**
     When `test=true`, adds a text overlay showing the size suffix
@@ -233,22 +192,27 @@ async def serve_photo_image_sized(
     ),
     fast: bool = Query(
         True,
-        description="Use fast scaling optimizations (OpenCV when available, smart resampling)",
+        description="Use fast scaling (OpenCV when available, optimized PIL otherwise)",
     ),
     db: DB = Depends(get_db),
 ):
     """
-    Serve a photo image scaled to common screen sizes.
+    Serve a photo image scaled to common screen sizes - OPTIMIZED VERSION.
 
-    Provides responsive image serving with automatic scaling and format
-    conversion. Supports multiple size variants optimized for different
-    screen sizes and use cases.
+    This is a drop-in replacement for the original serve_photo_image_sized
+    with significant performance improvements:
+
+    - 2-10x faster scaling using OpenCV when available
+    - Smart resampling algorithm selection based on scale factor
+    - Docker-compatible dependencies
+    - Graceful fallback to optimized PIL when OpenCV unavailable
 
     Args:
         photo_id: The UUID of the photo to serve
         size_suffix: Size suffix like "-sm", "-md", etc. (empty for original)
         quality: JPEG quality (1-100, default 75)
         test: When true, embed size-suffix text overlay for debugging
+        fast: Use fast scaling optimizations (default True)
         db: Photos database dependency
 
     Returns:
@@ -295,7 +259,7 @@ async def serve_photo_image_sized(
     # Process the image
     try:
         logger.debug(
-            f"URL: {request.url}  Query params: {dict(request.query_params)} test-enabled: {test}"
+            f"URL: {request.url}  Query params: {dict(request.query_params)} test-enabled: {test} fast-enabled: {fast}"
         )
 
         # Check if format conversion is needed (HEIC/TIFF always need conversion to JPEG)
@@ -321,49 +285,48 @@ async def serve_photo_image_sized(
 
         # Use fast scaling if enabled and no test overlay needed
         if fast and not test:
-            logger.debug("Attempting fast scaling with OpenCV")
+            logger.info(
+                f"Fast scaling: {photo.width}x{photo.height} -> {width}x{height}"
+            )
 
             try:
-                # Use OpenCV for fast scaling
-                image_bytes = resize_with_opencv(path, width, height, quality)
+                # Use our optimized scaler
+                image_bytes = DockerFastImageScaler.resize_auto(
+                    path, width, height, quality, prefer_opencv=True
+                )
+
                 logger.info(
-                    f"Fast OpenCV scaling: {photo.width}x{photo.height} -> {width}x{height}"
+                    f"Fast scaling successful, output size: {len(image_bytes)} bytes"
                 )
                 return StreamingResponse(
                     io.BytesIO(image_bytes), media_type="image/jpeg"
                 )
 
             except Exception as e:
-                logger.warning(
-                    f"OpenCV scaling failed ({e}), falling back to optimized PIL"
-                )
+                logger.warning(f"Fast scaling failed ({e}), falling back to PIL")
+                # Fall through to PIL processing below
 
-        logger.debug("Processing image with PIL")
+        logger.debug(
+            "Using PIL for processing (test overlay, fast disabled, or fallback)"
+        )
 
-        # Process the image
+        # Process the image with PIL (original logic with optimizations)
         img = Image.open(path)
 
-        # Resize if needed (either because scaling was requested OR we're processing anyway and target is smaller)
+        # Resize if needed with optimized resampling selection
         if needs_scaling or (
             needs_processing and (width < photo.width or height < photo.height)
         ):
             # Use optimized resampling algorithm selection
-            if fast:
-                scale_factor = min(width / photo.width, height / photo.height)
-                resampling = get_optimal_resampling(scale_factor)
-                logger.debug(
-                    f"Using optimized resampling: {resampling.name} (scale factor: {scale_factor:.2f})"
-                )
-            else:
-                resampling = Image.Resampling.LANCZOS
-                logger.debug("Using LANCZOS resampling (fast=False)")
+            scale_factor = min(width / photo.width, height / photo.height)
+            resampling = get_optimal_resampling_for_scale(scale_factor)
 
             img = img.resize((width, height), resampling)
             logger.info(
                 f"Resized image from {photo.width}x{photo.height} to {width}x{height} using {resampling.name}"
             )
 
-        # Add test overlay if requested
+        # Add test overlay if requested (original logic)
         if test:
             # Create a copy to avoid modifying the original
             img = img.copy()
@@ -448,6 +411,7 @@ async def serve_photo_image_sized(
             rgb_img.paste(img, mask=img.split()[-1] if img.mode == "RGBA" else None)
             img = rgb_img
 
+        # Save with optimization enabled
         img.save(buf, format="JPEG", quality=quality, optimize=True)
         buf.seek(0)
 
@@ -516,3 +480,55 @@ async def get_photos_srcset():
         dict: Dictionary of size variants with width and description info
     """
     return SCREEN_SIZES
+
+
+@router.get("/api/photos/benchmark/{photo_id}")
+async def benchmark_photo_scaling(
+    photo_id: str,
+    size_suffix: str = Query("-md", description="Size suffix to benchmark"),
+    iterations: int = Query(3, ge=1, le=10, description="Number of iterations"),
+    db: DB = Depends(get_db),
+):
+    """
+    Benchmark different scaling methods for a specific photo.
+    Useful for determining the fastest method for your specific image types and sizes.
+    """
+    photo = db.photos.get(photo_id)
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+
+    path = photo.path
+    if not path or not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Photo file not found")
+
+    if size_suffix not in SCREEN_SIZES:
+        raise HTTPException(
+            status_code=400, detail=f"Invalid size suffix: {size_suffix}"
+        )
+
+    # Calculate target dimensions
+    size_config = SCREEN_SIZES[size_suffix]
+    target_width = size_config["width"]
+    original_aspect = photo.width / photo.height
+    width = min(target_width, photo.width)
+    height = int(width / original_aspect)
+
+    try:
+        # Import the benchmark function
+        from image_scaling_docker import benchmark_resize_methods_docker
+
+        results = benchmark_resize_methods_docker(path, width, height, iterations)
+
+        return {
+            "photo_id": photo_id,
+            "original_size": {"width": photo.width, "height": photo.height},
+            "target_size": {"width": width, "height": height},
+            "size_suffix": size_suffix,
+            "iterations": iterations,
+            "results": results,
+            "fastest_method": min(results, key=results.get) if results else None,
+        }
+
+    except Exception as e:
+        logger.error(f"Benchmark failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Benchmark failed: {str(e)}")
