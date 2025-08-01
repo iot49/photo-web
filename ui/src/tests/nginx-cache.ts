@@ -5,7 +5,7 @@ import { PwTests } from '../pw-tests';
 // curl https://dev49.org/photos/api/photos/42338D98-AD75-42E6-A02C-B0F33DE226E0/img-thumb > thumb.jpg
 
 // Configuration constants for selective reporting
-const LOADING = true; // Enable/disable "Loading photos to populate cache..." section
+const LOADING = false; // Enable/disable "Loading photos to populate cache..." section
 
 async function testNginxHealth(msg: PwTests): Promise<void> {
   // First, let's check if we can access nginx health endpoint
