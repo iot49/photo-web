@@ -272,7 +272,6 @@ export class PwAlbumBrowser extends LitElement {
   }
 
   private navTemplate() {
-    // BUG: tooltip does not show when isPlayDisabled is true
     const isPlayDisabled = this.playList.size <= 0;
     return html`
       <div class="nav-controls-container" slot="nav-controls">

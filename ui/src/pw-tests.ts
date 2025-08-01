@@ -49,12 +49,43 @@ export class PwTests extends LitElement {
     .test-controls sl-icon {
       color: white;
     }
+
+    .nav-controls-container {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      width: 100%;
+      gap: 1rem;
+    }
+
+    .nav-control-item,
+    .nav-controls-container sl-icon {
+      color: white;
+      cursor: pointer;
+      padding: 22px;
+      border-radius: 4px;
+      transition: background-color 0.3s;
+      text-decoration: none;
+    }
+
+    .nav-control-item {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 1rem;
+      font-weight: 500;
+      text-align: center;
+    }
+
+    .nav-control-item:hover,
+    .nav-controls-container sl-icon:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
   `;
 
   @property({ type: Array })
-  private allMessages: { type: 'out' | 'err'; message: string }[] = [
-    { type: 'out', message: '**Choose the test to run from the navbar**' }
-  ];
+  private allMessages: { type: 'out' | 'err'; message: string }[] = [{ type: 'out', message: '**Choose the test to run from the navbar**' }];
 
   public out(msg: string) {
     this.allMessages = [...this.allMessages, { type: 'out', message: msg }];
@@ -90,30 +121,32 @@ export class PwTests extends LitElement {
     }
   }
 
+  private navTemplate() {
+    return html`
+      <div class="nav-controls-container" slot="nav-controls">
+        <sl-tooltip content="Run Authorization Test">
+          <div class="nav-control-item" @click=${this.runAuthorizeTest}>Auth</div>
+        </sl-tooltip>
+        <sl-tooltip content="Run Photos/Files delegated Authorization Test">
+          <div class="nav-control-item" @click=${this.runPhotosDocTest}>Delegation</div>
+        </sl-tooltip>
+        <sl-tooltip content="Run Nginx Cache Test">
+          <div class="nav-control-item" @click=${this.runNginxCacheTest}>Cache</div>
+        </sl-tooltip>
+      </div>
+    `;
+  }
+
   override render() {
     return html`
       <pw-nav-page>
-        <sl-dropdown slot="nav-controls" close-on-select class="test-controls">
-          <sl-button slot="trigger" variant="text" size="medium" title="Test Controls">
-            Test
-            <sl-icon name="play-circle"></sl-icon>
-          </sl-button>
-          <sl-menu>
-            <sl-menu-item @click=${this.runAuthorizeTest}>
-              Run Authorization Test
-            </sl-menu-item>
-            <sl-menu-item @click=${this.runPhotosDocTest}>
-              Run Photos/Doc Authorization Test
-            </sl-menu-item>
-            <sl-menu-item @click=${this.runNginxCacheTest}>
-              Run Nginx Cache Test
-            </sl-menu-item>
-          </sl-menu>
-        </sl-dropdown>
+        ${this.navTemplate()}
         <div class="messages-container">
           ${this.allMessages.map(
             (msg) => html`
               <div class="message">
+                <!-- next line must stay together! -->
+                <!-- prettier-ignore -->
                 <zero-md class="${msg.type}"><script type="text/markdown">${msg.message}</script></zero-md>
               </div>
             `
