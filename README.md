@@ -194,6 +194,17 @@ mkdocs build --clean
 
 The documentation will be available at `https://<your-domain>/static/docs/`.
 
+### Updating
+
+To update to the lastest version availabe on github, run the following commands in your project folder:
+
+```{bash}
+git pull
+cd ui && npm install && npm run build
+docker compose build
+docker compose up -d
+```
+
 ## Architecture
 
 The [Project Brief](./projectBrief.md) provides a concise overview. The AI generated documentation in the `./docs` (render with `mkdocs build`) a rather *extensive* AI generated discussion.
