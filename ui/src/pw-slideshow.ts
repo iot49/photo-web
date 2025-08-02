@@ -5,7 +5,6 @@ import { get_json } from './app/api';
 import { Albums, PhotoModel, SrcsetInfo } from './app/interfaces';
 import { consume } from '@lit/context';
 import { albumsContext, srcsetInfoContext } from './app/context';
-import 'swiped-events';
 
 /*
 Themes:
@@ -54,8 +53,18 @@ export class PwSlideshow extends LitElement {
   // Timeout ID for autoplay scheduling
   private autoplayTimeoutId: number | null = null;
 
-  // Swipe handling with swiped-events library
-  private swipeHandlersSetup = false;
+  // Touch/swipe handling
+  private touch = {
+    startX: 0,
+    startY: 0,
+    endX: 0,
+    endY: 0,
+    minSwipeDistance: 50, // minimum distance for a swipe
+    isActive: false // track if we're in a touch sequence
+  };
+
+  // Debug state for iPad console viewing
+  @state() private debugInfo = '';
 
   // playlist to array of album uid's
   private get uids(): string[] {
@@ -244,30 +253,99 @@ export class PwSlideshow extends LitElement {
     }
   }
 
+  private updateDebugInfo(message: string) {
+    const timestamp = new Date().toLocaleTimeString();
+    this.debugInfo = `${timestamp}: ${message}`;
+    console.log(this.debugInfo);
+  }
+
   private setupSwipeHandlers() {
-    if (this.swipeHandlersSetup) return;
-    
     if (!this.slideshow) {
-      console.log('Slideshow element not ready, retrying...');
-      setTimeout(() => this.setupSwipeHandlers(), 100);
+      this.updateDebugInfo('Slideshow element not found, retrying...');
+      setTimeout(() => this.setupSwipeHandlers(), 200);
       return;
     }
+
+    this.updateDebugInfo('Setting up swipe handlers');
     
-    console.log('Setting up swiped-events library handlers');
+    // Add touch handlers to the host element with capture=true to intercept before overlays
+    this.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: false, capture: true });
+    this.addEventListener('touchend', this.handleTouchEnd.bind(this), { passive: false, capture: true });
+    this.addEventListener('touchmove', this.handleTouchMove.bind(this), { passive: false, capture: true });
+  }
+
+  private handleTouchStart(event: TouchEvent) {
+    if (event.touches.length === 1) {
+      this.touch.startX = event.touches[0].clientX;
+      this.touch.startY = event.touches[0].clientY;
+      this.touch.isActive = true;
+      this.updateDebugInfo(`Touch start: ${this.touch.startX}, ${this.touch.startY}`);
+    }
+  }
+
+  private handleTouchMove(event: TouchEvent) {
+    if (!this.touch.isActive || event.touches.length !== 1) return;
     
-    // Use swiped-events library - simple and reliable
-    this.slideshow.addEventListener('swiped-left', () => {
-      console.log('Swiped left - next slide');
-      this.handleNextClick();
-    });
+    const currentX = event.touches[0].clientX;
+    const currentY = event.touches[0].clientY;
+    const deltaX = Math.abs(currentX - this.touch.startX);
+    const deltaY = Math.abs(currentY - this.touch.startY);
     
-    this.slideshow.addEventListener('swiped-right', () => {
-      console.log('Swiped right - previous slide');
-      this.handlePrevClick();
-    });
+    // If horizontal movement is greater than vertical, prevent default scrolling
+    if (deltaX > deltaY && deltaX > 10) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.updateDebugInfo(`Preventing default - deltaX: ${deltaX}, deltaY: ${deltaY}`);
+    }
+  }
+
+  private handleTouchEnd(event: TouchEvent) {
+    if (!this.touch.isActive || event.changedTouches.length !== 1) return;
     
-    this.swipeHandlersSetup = true;
-    console.log('Swiped-events handlers setup complete');
+    this.touch.endX = event.changedTouches[0].clientX;
+    this.touch.endY = event.changedTouches[0].clientY;
+    this.touch.isActive = false;
+    
+    this.updateDebugInfo(`Touch end: ${this.touch.endX}, ${this.touch.endY}`);
+    
+    // Check if this was a swipe gesture before preventing default
+    const wasSwipe = this.handleSwipe();
+    
+    // Only prevent default behavior if it was actually a swipe
+    if (wasSwipe) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.updateDebugInfo('Prevented click due to swipe');
+    } else {
+      this.updateDebugInfo('Allowing click - no swipe detected');
+    }
+  }
+
+  private handleSwipe(): boolean {
+    const deltaX = this.touch.endX - this.touch.startX;
+    const deltaY = this.touch.endY - this.touch.startY;
+    const absDeltaX = Math.abs(deltaX);
+    const absDeltaY = Math.abs(deltaY);
+
+    this.updateDebugInfo(`Swipe: dX=${deltaX}, dY=${deltaY}, absDX=${absDeltaX}, absDY=${absDeltaY}`);
+
+    // Only process horizontal swipes that are longer than vertical movement
+    if (absDeltaX > this.touch.minSwipeDistance && absDeltaX > absDeltaY) {
+      const direction = deltaX > 0 ? 'right (prev)' : 'left (next)';
+      this.updateDebugInfo(`Valid swipe: ${direction}`);
+      
+      if (deltaX > 0) {
+        // Swipe right - go to previous slide
+        this.handlePrevClick();
+      } else {
+        // Swipe left - go to next slide
+        this.handleNextClick();
+      }
+      return true; // Was a swipe
+    } else {
+      this.updateDebugInfo(`Invalid swipe: distance=${absDeltaX}, threshold=${this.touch.minSwipeDistance}`);
+      return false; // Was not a swipe
+    }
   }
 
   override render() {
@@ -291,7 +369,7 @@ export class PwSlideshow extends LitElement {
       `;
     }
 
-    // Swipe gestures implemented using swiped-events library
+    // Swipe gestures are now implemented using native touch events
 
     // render each album with a title followed by the photos
     return html`
@@ -326,6 +404,11 @@ export class PwSlideshow extends LitElement {
           <p>${this.theme === 'carousel' ? 'ken burns' : 'carousel'}</p>
         </div>
       </div>
+      ${this.debugInfo ? html`
+        <div id="debug-info">
+          <p>${this.debugInfo}</p>
+        </div>
+      ` : ''}
     `;
   }
 
@@ -682,6 +765,27 @@ export class PwSlideshow extends LitElement {
         text-align: center;
         background: black;
         box-sizing: border-box;
+      }
+
+      /* Debug info display for iPad console viewing */
+      #debug-info {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        font-family: monospace;
+        font-size: 12px;
+        z-index: 1000;
+        max-width: 300px;
+        word-wrap: break-word;
+      }
+
+      #debug-info p {
+        margin: 0;
+        line-height: 1.2;
       }
     `,
   ];
