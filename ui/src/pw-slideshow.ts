@@ -244,43 +244,57 @@ export class PwSlideshow extends LitElement {
   }
 
   private setupSwipeHandlers() {
-    if (!this.slideshow || this.swipeHandlersSetup) return;
+    if (this.swipeHandlersSetup) return;
     
-    // Simple swipe detection using custom events
-    // This mimics the swiped-events library approach
-    this.slideshow.addEventListener('swiped-left', () => {
-      console.log('Swiped left - next slide');
-      this.handleNextClick();
-    });
+    if (!this.slideshow) {
+      console.log('Slideshow element not ready, retrying...');
+      setTimeout(() => this.setupSwipeHandlers(), 100);
+      return;
+    }
     
-    this.slideshow.addEventListener('swiped-right', () => {
-      console.log('Swiped right - previous slide');
-      this.handlePrevClick();
-    });
+    console.log('Setting up simple swipe handlers on slideshow element');
     
-    // Add basic touch handling to dispatch custom swipe events
+    // Add basic touch handling directly to slideshow element
     let startX = 0;
     let startY = 0;
     
-    this.slideshow.addEventListener('touchstart', (e) => {
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-    }, { passive: true });
-    
-    this.slideshow.addEventListener('touchend', (e) => {
-      const endX = e.changedTouches[0].clientX;
-      const endY = e.changedTouches[0].clientY;
-      const deltaX = endX - startX;
-      const deltaY = endY - startY;
-      const absDeltaX = Math.abs(deltaX);
-      const absDeltaY = Math.abs(deltaY);
-      
-      // Only trigger swipe if horizontal movement > 50px and > vertical movement
-      if (absDeltaX > 50 && absDeltaX > absDeltaY) {
-        const eventName = deltaX > 0 ? 'swiped-right' : 'swiped-left';
-        this.slideshow.dispatchEvent(new CustomEvent(eventName));
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        console.log('Touch start:', startX, startY);
       }
-    }, { passive: true });
+    };
+    
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (e.changedTouches.length === 1) {
+        const endX = e.changedTouches[0].clientX;
+        const endY = e.changedTouches[0].clientY;
+        const deltaX = endX - startX;
+        const deltaY = endY - startY;
+        const absDeltaX = Math.abs(deltaX);
+        const absDeltaY = Math.abs(deltaY);
+        
+        console.log('Touch end:', endX, endY, 'Delta:', deltaX, deltaY);
+        
+        // Only trigger swipe if horizontal movement > 50px and > vertical movement
+        if (absDeltaX > 50 && absDeltaX > absDeltaY) {
+          console.log('Valid swipe detected:', deltaX > 0 ? 'right' : 'left');
+          if (deltaX > 0) {
+            // Swipe right - go to previous slide
+            this.handlePrevClick();
+          } else {
+            // Swipe left - go to next slide
+            this.handleNextClick();
+          }
+        } else {
+          console.log('Not a valid swipe - distance:', absDeltaX, 'threshold: 50');
+        }
+      }
+    };
+    
+    this.slideshow.addEventListener('touchstart', handleTouchStart, { passive: true });
+    this.slideshow.addEventListener('touchend', handleTouchEnd, { passive: true });
     
     this.swipeHandlersSetup = true;
     console.log('Simple swipe handlers setup complete');
