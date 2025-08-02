@@ -53,18 +53,8 @@ export class PwSlideshow extends LitElement {
   // Timeout ID for autoplay scheduling
   private autoplayTimeoutId: number | null = null;
 
-  // Touch/swipe handling
-  private touch = {
-    startX: 0,
-    startY: 0,
-    endX: 0,
-    endY: 0,
-    minSwipeDistance: 50, // minimum distance for a swipe
-    isActive: false // track if we're in a touch sequence
-  };
-
-  // Debug state for iPad console viewing
-  @state() private debugInfo = '';
+  // Simple swipe handling with swiped-events library
+  private swipeHandlersSetup = false;
 
   // playlist to array of album uid's
   private get uids(): string[] {
@@ -253,99 +243,47 @@ export class PwSlideshow extends LitElement {
     }
   }
 
-  private updateDebugInfo(message: string) {
-    const timestamp = new Date().toLocaleTimeString();
-    this.debugInfo = `${timestamp}: ${message}`;
-    console.log(this.debugInfo);
-  }
-
   private setupSwipeHandlers() {
-    if (!this.slideshow) {
-      this.updateDebugInfo('Slideshow element not found, retrying...');
-      setTimeout(() => this.setupSwipeHandlers(), 200);
-      return;
-    }
-
-    this.updateDebugInfo('Setting up swipe handlers');
+    if (!this.slideshow || this.swipeHandlersSetup) return;
     
-    // Add touch handlers to the host element with capture=true to intercept before overlays
-    this.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: false, capture: true });
-    this.addEventListener('touchend', this.handleTouchEnd.bind(this), { passive: false, capture: true });
-    this.addEventListener('touchmove', this.handleTouchMove.bind(this), { passive: false, capture: true });
-  }
-
-  private handleTouchStart(event: TouchEvent) {
-    if (event.touches.length === 1) {
-      this.touch.startX = event.touches[0].clientX;
-      this.touch.startY = event.touches[0].clientY;
-      this.touch.isActive = true;
-      this.updateDebugInfo(`Touch start: ${this.touch.startX}, ${this.touch.startY}`);
-    }
-  }
-
-  private handleTouchMove(event: TouchEvent) {
-    if (!this.touch.isActive || event.touches.length !== 1) return;
+    // Simple swipe detection using custom events
+    // This mimics the swiped-events library approach
+    this.slideshow.addEventListener('swiped-left', () => {
+      console.log('Swiped left - next slide');
+      this.handleNextClick();
+    });
     
-    const currentX = event.touches[0].clientX;
-    const currentY = event.touches[0].clientY;
-    const deltaX = Math.abs(currentX - this.touch.startX);
-    const deltaY = Math.abs(currentY - this.touch.startY);
+    this.slideshow.addEventListener('swiped-right', () => {
+      console.log('Swiped right - previous slide');
+      this.handlePrevClick();
+    });
     
-    // If horizontal movement is greater than vertical, prevent default scrolling
-    if (deltaX > deltaY && deltaX > 10) {
-      event.preventDefault();
-      event.stopPropagation();
-      this.updateDebugInfo(`Preventing default - deltaX: ${deltaX}, deltaY: ${deltaY}`);
-    }
-  }
-
-  private handleTouchEnd(event: TouchEvent) {
-    if (!this.touch.isActive || event.changedTouches.length !== 1) return;
+    // Add basic touch handling to dispatch custom swipe events
+    let startX = 0;
+    let startY = 0;
     
-    this.touch.endX = event.changedTouches[0].clientX;
-    this.touch.endY = event.changedTouches[0].clientY;
-    this.touch.isActive = false;
+    this.slideshow.addEventListener('touchstart', (e) => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+    }, { passive: true });
     
-    this.updateDebugInfo(`Touch end: ${this.touch.endX}, ${this.touch.endY}`);
-    
-    // Check if this was a swipe gesture before preventing default
-    const wasSwipe = this.handleSwipe();
-    
-    // Only prevent default behavior if it was actually a swipe
-    if (wasSwipe) {
-      event.preventDefault();
-      event.stopPropagation();
-      this.updateDebugInfo('Prevented click due to swipe');
-    } else {
-      this.updateDebugInfo('Allowing click - no swipe detected');
-    }
-  }
-
-  private handleSwipe(): boolean {
-    const deltaX = this.touch.endX - this.touch.startX;
-    const deltaY = this.touch.endY - this.touch.startY;
-    const absDeltaX = Math.abs(deltaX);
-    const absDeltaY = Math.abs(deltaY);
-
-    this.updateDebugInfo(`Swipe: dX=${deltaX}, dY=${deltaY}, absDX=${absDeltaX}, absDY=${absDeltaY}`);
-
-    // Only process horizontal swipes that are longer than vertical movement
-    if (absDeltaX > this.touch.minSwipeDistance && absDeltaX > absDeltaY) {
-      const direction = deltaX > 0 ? 'right (prev)' : 'left (next)';
-      this.updateDebugInfo(`Valid swipe: ${direction}`);
+    this.slideshow.addEventListener('touchend', (e) => {
+      const endX = e.changedTouches[0].clientX;
+      const endY = e.changedTouches[0].clientY;
+      const deltaX = endX - startX;
+      const deltaY = endY - startY;
+      const absDeltaX = Math.abs(deltaX);
+      const absDeltaY = Math.abs(deltaY);
       
-      if (deltaX > 0) {
-        // Swipe right - go to previous slide
-        this.handlePrevClick();
-      } else {
-        // Swipe left - go to next slide
-        this.handleNextClick();
+      // Only trigger swipe if horizontal movement > 50px and > vertical movement
+      if (absDeltaX > 50 && absDeltaX > absDeltaY) {
+        const eventName = deltaX > 0 ? 'swiped-right' : 'swiped-left';
+        this.slideshow.dispatchEvent(new CustomEvent(eventName));
       }
-      return true; // Was a swipe
-    } else {
-      this.updateDebugInfo(`Invalid swipe: distance=${absDeltaX}, threshold=${this.touch.minSwipeDistance}`);
-      return false; // Was not a swipe
-    }
+    }, { passive: true });
+    
+    this.swipeHandlersSetup = true;
+    console.log('Simple swipe handlers setup complete');
   }
 
   override render() {
@@ -404,11 +342,6 @@ export class PwSlideshow extends LitElement {
           <p>${this.theme === 'carousel' ? 'ken burns' : 'carousel'}</p>
         </div>
       </div>
-      ${this.debugInfo ? html`
-        <div id="debug-info">
-          <p>${this.debugInfo}</p>
-        </div>
-      ` : ''}
     `;
   }
 
@@ -765,27 +698,6 @@ export class PwSlideshow extends LitElement {
         text-align: center;
         background: black;
         box-sizing: border-box;
-      }
-
-      /* Debug info display for iPad console viewing */
-      #debug-info {
-        position: fixed;
-        top: 10px;
-        left: 10px;
-        background: rgba(0, 0, 0, 0.8);
-        color: white;
-        padding: 10px;
-        border-radius: 5px;
-        font-family: monospace;
-        font-size: 12px;
-        z-index: 1000;
-        max-width: 300px;
-        word-wrap: break-word;
-      }
-
-      #debug-info p {
-        margin: 0;
-        line-height: 1.2;
       }
     `,
   ];
