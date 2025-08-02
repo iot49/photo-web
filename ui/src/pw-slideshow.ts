@@ -96,7 +96,8 @@ export class PwSlideshow extends LitElement {
   protected firstUpdated(_changedProperties: PropertyValues): void {
     super.firstUpdated(_changedProperties);
     this.goto(0);
-    this.setupSwipeHandlers();
+    // Setup swipe handlers after a short delay to ensure slideshow element is ready
+    setTimeout(() => this.setupSwipeHandlers(), 100);
   }
 
   private goto = (nextIndex: number) => {
