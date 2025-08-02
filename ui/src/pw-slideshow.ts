@@ -308,14 +308,20 @@ export class PwSlideshow extends LitElement {
     
     this.updateDebugInfo(`Touch end: ${this.touch.endX}, ${this.touch.endY}`);
     
-    // Stop event propagation to prevent overlay clicks
-    event.preventDefault();
-    event.stopPropagation();
+    // Check if this was a swipe gesture before preventing default
+    const wasSwipe = this.handleSwipe();
     
-    this.handleSwipe();
+    // Only prevent default behavior if it was actually a swipe
+    if (wasSwipe) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.updateDebugInfo('Prevented click due to swipe');
+    } else {
+      this.updateDebugInfo('Allowing click - no swipe detected');
+    }
   }
 
-  private handleSwipe() {
+  private handleSwipe(): boolean {
     const deltaX = this.touch.endX - this.touch.startX;
     const deltaY = this.touch.endY - this.touch.startY;
     const absDeltaX = Math.abs(deltaX);
@@ -335,8 +341,10 @@ export class PwSlideshow extends LitElement {
         // Swipe left - go to next slide
         this.handleNextClick();
       }
+      return true; // Was a swipe
     } else {
       this.updateDebugInfo(`Invalid swipe: distance=${absDeltaX}, threshold=${this.touch.minSwipeDistance}`);
+      return false; // Was not a swipe
     }
   }
 
