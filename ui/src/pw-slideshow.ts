@@ -5,6 +5,7 @@ import { get_json } from './app/api';
 import { Albums, PhotoModel, SrcsetInfo } from './app/interfaces';
 import { consume } from '@lit/context';
 import { albumsContext, srcsetInfoContext } from './app/context';
+import 'swiped-events';
 
 /*
 Themes:
@@ -53,7 +54,7 @@ export class PwSlideshow extends LitElement {
   // Timeout ID for autoplay scheduling
   private autoplayTimeoutId: number | null = null;
 
-  // Simple swipe handling with swiped-events library
+  // Swipe handling with swiped-events library
   private swipeHandlersSetup = false;
 
   // playlist to array of album uid's
@@ -252,52 +253,21 @@ export class PwSlideshow extends LitElement {
       return;
     }
     
-    console.log('Setting up simple swipe handlers on slideshow element');
+    console.log('Setting up swiped-events library handlers');
     
-    // Add basic touch handling directly to slideshow element
-    let startX = 0;
-    let startY = 0;
+    // Use swiped-events library - simple and reliable
+    this.slideshow.addEventListener('swiped-left', () => {
+      console.log('Swiped left - next slide');
+      this.handleNextClick();
+    });
     
-    const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 1) {
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-        console.log('Touch start:', startX, startY);
-      }
-    };
-    
-    const handleTouchEnd = (e: TouchEvent) => {
-      if (e.changedTouches.length === 1) {
-        const endX = e.changedTouches[0].clientX;
-        const endY = e.changedTouches[0].clientY;
-        const deltaX = endX - startX;
-        const deltaY = endY - startY;
-        const absDeltaX = Math.abs(deltaX);
-        const absDeltaY = Math.abs(deltaY);
-        
-        console.log('Touch end:', endX, endY, 'Delta:', deltaX, deltaY);
-        
-        // Only trigger swipe if horizontal movement > 50px and > vertical movement
-        if (absDeltaX > 50 && absDeltaX > absDeltaY) {
-          console.log('Valid swipe detected:', deltaX > 0 ? 'right' : 'left');
-          if (deltaX > 0) {
-            // Swipe right - go to previous slide
-            this.handlePrevClick();
-          } else {
-            // Swipe left - go to next slide
-            this.handleNextClick();
-          }
-        } else {
-          console.log('Not a valid swipe - distance:', absDeltaX, 'threshold: 50');
-        }
-      }
-    };
-    
-    this.slideshow.addEventListener('touchstart', handleTouchStart, { passive: true });
-    this.slideshow.addEventListener('touchend', handleTouchEnd, { passive: true });
+    this.slideshow.addEventListener('swiped-right', () => {
+      console.log('Swiped right - previous slide');
+      this.handlePrevClick();
+    });
     
     this.swipeHandlersSetup = true;
-    console.log('Simple swipe handlers setup complete');
+    console.log('Swiped-events handlers setup complete');
   }
 
   override render() {
@@ -321,7 +291,7 @@ export class PwSlideshow extends LitElement {
       `;
     }
 
-    // Swipe gestures are now implemented using native touch events
+    // Swipe gestures implemented using swiped-events library
 
     // render each album with a title followed by the photos
     return html`
