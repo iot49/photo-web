@@ -53,6 +53,15 @@ export class PwSlideshow extends LitElement {
   // Timeout ID for autoplay scheduling
   private autoplayTimeoutId: number | null = null;
 
+  // Touch/swipe handling
+  private touch = {
+    startX: 0,
+    startY: 0,
+    endX: 0,
+    endY: 0,
+    minSwipeDistance: 50 // minimum distance for a swipe
+  };
+
   // playlist to array of album uid's
   private get uids(): string[] {
     return this.playlist.split(':');
@@ -87,6 +96,7 @@ export class PwSlideshow extends LitElement {
   protected firstUpdated(_changedProperties: PropertyValues): void {
     super.firstUpdated(_changedProperties);
     this.goto(0);
+    this.setupSwipeHandlers();
   }
 
   private goto = (nextIndex: number) => {
@@ -238,6 +248,46 @@ export class PwSlideshow extends LitElement {
     }
   }
 
+  private setupSwipeHandlers() {
+    if (!this.slideshow) return;
+
+    this.slideshow.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: true });
+    this.slideshow.addEventListener('touchend', this.handleTouchEnd.bind(this), { passive: true });
+  }
+
+  private handleTouchStart(event: TouchEvent) {
+    if (event.touches.length === 1) {
+      this.touch.startX = event.touches[0].clientX;
+      this.touch.startY = event.touches[0].clientY;
+    }
+  }
+
+  private handleTouchEnd(event: TouchEvent) {
+    if (event.changedTouches.length === 1) {
+      this.touch.endX = event.changedTouches[0].clientX;
+      this.touch.endY = event.changedTouches[0].clientY;
+      this.handleSwipe();
+    }
+  }
+
+  private handleSwipe() {
+    const deltaX = this.touch.endX - this.touch.startX;
+    const deltaY = this.touch.endY - this.touch.startY;
+    const absDeltaX = Math.abs(deltaX);
+    const absDeltaY = Math.abs(deltaY);
+
+    // Only process horizontal swipes that are longer than vertical movement
+    if (absDeltaX > this.touch.minSwipeDistance && absDeltaX > absDeltaY) {
+      if (deltaX > 0) {
+        // Swipe right - go to previous slide
+        this.handlePrevClick();
+      } else {
+        // Swipe left - go to next slide
+        this.handleNextClick();
+      }
+    }
+  }
+
   override render() {
     // wait for photo info to load
     if (this.photos == null) {
@@ -258,6 +308,8 @@ export class PwSlideshow extends LitElement {
         </div>
       `;
     }
+
+    // Swipe gestures are now implemented using native touch events
 
     // render each album with a title followed by the photos
     return html`
