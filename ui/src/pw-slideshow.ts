@@ -180,9 +180,7 @@ export class PwSlideshow extends LitElement {
     this.autoplay = !this.autoplay;
 
     if (this.autoplay) {
-      // Restart autoplay with ken-burns theme
-      this.theme = 'ken-burns';
-
+      // Restart autoplay - keep current theme
       // Get the current slide to calculate dynamic timing
       const slides = this.slideshow?.children as unknown as HTMLElement[];
       if (slides && slides.length > 0) {
@@ -193,6 +191,11 @@ export class PwSlideshow extends LitElement {
         if (imgElement) {
           const customProperty = getComputedStyle(imgElement).getPropertyValue('--data-dynamic-time-factor');
           if (customProperty) dynamicTimeFactor = parseFloat(customProperty) || 1.0;
+          
+          // Resume ken-burns animation if in ken-burns mode
+          if (this.theme === 'ken-burns') {
+            imgElement.style.animationPlayState = 'running';
+          }
         }
 
         const dynamicSlideMs = SLIDE_MS * dynamicTimeFactor;
@@ -201,9 +204,19 @@ export class PwSlideshow extends LitElement {
         this.autoplayTimeoutId = window.setTimeout(() => this.goto(this.currentIndex + 1), dynamicSlideMs - TRANSITION_MS);
       }
     } else {
-      // Stop autoplay and switch to carousel theme for immediate transitions
-      this.theme = 'carousel';
+      // Pause ken-burns animation when autoplay is stopped
+      if (this.theme === 'ken-burns') {
+        const slides = this.slideshow?.children as unknown as HTMLElement[];
+        if (slides && slides.length > 0) {
+          const currentSlide = slides[this.currentIndex];
+          const imgElement = currentSlide?.querySelector('img') as HTMLElement;
+          if (imgElement) {
+            imgElement.style.animationPlayState = 'paused';
+          }
+        }
+      }
     }
+    // Note: Theme is now only controlled by the dedicated theme toggle button
   }
 
   private toggleTheme() {
