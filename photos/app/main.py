@@ -6,7 +6,6 @@ from api import albums, authorize, cache, photos
 from doc_utils import dedent_and_convert_to_html
 from fastapi import FastAPI, HTTPException
 from models import DB
-from pillow_heif import register_heif_opener
 
 # Import the shared DB manager
 from shared_db import shared_db_manager
@@ -15,8 +14,8 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-# Register the HEIF opener to allow Pillow to read HEIC files
-register_heif_opener()
+# ImageMagick will handle all image formats including HEIC natively
+logger.info("Using ImageMagick for image processing with native HEIC support")
 
 
 async def get_db() -> DB:

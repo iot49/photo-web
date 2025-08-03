@@ -1,64 +1,17 @@
 import io
 import logging
 import os
+import subprocess
 from typing import Optional
 
 from doc_utils import dedent_and_convert_to_html
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from models import DB
-from PIL import Image, ImageDraw, ImageFont
+from wand.exceptions import WandException
+from wand.image import Image as WandImage
 
 logger = logging.getLogger(__name__)
-
-# Try to import OpenCV for faster image processing
-try:
-    import cv2
-    import numpy as np
-
-    HAS_OPENCV = True
-    logger.info("OpenCV available for fast image processing")
-except ImportError:
-    HAS_OPENCV = False
-    logger.info("OpenCV not available, using PIL fallback")
-
-
-def resize_with_opencv(
-    image_path: str, width: int, height: int, quality: int = 75
-) -> bytes:
-    """Fast resize using OpenCV (2-10x faster than PIL)."""
-    if not HAS_OPENCV:
-        raise ImportError("OpenCV not available")
-
-    # Skip HEIC files - OpenCV can't read them
-    if image_path.lower().endswith(".heic"):
-        raise ValueError("HEIC format not supported by OpenCV")
-
-    img = cv2.imread(image_path)
-    if img is None:
-        raise ValueError(f"Could not read image: {image_path}")
-
-    resized = cv2.resize(img, (width, height), interpolation=cv2.INTER_LANCZOS4)
-    encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
-    success, encoded_img = cv2.imencode(".jpg", resized, encode_param)
-
-    if not success:
-        raise ValueError("Failed to encode image")
-
-    return encoded_img.tobytes()
-
-
-def get_optimal_resampling(scale_factor: float) -> Image.Resampling:
-    """Choose optimal resampling algorithm based on scale factor for better performance."""
-    if scale_factor < 0.3:
-        return Image.Resampling.NEAREST  # Very large downscaling - fastest
-    elif scale_factor < 0.6:
-        return Image.Resampling.BILINEAR  # Large downscaling - much faster than LANCZOS
-    elif scale_factor < 0.9:
-        return Image.Resampling.BICUBIC  # Medium scaling - balanced speed/quality
-    else:
-        return Image.Resampling.LANCZOS  # Small scaling - best quality
-
 
 # Define common screen sizes for responsive images
 SCREEN_SIZES = {
@@ -78,6 +31,164 @@ async def get_db() -> DB:
     raise NotImplementedError("Database dependency not configured")
 
 
+def process_image_with_imagemagick(
+    input_path: str,
+    width: int,
+    height: int,
+    quality: int = 85,
+    test_overlay: str = None,
+) -> bytes:
+    """
+    Process any image format including HEIC using ImageMagick.
+
+    Args:
+        input_path: Path to the input image file
+        width: Target width in pixels
+        height: Target height in pixels
+        quality: JPEG quality (1-100)
+        test_overlay: Optional text to overlay for testing
+
+    Returns:
+        bytes: Processed image as JPEG bytes
+
+    Raises:
+        subprocess.CalledProcessError: If ImageMagick command fails
+        FileNotFoundError: If ImageMagick is not installed
+    """
+    try:
+        # Build ImageMagick command
+        # Use 'convert' for ImageMagick 6.x (installed in container)
+        cmd = [
+            "convert",
+            input_path,
+            "-resize",
+            f"{width}x{height}",
+            "-strip",  # Remove metadata for smaller file size
+            "-quality",
+            str(quality),
+            "-sampling-factor",
+            "4:2:0",  # Optimize JPEG compression
+        ]
+
+        # Add test overlay if requested
+        if test_overlay:
+            # Calculate font size based on image width (5% of width, min 20, max 100)
+            font_size = max(20, min(100, int(0.05 * width)))
+            cmd.extend(
+                [
+                    "-gravity",
+                    "SouthEast",
+                    "-pointsize",
+                    str(font_size),
+                    "-fill",
+                    "white",
+                    "-stroke",
+                    "black",
+                    "-strokewidth",
+                    "2",
+                    "-annotate",
+                    "+50+50",
+                    test_overlay,
+                ]
+            )
+
+        # Output as JPEG to stdout
+        cmd.append("jpg:-")
+
+        logger.debug(f"Running ImageMagick command: {' '.join(cmd)}")
+
+        # Execute ImageMagick command
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            check=True,
+            timeout=30,  # 30 second timeout for safety
+        )
+
+        logger.info(
+            f"ImageMagick processed image: {input_path} -> {width}x{height} (quality: {quality})"
+        )
+        return result.stdout
+
+    except subprocess.CalledProcessError as e:
+        logger.error(
+            f"ImageMagick command failed: {e.stderr.decode() if e.stderr else str(e)}"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Image processing failed: {e.stderr.decode() if e.stderr else str(e)}",
+        )
+    except subprocess.TimeoutExpired:
+        logger.error(f"ImageMagick command timed out for image: {input_path}")
+        raise HTTPException(status_code=500, detail="Image processing timed out")
+    except FileNotFoundError:
+        logger.error("ImageMagick not found - ensure it's installed in the container")
+        raise HTTPException(
+            status_code=500, detail="Image processing service unavailable"
+        )
+
+
+def process_image_with_wand(
+    input_path: str,
+    width: int,
+    height: int,
+    quality: int = 85,
+    test_overlay: str = None,
+) -> bytes:
+    """
+    Alternative processing using Wand (ImageMagick Python bindings).
+
+    Args:
+        input_path: Path to the input image file
+        width: Target width in pixels
+        height: Target height in pixels
+        quality: JPEG quality (1-100)
+        test_overlay: Optional text to overlay for testing
+
+    Returns:
+        bytes: Processed image as JPEG bytes
+    """
+    try:
+        with WandImage(filename=input_path) as img:
+            # Resize image maintaining aspect ratio
+            img.resize(width, height)
+
+            # Strip metadata
+            img.strip()
+
+            # Set quality
+            img.compression_quality = quality
+
+            # Add test overlay if requested
+            if test_overlay:
+                font_size = max(20, min(100, int(0.05 * width)))
+                img.font_size = font_size
+                img.font_family = "Arial"
+                img.fill_color = "white"
+                img.stroke_color = "black"
+                img.stroke_width = 2
+
+                # Position in bottom right
+                x = max(0, width - len(test_overlay) * font_size * 0.6 - 50)
+                y = height - 50
+                img.annotate(test_overlay, x, y)
+
+            # Convert to JPEG
+            img.format = "jpeg"
+            img.options["jpeg:sampling-factor"] = "4:2:0"
+
+            logger.info(
+                f"Wand processed image: {input_path} -> {width}x{height} (quality: {quality})"
+            )
+            return img.make_blob()
+
+    except WandException as e:
+        logger.error(f"Wand processing failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Image processing failed: {str(e)}"
+        )
+
+
 @router.get(
     "/api/photos/{photo_id}/img",
     tags=["photos"],
@@ -92,7 +203,7 @@ async def get_db() -> DB:
     **Access Control:** Photo access inherited from most permissive album
     
     **Format Handling:**
-    - HEIC images automatically converted to JPEG
+    - HEIC images automatically converted to JPEG using ImageMagick
     - Other formats served as-is when possible
     - Quality parameter applies only to JPEG conversion
     
@@ -160,7 +271,7 @@ async def get_db() -> DB:
     **Quality Optimization:**
     - Smaller sizes use lower quality for faster loading
     - Larger sizes maintain higher quality for detail
-    - HEIC images always converted to JPEG
+    - HEIC images always converted to JPEG using ImageMagick
     
     **Caching:**
     - Processed images cached at multiple levels
@@ -231,28 +342,28 @@ async def serve_photo_image_sized(
         False,
         description="When true, embed size-suffix text overlay in image for debugging",
     ),
-    fast: bool = Query(
-        True,
-        description="Use fast scaling optimizations (OpenCV when available, smart resampling)",
+    use_wand: bool = Query(
+        False,
+        description="Use Wand (Python bindings) instead of subprocess for ImageMagick",
     ),
     db: DB = Depends(get_db),
 ):
     """
-    Serve a photo image scaled to common screen sizes.
+    Serve a photo image scaled to common screen sizes using ImageMagick.
 
     Provides responsive image serving with automatic scaling and format
-    conversion. Supports multiple size variants optimized for different
-    screen sizes and use cases.
+    conversion. Supports all image formats including HEIC through ImageMagick.
 
     Args:
         photo_id: The UUID of the photo to serve
         size_suffix: Size suffix like "-sm", "-md", etc. (empty for original)
         quality: JPEG quality (1-100, default 75)
         test: When true, embed size-suffix text overlay for debugging
+        use_wand: Use Wand Python bindings instead of subprocess
         db: Photos database dependency
 
     Returns:
-        Image scaled to the specified dimensions with appropriate MIME type.
+        Image scaled to the specified dimensions as JPEG.
         No upscaling is performed - smaller originals returned at native size.
         Test mode adds size-suffix text overlay in lower right corner.
 
@@ -300,7 +411,6 @@ async def serve_photo_image_sized(
 
         # Check if format conversion is needed (HEIC/TIFF always need conversion to JPEG)
         needs_conversion = photo.uti in ["public.heic", "public.tiff"]
-        mime_type = "image/jpeg" if needs_conversion else photo.mime_type
 
         # Check if scaling is needed (target dimensions are smaller than original)
         needs_scaling = (width > 0 and width < photo.width) or (
@@ -308,7 +418,7 @@ async def serve_photo_image_sized(
         )
 
         logger.debug(
-            f"Processing flags: needs_conversion={needs_conversion}, needs_scaling={needs_scaling}, test={test}, fast={fast}"
+            f"Processing flags: needs_conversion={needs_conversion}, needs_scaling={needs_scaling}, test={test}"
         )
 
         # Process image if conversion, scaling, or test overlay is needed
@@ -317,142 +427,32 @@ async def serve_photo_image_sized(
         if not needs_processing:
             logger.info("No processing needed, returning original file")
             # Return original unscaled image (only if no processing needed at all)
+            mime_type = photo.mime_type if not needs_conversion else "image/jpeg"
             return FileResponse(path, media_type=mime_type)
 
-        # Use fast scaling if enabled and no test overlay needed
-        if fast and not test:
-            logger.debug("Attempting fast scaling with OpenCV")
+        # Determine test overlay text
+        test_overlay = (
+            size_suffix if test and size_suffix else ("original" if test else None)
+        )
 
-            try:
-                # Use OpenCV for fast scaling
-                image_bytes = resize_with_opencv(path, width, height, quality)
-                logger.info(
-                    f"Fast OpenCV scaling: {photo.width}x{photo.height} -> {width}x{height}"
-                )
-                return StreamingResponse(
-                    io.BytesIO(image_bytes), media_type="image/jpeg"
-                )
-
-            except Exception as e:
-                logger.warning(
-                    f"OpenCV scaling failed ({e}), falling back to optimized PIL"
-                )
-
-        logger.debug("Processing image with PIL")
-
-        # Process the image
-        img = Image.open(path)
-
-        # Resize if needed (either because scaling was requested OR we're processing anyway and target is smaller)
-        if needs_scaling or (
-            needs_processing and (width < photo.width or height < photo.height)
-        ):
-            # Use optimized resampling algorithm selection
-            if fast:
-                scale_factor = min(width / photo.width, height / photo.height)
-                resampling = get_optimal_resampling(scale_factor)
-                logger.debug(
-                    f"Using optimized resampling: {resampling.name} (scale factor: {scale_factor:.2f})"
-                )
-            else:
-                resampling = Image.Resampling.LANCZOS
-                logger.debug("Using LANCZOS resampling (fast=False)")
-
-            img = img.resize((width, height), resampling)
-            logger.info(
-                f"Resized image from {photo.width}x{photo.height} to {width}x{height} using {resampling.name}"
+        # Process with ImageMagick
+        if use_wand:
+            logger.debug("Processing image with Wand (ImageMagick Python bindings)")
+            image_bytes = process_image_with_wand(
+                path, width, height, quality, test_overlay
+            )
+        else:
+            logger.debug("Processing image with ImageMagick subprocess")
+            image_bytes = process_image_with_imagemagick(
+                path, width, height, quality, test_overlay
             )
 
-        # Add test overlay if requested
-        if test:
-            # Create a copy to avoid modifying the original
-            img = img.copy()
-            draw = ImageDraw.Draw(img)
-
-            # Determine text to overlay
-            text = size_suffix if size_suffix else "original"
-
-            # Use a more reasonable font size (5% of image width, min 20px, max 100px)
-            font_size = max(20, min(100, int(0.05 * img.width)))
-            font = None
-
-            try:
-                # Try to load a system font with the calculated size
-                font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", font_size)
-            except (OSError, IOError):
-                try:
-                    # Try other common system fonts
-                    font = ImageFont.truetype(
-                        "/System/Library/Fonts/Helvetica.ttc", font_size
-                    )
-                except (OSError, IOError):
-                    try:
-                        # Try another fallback
-                        font = ImageFont.truetype(
-                            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-                            font_size,
-                        )
-                    except (OSError, IOError):
-                        try:
-                            # Create a default font with size parameter
-                            font = ImageFont.load_default(size=font_size)
-                        except:
-                            # Final fallback - use default font
-                            font = ImageFont.load_default()
-                            logger.warning(
-                                f"Could not load any font with size {font_size}, using default"
-                            )
-
-            # Get text dimensions
-            if font:
-                bbox = draw.textbbox((0, 0), text, font=font)
-                text_width = bbox[2] - bbox[0]
-                text_height = bbox[3] - bbox[1]
-            else:
-                # Rough estimate if no font available
-                text_width = len(text) * font_size * 0.6
-                text_height = font_size
-
-            # Position in lower right corner with more padding to avoid cutoff
-            padding_x = max(
-                50, int(text_width * 0.1)
-            )  # At least 50px or 10% of text width
-            padding_y = max(
-                50, int(text_height * 1.5)
-            )  # At least 50px or 1.5x text height (about one line)
-            x = max(0, img.width - text_width - padding_x)
-            y = max(0, img.height - text_height - padding_y)
-
-            # Draw text with black outline for better visibility
-            outline_width = 2
-            # Draw outline
-            for dx in range(-outline_width, outline_width + 1):
-                for dy in range(-outline_width, outline_width + 1):
-                    if dx != 0 or dy != 0:
-                        draw.text((x + dx, y + dy), text, fill=(0, 0, 0), font=font)
-
-            # Draw main text in white
-            draw.text((x, y), text, fill=(255, 255, 255), font=font)
-
-            logger.info(
-                f"Added test overlay '{text}' at position ({x}, {y}) with font size {font_size}"
-            )
-
-        # Convert to JPEG and return
-        buf = io.BytesIO()
-        # Convert to RGB if necessary (for RGBA images with transparency)
-        if img.mode in ("RGBA", "LA", "P"):
-            rgb_img = Image.new("RGB", img.size, (255, 255, 255))
-            if img.mode == "P":
-                img = img.convert("RGBA")
-            rgb_img.paste(img, mask=img.split()[-1] if img.mode == "RGBA" else None)
-            img = rgb_img
-
-        img.save(buf, format="JPEG", quality=quality, optimize=True)
-        buf.seek(0)
+        logger.info(
+            f"ImageMagick processed: {photo.width}x{photo.height} -> {width}x{height} (quality: {quality})"
+        )
 
         # Return the processed image
-        return StreamingResponse(buf, media_type="image/jpeg")
+        return StreamingResponse(io.BytesIO(image_bytes), media_type="image/jpeg")
 
     except Exception as e:
         logger.error(f"Error processing image {path}: {e}")

@@ -3,9 +3,6 @@ uvicorn
 gunicorn
 pydantic
 osxphotos
-Pillow  # Keep regular Pillow for Docker compatibility
-pillow-heif
-opencv-python-headless  # Headless version for Docker/server environments
+Wand  # ImageMagick Python bindings
 apscheduler
 markdown
-numpy  # Required for OpenCV
