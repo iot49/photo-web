@@ -80,7 +80,6 @@ export class PwMain extends LitElement {
   srcsetInfo!: SrcsetInfo;
 
   @state() private isLoading = true;
-  @state() private showTermsDialog = false;
 
   private uri = '';
   private queryParams = new URLSearchParams();
@@ -135,7 +134,7 @@ export class PwMain extends LitElement {
       const requiredTermsDate = new Date(this.termsDate);
       
       if (userTermsDate < requiredTermsDate) {
-        this.showTermsDialog = true;
+        this.showTermsDialog();
       }
     }
   }
@@ -145,7 +144,7 @@ export class PwMain extends LitElement {
       await post_json('/auth/term-accepted');
       // Re-download the me object to ensure fresh data from server
       this.me = await get_json('/auth/me');
-      this.showTermsDialog = false;
+      this.hideTermsDialog();
     } catch (error) {
       console.error('Failed to accept terms:', error);
       // Show error to user - could use a toast notification here
@@ -155,8 +154,22 @@ export class PwMain extends LitElement {
 
   private handleRejectTerms() {
     // Close the dialog first, then log out the user
-    this.showTermsDialog = false;
+    this.hideTermsDialog();
     logout(window.location.pathname);
+  }
+
+  private showTermsDialog() {
+    const dialog = this.shadowRoot?.querySelector('sl-dialog') as any;
+    if (dialog) {
+      dialog.show();
+    }
+  }
+
+  private hideTermsDialog() {
+    const dialog = this.shadowRoot?.querySelector('sl-dialog') as any;
+    if (dialog) {
+      dialog.hide();
+    }
   }
 
   private setupNavigationInterception() {
@@ -300,12 +313,11 @@ export class PwMain extends LitElement {
       <!-- Terms of Use Dialog -->
       <sl-dialog
         label="Terms of Use"
-        ?open=${this.showTermsDialog}
         no-header
         @sl-request-close=${(e: CustomEvent) => e.preventDefault()}
       >
         <h3>Terms of Use</h3>
-        <p>Terms of use: This application uses cookies and stores your name and email in a database.</p>
+        <p>Terms of use: This application uses cookies and</br>your name and email in a database on the server.</p>
         
         <div slot="footer">
           <sl-button variant="default" @click=${this.handleRejectTerms}>
