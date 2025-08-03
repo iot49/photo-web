@@ -143,8 +143,8 @@ export class PwMain extends LitElement {
   private async handleAcceptTerms() {
     try {
       await post_json('/auth/term-accepted');
-      // Update the me object to reflect the new terms acceptance
-      this.me = { ...this.me, terms_accepted: this.termsDate };
+      // Re-download the me object to ensure fresh data from server
+      this.me = await get_json('/auth/me');
       this.showTermsDialog = false;
     } catch (error) {
       console.error('Failed to accept terms:', error);
