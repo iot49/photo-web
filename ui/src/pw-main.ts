@@ -132,7 +132,7 @@ export class PwMain extends LitElement {
     if (this.me && this.me.email) {
       const userTermsDate = new Date(this.me.terms_accepted);
       const requiredTermsDate = new Date(this.termsDate);
-      
+
       if (userTermsDate < requiredTermsDate) {
         this.showTermsDialog();
       }
@@ -317,8 +317,10 @@ export class PwMain extends LitElement {
         @sl-request-close=${(e: CustomEvent) => e.preventDefault()}
       >
         <h3>Terms of Use</h3>
-        <p>Terms of use: This application uses cookies and</br>your name and email in a database on the server.</p>
-        
+        <p>Terms of use: This application uses cookies and</br>stores your name and email in a database on the server. </br></br>
+        The provider assumes no responsibility for the correctness of the content on this size.
+        Use all information or recommendations at your own risk. Consult professional help before making any life-style changes 
+        discussed on this site.</p>
         <div slot="footer">
           <sl-button variant="default" @click=${this.handleRejectTerms}>
             Reject
