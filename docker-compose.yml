@@ -110,9 +110,27 @@ services:
       # IMPORTANT: give Docker and Terminal "Full Disk Access" in System Preferences/Privacy & Security
       - ${PHOTOS_LIBRARY}:/photo_db:ro
       - nginx-cache:/var/cache/nginx # access to nginx cache
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /tmp/imagemagick:/tmp/imagemagick # shared volume for ImageMagick processing
     # No direct Traefik labels - accessed through nginx proxy
     networks:
       - ingress
+    depends_on:
+      - imagemagick
+
+  imagemagick:
+    image: dpokidov/imagemagick:latest
+    container_name: imagemagick
+    restart: unless-stopped
+    volumes:
+      - /tmp/imagemagick:/images
+      - ${PHOTOS_LIBRARY}:/photo_db:ro
+    # This service will be called by the photos service for image processing
+    # No external access needed
+    networks:
+      - ingress
+    # Keep container running for service calls - override entrypoint
+    entrypoint: ["tail", "-f", "/dev/null"]
 
   files:
     build: ./files/app

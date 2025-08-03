@@ -7,9 +7,8 @@ from typing import Optional
 from doc_utils import dedent_and_convert_to_html
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
+from imagemagick_service import process_image_with_imagemagick_service
 from models import DB
-from wand.exceptions import WandException
-from wand.image import Image as WandImage
 
 logger = logging.getLogger(__name__)
 
@@ -56,16 +55,16 @@ def process_image_with_imagemagick(
         FileNotFoundError: If ImageMagick is not installed
     """
     try:
-        # Build ImageMagick command
-        # Use 'convert' for ImageMagick 6.x (installed in container)
+        # Build ImageMagick 7 command with proper HEIC handling
         cmd = [
-            "convert",
+            "magick",
             input_path,
+            "-auto-orient",  # Handle EXIF orientation from HEIC
             "-resize",
-            f"{width}x{height}",
+            f"{width}x{height}>",  # Don't upscale (> means only shrink)
             "-strip",  # Remove metadata for smaller file size
             "-quality",
-            str(quality),
+            str(quality),  # ImageMagick 7 accepts quality as integer
             "-sampling-factor",
             "4:2:0",  # Optimize JPEG compression
         ]
@@ -111,81 +110,30 @@ def process_image_with_imagemagick(
         return result.stdout
 
     except subprocess.CalledProcessError as e:
-        logger.error(
-            f"ImageMagick command failed: {e.stderr.decode() if e.stderr else str(e)}"
-        )
-        raise HTTPException(
-            status_code=500,
-            detail=f"Image processing failed: {e.stderr.decode() if e.stderr else str(e)}",
-        )
+        error_msg = e.stderr.decode() if e.stderr else str(e)
+        logger.error(f"ImageMagick 7 command failed: {error_msg}")
+
+        # Check for specific HEIC-related errors
+        if "no decode delegate" in error_msg.lower() or "heic" in error_msg.lower():
+            raise HTTPException(
+                status_code=500,
+                detail="HEIC format not supported. Please ensure ImageMagick 7 is compiled with libheif support.",
+            )
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Image processing failed: {error_msg}",
+            )
     except subprocess.TimeoutExpired:
         logger.error(f"ImageMagick command timed out for image: {input_path}")
         raise HTTPException(status_code=500, detail="Image processing timed out")
     except FileNotFoundError:
-        logger.error("ImageMagick not found - ensure it's installed in the container")
-        raise HTTPException(
-            status_code=500, detail="Image processing service unavailable"
+        logger.error(
+            "ImageMagick 7 'magick' command not found - ensure ImageMagick 7 is installed"
         )
-
-
-def process_image_with_wand(
-    input_path: str,
-    width: int,
-    height: int,
-    quality: int = 85,
-    test_overlay: str = None,
-) -> bytes:
-    """
-    Alternative processing using Wand (ImageMagick Python bindings).
-
-    Args:
-        input_path: Path to the input image file
-        width: Target width in pixels
-        height: Target height in pixels
-        quality: JPEG quality (1-100)
-        test_overlay: Optional text to overlay for testing
-
-    Returns:
-        bytes: Processed image as JPEG bytes
-    """
-    try:
-        with WandImage(filename=input_path) as img:
-            # Resize image maintaining aspect ratio
-            img.resize(width, height)
-
-            # Strip metadata
-            img.strip()
-
-            # Set quality
-            img.compression_quality = quality
-
-            # Add test overlay if requested
-            if test_overlay:
-                font_size = max(20, min(100, int(0.05 * width)))
-                img.font_size = font_size
-                img.font_family = "Arial"
-                img.fill_color = "white"
-                img.stroke_color = "black"
-                img.stroke_width = 2
-
-                # Position in bottom right
-                x = max(0, width - len(test_overlay) * font_size * 0.6 - 50)
-                y = height - 50
-                img.annotate(test_overlay, x, y)
-
-            # Convert to JPEG
-            img.format = "jpeg"
-            img.options["jpeg:sampling-factor"] = "4:2:0"
-
-            logger.info(
-                f"Wand processed image: {input_path} -> {width}x{height} (quality: {quality})"
-            )
-            return img.make_blob()
-
-    except WandException as e:
-        logger.error(f"Wand processing failed: {str(e)}")
         raise HTTPException(
-            status_code=500, detail=f"Image processing failed: {str(e)}"
+            status_code=500,
+            detail="ImageMagick 7 not available - image processing service unavailable",
         )
 
 
@@ -342,10 +290,6 @@ async def serve_photo_image_sized(
         False,
         description="When true, embed size-suffix text overlay in image for debugging",
     ),
-    use_wand: bool = Query(
-        False,
-        description="Use Wand (Python bindings) instead of subprocess for ImageMagick",
-    ),
     db: DB = Depends(get_db),
 ):
     """
@@ -359,7 +303,6 @@ async def serve_photo_image_sized(
         size_suffix: Size suffix like "-sm", "-md", etc. (empty for original)
         quality: JPEG quality (1-100, default 75)
         test: When true, embed size-suffix text overlay for debugging
-        use_wand: Use Wand Python bindings instead of subprocess
         db: Photos database dependency
 
     Returns:
@@ -435,17 +378,11 @@ async def serve_photo_image_sized(
             size_suffix if test and size_suffix else ("original" if test else None)
         )
 
-        # Process with ImageMagick
-        if use_wand:
-            logger.debug("Processing image with Wand (ImageMagick Python bindings)")
-            image_bytes = process_image_with_wand(
-                path, width, height, quality, test_overlay
-            )
-        else:
-            logger.debug("Processing image with ImageMagick subprocess")
-            image_bytes = process_image_with_imagemagick(
-                path, width, height, quality, test_overlay
-            )
+        # Process with ImageMagick service - this is the only processing method available
+        logger.debug("Processing image with ImageMagick service")
+        image_bytes = process_image_with_imagemagick_service(
+            path, width, height, quality, test_overlay
+        )
 
         logger.info(
             f"ImageMagick processed: {photo.width}x{photo.height} -> {width}x{height} (quality: {quality})"

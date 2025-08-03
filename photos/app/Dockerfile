@@ -4,20 +4,25 @@ FROM python:3.10-slim-bullseye
 # Set the working directory in the container
 WORKDIR /app
 
-# Install ImageMagick with HEIC support and other dependencies
+# Set environment variables for non-interactive installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+
+# Install minimal system dependencies including Docker CLI
 RUN apt-get update && apt-get install -y \
-    imagemagick \
-    libheif-dev \
-    libheif1 \
-    libmagickwand-dev \
-    pkg-config \
+    curl \
+    ca-certificates \
+    gnupg \
+    lsb-release \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
+    && apt-get update \
+    && apt-get install -y docker-ce-cli \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure ImageMagick policy to allow processing of common image formats
-RUN sed -i 's/rights="none" pattern="PDF"/rights="read|write" pattern="PDF"/' /etc/ImageMagick-6/policy.xml && \
-    sed -i 's/rights="none" pattern="LABEL"/rights="read|write" pattern="LABEL"/' /etc/ImageMagick-6/policy.xml && \
-    sed -i 's/rights="none" pattern="URL"/rights="read|write" pattern="URL"/' /etc/ImageMagick-6/policy.xml && \
-    sed -i 's/rights="none" pattern="EPHEMERAL"/rights="read|write" pattern="EPHEMERAL"/' /etc/ImageMagick-6/policy.xml
+# Create directory for temporary image processing
+RUN mkdir -p /tmp/imagemagick
 
 # Copy the current directory contents into the container at /app
 COPY ./requirements.txt /app/requirements.txt
