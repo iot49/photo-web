@@ -30,6 +30,10 @@ class UserBase(SQLModel):
         default="2000-01-01",
         description="Date when the user last accepted terms (ISO format)",
     )
+    created_at: str = Field(
+        default="",
+        description="Date when the user account was created (ISO format)",
+    )
     last_login: str = Field(
         default="", description="Last login timestamp in UTC string format"
     )
@@ -58,6 +62,7 @@ class User(UserBase, table=True, extend_existing=True):
                 "enabled": True,
                 "logged_in": True,
                 "picture": "https://example.com/profile.jpg",
+                "created_at": "2025-01-01",
             }
         }
 
@@ -77,6 +82,7 @@ class UserUpdate(SQLModel):
     enabled: Optional[bool] = None
     picture: Optional[str] = None
     terms_accepted: Optional[str] = None
+    created_at: Optional[str] = None
 
 
 class UserResponse(UserBase):

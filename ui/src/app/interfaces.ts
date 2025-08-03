@@ -54,6 +54,7 @@ export interface Me {
   email?: string;
   picture?: string;
   terms_accepted: string;
+  created_at: string;
 }
 
 export class SrcsetInfo {

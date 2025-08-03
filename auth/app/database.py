@@ -41,6 +41,10 @@ class DatabaseManager:
             if super_user_email and user_data.email == super_user_email:
                 user_dict["roles"] = "public,admin"
 
+            # Set created_at to current date if not provided
+            if not user_dict.get("created_at"):
+                user_dict["created_at"] = datetime.now().strftime("%Y-%m-%d")
+
             user = User(**user_dict)
             session.add(user)
             session.commit()
@@ -133,6 +137,7 @@ class DatabaseManager:
                 picture=firebase_user_data.get("picture", ""),
                 roles="public",  # Default role
                 enabled=True,
+                created_at=datetime.now().strftime("%Y-%m-%d"),
             )
             user = self.create_user(user_data)
             # Set initial login time

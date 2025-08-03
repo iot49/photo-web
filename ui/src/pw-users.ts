@@ -14,6 +14,7 @@ interface User {
   picture: string;
   last_login: string;
   terms_accepted: string;
+  created_at: string;
 }
 
 /**
@@ -147,12 +148,12 @@ export class PwUsers extends LitElement {
     this.editForm = { ...this.editForm, [field]: value };
   }
 
-  private formatTermsAccepted(termsAccepted: string): string {
-    if (!termsAccepted) return 'Not accepted';
+  private formatDate(dateString: string, defaultText: string = 'Unknown'): string {
+    if (!dateString) return defaultText;
     try {
-      return new Date(termsAccepted).toLocaleDateString();
+      return new Date(dateString).toLocaleDateString();
     } catch {
-      return termsAccepted;
+      return dateString;
     }
   }
 
@@ -207,7 +208,8 @@ export class PwUsers extends LitElement {
             ? html`<sl-relative-time date="${user.last_login}"></sl-relative-time>`
             : 'Never'}
         </td>
-        <td class="terms-accepted">${this.formatTermsAccepted(user.terms_accepted)}</td>
+        <td class="terms-accepted">${this.formatDate(user.terms_accepted, 'Not accepted')}</td>
+        <td class="created-at">${this.formatDate(user.created_at)}</td>
         <td class="actions">
           ${isEditing
             ? html`
@@ -267,6 +269,7 @@ export class PwUsers extends LitElement {
                 <th>Enabled</th>
                 <th>Last Login</th>
                 <th>Terms Accepted</th>
+                <th>Created</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -413,13 +416,9 @@ export class PwUsers extends LitElement {
       color: #c62828;
     }
 
-    .last-login {
-      font-size: 0.875rem;
-      color: #666;
-      min-width: 120px;
-    }
-
-    .terms-accepted {
+    .last-login,
+    .terms-accepted,
+    .created-at {
       font-size: 0.875rem;
       color: #666;
       min-width: 120px;
@@ -513,7 +512,8 @@ export class PwUsers extends LitElement {
 
       /* Hide less important columns on mobile */
       .last-login,
-      .terms-accepted {
+      .terms-accepted,
+      .created-at {
         display: none;
       }
 

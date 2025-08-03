@@ -273,6 +273,11 @@ export class PwSlideshow extends LitElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
+    // Clean up autoplay timeout when component is removed
+    if (this.autoplayTimeoutId !== null) {
+      clearTimeout(this.autoplayTimeoutId);
+      this.autoplayTimeoutId = null;
+    }
     // Clean up swipe handler when component is removed
     if (this.swipeHandler) {
       this.swipeHandler.destroy();
