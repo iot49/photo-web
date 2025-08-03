@@ -23,6 +23,7 @@ import secrets
 from contextlib import asynccontextmanager
 
 from api.login import router as login_router
+from api.terms import router as terms_router
 from api.users import router as users_router
 from authorization import get_authorization_manager
 from database import DatabaseManager, get_database_manager, init_database
@@ -110,6 +111,10 @@ app = FastAPI(
             "description": "User login, logout, and session management endpoints",
         },
         {
+            "name": "terms",
+            "description": "Terms and conditions acceptance endpoints",
+        },
+        {
             "name": "users",
             "description": "User management and administrative operations",
         },
@@ -134,6 +139,7 @@ app.add_middleware(
 # Include the API routers
 app.include_router(users_router)
 app.include_router(login_router)
+app.include_router(terms_router)
 
 
 def get_db() -> DatabaseManager:

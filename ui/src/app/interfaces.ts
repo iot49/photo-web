@@ -53,6 +53,7 @@ export interface Me {
   name?: string;
   email?: string;
   picture?: string;
+  terms_accepted: string;
 }
 
 export class SrcsetInfo {

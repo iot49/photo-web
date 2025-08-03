@@ -26,6 +26,13 @@ class UserBase(SQLModel):
         default=True, description="Whether the user account is enabled"
     )
     picture: str = Field(default="", description="URL to user's profile picture")
+    terms_accepted: str = Field(
+        default="2000-01-01",
+        description="Date when the user last accepted terms (ISO format)",
+    )
+    last_login: str = Field(
+        default="", description="Last login timestamp in UTC string format"
+    )
 
     model_config = ConfigDict(extra="ignore")
 
@@ -38,9 +45,6 @@ class User(UserBase, table=True, extend_existing=True):
     """User model for storing user authentication and authorization data."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    last_login: str = Field(
-        default="", description="Last login timestamp in UTC string format"
-    )
 
     class Config:
         """SQLModel configuration."""
@@ -72,6 +76,7 @@ class UserUpdate(SQLModel):
     roles: Optional[str] = None
     enabled: Optional[bool] = None
     picture: Optional[str] = None
+    terms_accepted: Optional[str] = None
 
 
 class UserResponse(UserBase):

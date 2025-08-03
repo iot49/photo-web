@@ -47,15 +47,24 @@ def verify_cookie(session_cookie: str) -> UserBase:
                 name=user_info.get("name"),
                 email=email,
                 picture=user_info.get("picture", ""),
-                roles="public,protected"
+                roles="public,protected",
             )
             user = db.create_user(user_data)
+            # Set initial last_login for new user
+            user = db.update_last_login(email)
+        else:
+            # Update last_login field for existing user
+            user = db.update_last_login(email)
 
-        return user if user else UserBase(
-            name=user_info.get("name"),
-            email=email,
-            picture=user_info.get("picture", ""),
-            roles="public,protected"
+        return (
+            user
+            if user
+            else UserBase(
+                name=user_info.get("name"),
+                email=email,
+                picture=user_info.get("picture", ""),
+                roles="public,protected",
+            )
         )
     except (
         auth.InvalidIdTokenError,
@@ -89,7 +98,8 @@ def verify_user(request: Request) -> UserBase:
 
         if datetime.now() - cache_time < timedelta(minutes=CACHE_VALID_MINUTES):
             # Return cached info without the internal cache timestamp
-            return UserBase(**cached_info)
+            cached_data = {k: v for k, v in cached_info.items() if k != "_cached_at"}
+            return UserBase(**cached_data)
 
     # get user info from session_cookie
     user_info = verify_cookie(session_cookie)

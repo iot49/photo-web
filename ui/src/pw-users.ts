@@ -13,6 +13,7 @@ interface User {
   uuid: string;
   picture: string;
   last_login: string;
+  terms_accepted: string;
 }
 
 /**
@@ -146,12 +147,12 @@ export class PwUsers extends LitElement {
     this.editForm = { ...this.editForm, [field]: value };
   }
 
-  private formatLastLogin(lastLogin: string): string {
-    if (!lastLogin) return 'Never';
+  private formatTermsAccepted(termsAccepted: string): string {
+    if (!termsAccepted) return 'Not accepted';
     try {
-      return new Date(lastLogin).toLocaleString();
+      return new Date(termsAccepted).toLocaleDateString();
     } catch {
-      return lastLogin;
+      return termsAccepted;
     }
   }
 
@@ -201,7 +202,12 @@ export class PwUsers extends LitElement {
               `
             : html` <span class="badge ${user.enabled ? 'enabled' : 'disabled'}"> ${user.enabled ? 'Enabled' : 'Disabled'} </span> `}
         </td>
-        <td class="last-login">${this.formatLastLogin(user.last_login)}</td>
+        <td class="last-login">
+          ${user.last_login
+            ? html`<sl-relative-time date="${user.last_login}"></sl-relative-time>`
+            : 'Never'}
+        </td>
+        <td class="terms-accepted">${this.formatTermsAccepted(user.terms_accepted)}</td>
         <td class="actions">
           ${isEditing
             ? html`
@@ -260,6 +266,7 @@ export class PwUsers extends LitElement {
                 <th>Roles</th>
                 <th>Enabled</th>
                 <th>Last Login</th>
+                <th>Terms Accepted</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -412,6 +419,12 @@ export class PwUsers extends LitElement {
       min-width: 120px;
     }
 
+    .terms-accepted {
+      font-size: 0.875rem;
+      color: #666;
+      min-width: 120px;
+    }
+
     .actions {
       white-space: nowrap;
     }
@@ -499,7 +512,8 @@ export class PwUsers extends LitElement {
       }
 
       /* Hide less important columns on mobile */
-      .last-login {
+      .last-login,
+      .terms-accepted {
         display: none;
       }
 

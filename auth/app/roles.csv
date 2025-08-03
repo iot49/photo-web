@@ -18,6 +18,7 @@ allow, /auth/firebase-config, public
 allow, /auth/login*, public, Login page
 allow, /auth/logout*, public, Logout endpoint
 allow, /auth/me, public, User info endpoint
+allow, /auth/term-accepted, public, Terms acceptance endpoint
 allow, /auth/users*, admin, User management
 allow, /auth/roles-csv, admin, Testing
 

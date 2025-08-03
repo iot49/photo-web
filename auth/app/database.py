@@ -88,7 +88,7 @@ class DatabaseManager:
             if not user:
                 return None
 
-            user.last_login = datetime.utcnow().isoformat() + "Z"
+            user.last_login = datetime.now().isoformat() + "Z"
             session.add(user)
             session.commit()
             session.refresh(user)

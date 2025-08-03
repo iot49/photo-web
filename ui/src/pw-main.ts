@@ -4,8 +4,9 @@ import { customElement, state } from 'lit/decorators.js';
 import { Albums, Me, SrcsetInfo } from './app/interfaces';
 import { provide } from '@lit/context';
 import { albumsContext, meContext, srcsetInfoContext } from './app/context';
-import { get_json } from './app/api';
+import { get_json, post_json } from './app/api';
 import { recentAlbums } from './pw-album-browser';
+import { logout } from './app/login';
 
 const DEBUG = false;
 
@@ -79,9 +80,11 @@ export class PwMain extends LitElement {
   srcsetInfo!: SrcsetInfo;
 
   @state() private isLoading = true;
+  @state() private showTermsDialog = false;
 
   private uri = '';
   private queryParams = new URLSearchParams();
+  private termsDate = '2025-08-03'; // TERMS_DATE from environment
 
   async connectedCallback() {
     super.connectedCallback();
@@ -97,6 +100,9 @@ export class PwMain extends LitElement {
     // Intercept navigation events using the modern Navigation API
     this.setupNavigationInterception();
 
+    // Check if terms need to be accepted after authentication is confirmed
+    this.checkTermsAcceptance();
+
     this.isLoading = false;
   }
 
@@ -105,6 +111,9 @@ export class PwMain extends LitElement {
       if (DEBUG) console.log('Auth state changed, refreshing albums and me');
       this.albums = await get_json('/photos/api/albums');
       this.me = await get_json('/auth/me');
+
+      // Check terms acceptance after login
+      this.checkTermsAcceptance();
 
       // NOTE: this is probably not required. Components check out state.
       // Clear component cache on auth state change to ensure components
@@ -117,6 +126,37 @@ export class PwMain extends LitElement {
     // Listen for both login and logout events with the same handler
     window.addEventListener('pw-login', refreshData);
     window.addEventListener('pw-logout', refreshData);
+  }
+
+  private checkTermsAcceptance() {
+    // Only check if user is authenticated (has email)
+    if (this.me && this.me.email) {
+      const userTermsDate = new Date(this.me.terms_accepted);
+      const requiredTermsDate = new Date(this.termsDate);
+      
+      if (userTermsDate < requiredTermsDate) {
+        this.showTermsDialog = true;
+      }
+    }
+  }
+
+  private async handleAcceptTerms() {
+    try {
+      await post_json('/auth/term-accepted');
+      // Update the me object to reflect the new terms acceptance
+      this.me = { ...this.me, terms_accepted: this.termsDate };
+      this.showTermsDialog = false;
+    } catch (error) {
+      console.error('Failed to accept terms:', error);
+      // Show error to user - could use a toast notification here
+      alert('Failed to accept terms. Please try again.');
+    }
+  }
+
+  private handleRejectTerms() {
+    // Close the dialog first, then log out the user
+    this.showTermsDialog = false;
+    logout(window.location.pathname);
   }
 
   private setupNavigationInterception() {
@@ -256,6 +296,26 @@ export class PwMain extends LitElement {
           )
         )}
       </main>
+      
+      <!-- Terms of Use Dialog -->
+      <sl-dialog
+        label="Terms of Use"
+        ?open=${this.showTermsDialog}
+        no-header
+        @sl-request-close=${(e: CustomEvent) => e.preventDefault()}
+      >
+        <h3>Terms of Use</h3>
+        <p>Terms of use: This application uses cookies and stores your name and email in a database.</p>
+        
+        <div slot="footer">
+          <sl-button variant="default" @click=${this.handleRejectTerms}>
+            Reject
+          </sl-button>
+          <sl-button variant="primary" @click=${this.handleAcceptTerms}>
+            Accept
+          </sl-button>
+        </div>
+      </sl-dialog>
     `;
   }
 
