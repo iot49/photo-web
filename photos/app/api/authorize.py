@@ -54,8 +54,24 @@ async def authorize_access(request: Request, db: DB = Depends(get_db)):
 
         if kind == "photos":
             item = db.photos.get(uuid)
+            logger.info(
+                f"Photo lookup: uuid={uuid}, item={'found' if item else 'NOT_FOUND'}"
+            )
+            if not item:
+                logger.error(
+                    f"Photo {uuid} not found in database - possible DB connection issue"
+                )
+                raise HTTPException(status_code=404, detail=f"Photo {uuid} not found")
+            logger.info(f"Photo {uuid}: realm={item.realm}, user_roles={roles}")
             if item.realm in roles:
+                logger.info(
+                    f"Access GRANTED for photo {uuid}: realm '{item.realm}' in roles {roles}"
+                )
                 return {"status": "authorized"}
+            else:
+                logger.warning(
+                    f"Access DENIED for photo {uuid}: realm '{item.realm}' not in roles {roles}"
+                )
         if kind == "albums":
             item = db.albums.get(uuid)
             if item.realm in roles:

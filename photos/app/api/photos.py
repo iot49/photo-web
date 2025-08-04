@@ -317,9 +317,14 @@ async def serve_photo_image_sized(
             detail=f"Invalid size suffix '{size_suffix}'. Valid options: '' (original), {list(SCREEN_SIZES.keys())}",
         )
 
+    logger.info(f"Serving photo {photo_id}{size_suffix} - checking database")
     photo = db.photos.get(photo_id)
     if not photo:
+        logger.error(f"Photo {photo_id} not found in database")
         raise HTTPException(status_code=404, detail="Photo not found")
+    logger.info(
+        f"Photo {photo_id} found: realm={photo.realm}, path exists={os.path.exists(photo.path) if photo.path else False}"
+    )
 
     path = photo.path
     if not path or not os.path.exists(path):

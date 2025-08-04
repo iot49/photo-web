@@ -48,6 +48,11 @@ class SharedDB:
 
     def get_db(self) -> DB:
         """Returns the shared database instance, loading it if necessary."""
+        if self._db is None:
+            logger.error(
+                "Database is None - this should not happen after initialization!"
+            )
+            self.reload_db()
         return self._db
 
     def get_scheduler(self) -> AsyncIOScheduler:
@@ -63,12 +68,18 @@ class SharedDB:
             f"Loading photos database from {photos_db_path} with filters {photos_db_filters}..."
         )
         try:
+            logger.info(f"Starting database reload from {photos_db_path}")
             self._db = read_db(photos_db_path, photos_db_filters)
             logger.info(
-                f"Database with {len(self._db.albums)} albums and {len(self._db.photos)} photos loaded."
+                f"Database reload completed: {len(self._db.albums)} albums and {len(self._db.photos)} photos loaded."
             )
         except Exception as e:
             logger.error(f"Failed to load photos database: {e}")
+            # Don't set _db to None on failure - keep the old one if it exists
+            if self._db is None:
+                logger.critical(
+                    "No database available - service will be non-functional"
+                )
             raise
 
     def start_scheduler(self) -> None:

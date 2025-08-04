@@ -139,19 +139,15 @@ export class PwSlideshow extends LitElement {
     if (this.theme === 'ken-burns') {
       if (imgElement) {
         imgElement.style.animationDuration = `${dynamicSlideMs}ms`;
-        console.log(`[DEBUG] Set ken-burns animation duration for image: ${dynamicSlideMs}ms`);
-      }
-      if (videoElement) {
-        videoElement.style.animationDuration = `${dynamicSlideMs}ms`;
-        console.log(`[DEBUG] Set ken-burns animation duration for video: ${dynamicSlideMs}ms, readyState=${videoElement.readyState}, paused=${videoElement.paused}`, videoElement.src);
         
+      }
+      // Videos in ken-burns mode don't get animations, but still need to be played
+      if (videoElement) {
         // Attempt to play video if it's ready
         if (videoElement.readyState >= 2) { // HAVE_CURRENT_DATA or higher
           videoElement.play().catch(error => {
-            console.error(`[DEBUG] Failed to play video in ken-burns goto:`, error, videoElement.src);
+            console.warn('Failed to play video:', error);
           });
-        } else {
-          console.log(`[DEBUG] Video not ready to play in ken-burns goto, readyState=${videoElement.readyState}`, videoElement.src);
         }
       }
     }
@@ -176,7 +172,9 @@ export class PwSlideshow extends LitElement {
           }
         }, SLIDE_MS);
       } else {
-        this.autoplayTimeoutId = window.setTimeout(() => this.goto(nextIndex + 1), dynamicSlideMs - TRANSITION_MS);
+        const timeoutMs = dynamicSlideMs - TRANSITION_MS;
+        
+        this.autoplayTimeoutId = window.setTimeout(() => this.goto(nextIndex + 1), timeoutMs);
       }
     }
   };
@@ -187,29 +185,24 @@ export class PwSlideshow extends LitElement {
   private calculateSlideDuration(slide: HTMLElement): number {
     const videoElement = slide.querySelector('video') as HTMLVideoElement;
     const imgElement = slide.querySelector('img') as HTMLElement;
-    
-    // Get dynamic time factor from CSS custom property (applies to both images and videos)
-    let dynamicTimeFactor = 1.0;
-    const mediaElement = imgElement || videoElement;
-    if (mediaElement) {
-      const customProperty = getComputedStyle(mediaElement).getPropertyValue('--data-dynamic-time-factor');
-      if (customProperty) dynamicTimeFactor = parseFloat(customProperty) || 1.0;
-    }
 
     if (videoElement) {
-      // For videos: use max of SLIDE_MS, video duration, or HTML data attribute, then apply dynamic factor
+      // For videos: use max of SLIDE_MS, video duration, or HTML data attribute (no dynamic factor)
       const videoDurationMs = videoElement.duration ? videoElement.duration * 1000 : SLIDE_MS;
       const htmlDuration = videoElement.dataset.duration ? parseInt(videoElement.dataset.duration) : 0;
-      const baseDuration = Math.max(SLIDE_MS, videoDurationMs, htmlDuration) * dynamicTimeFactor;
-      
-      console.log(`[DEBUG] Video duration calculation: duration=${videoElement.duration}s, durationMs=${videoDurationMs}ms, htmlDuration=${htmlDuration}ms, baseDuration=${baseDuration}ms, readyState=${videoElement.readyState}`, videoElement.src);
+      const baseDuration = Math.max(SLIDE_MS, videoDurationMs, htmlDuration);
       
       // Set up video looping for short videos
-      videoElement.loop = videoDurationMs < SLIDE_MS;
+      const shouldLoop = videoDurationMs < SLIDE_MS;
+      videoElement.loop = shouldLoop;
       
       return baseDuration;
     } else if (imgElement) {
-      // For images: use dynamic time factor from CSS custom property
+      // For images: get dynamic time factor from CSS custom property
+      let dynamicTimeFactor = 1.0;
+      const customProperty = getComputedStyle(imgElement).getPropertyValue('--data-dynamic-time-factor');
+      if (customProperty) dynamicTimeFactor = parseFloat(customProperty) || 1.0;
+      
       return SLIDE_MS * dynamicTimeFactor;
     }
     
@@ -235,16 +228,15 @@ export class PwSlideshow extends LitElement {
         const imgElement = currentSlide?.querySelector('img') as HTMLElement;
         const videoElement = currentSlide?.querySelector('video') as HTMLVideoElement;
 
-        // Resume ken-burns animation if in ken-burns mode
+        // Resume ken-burns animation if in ken-burns mode (images only)
         if (this.theme === 'ken-burns' && imgElement) {
           imgElement.style.animationPlayState = 'running';
         }
         
         // Resume video playback if it's a video
         if (videoElement) {
-          console.log(`[DEBUG] Attempting to play video in autoplay toggle: readyState=${videoElement.readyState}, paused=${videoElement.paused}`, videoElement.src);
           videoElement.play().catch(error => {
-            console.error(`[DEBUG] Failed to play video in autoplay toggle:`, error, videoElement.src);
+            console.warn('Failed to resume video playback:', error);
           });
         }
 
@@ -310,46 +302,42 @@ export class PwSlideshow extends LitElement {
     }
   }
 
-  // Video event handlers for debugging
-  private handleVideoLoadedMetadata(e: Event) {
-    const video = e.target as HTMLVideoElement;
-    console.log(`[DEBUG] Video metadata loaded: duration=${video.duration}s, readyState=${video.readyState}`, video.src);
-  }
-
   private handleVideoCanPlay(e: Event) {
     const video = e.target as HTMLVideoElement;
-    console.log(`[DEBUG] Video can play: duration=${video.duration}s, readyState=${video.readyState}, theme=${this.theme}`, video.src);
     
     // Try to play video immediately when it can play in ken-burns mode
     if (this.theme === 'ken-burns') {
       const slideWrapper = video.closest('.slide-wrapper') as HTMLElement;
       if (slideWrapper && slideWrapper.classList.contains('next')) {
-        console.log(`[DEBUG] Attempting to play video in ken-burns mode (slide is active)`);
         video.play().catch(error => {
-          console.error(`[DEBUG] Failed to auto-play video in ken-burns canplay:`, error, video.src);
+          console.warn('Failed to play video on canplay:', error);
         });
       }
     }
   }
 
-  private handleVideoPlay(e: Event) {
-    const video = e.target as HTMLVideoElement;
-    console.log(`[DEBUG] Video started playing: currentTime=${video.currentTime}s, paused=${video.paused}`, video.src);
-  }
-
-  private handleVideoPause(e: Event) {
-    const video = e.target as HTMLVideoElement;
-    console.log(`[DEBUG] Video paused: currentTime=${video.currentTime}s, paused=${video.paused}`, video.src);
-  }
-
   private handleVideoEnded(e: Event) {
     const video = e.target as HTMLVideoElement;
-    console.log(`[DEBUG] Video ended: currentTime=${video.currentTime}s, duration=${video.duration}s`, video.src);
+    
+    // If autoplay is enabled and this video is not set to loop, advance to next slide
+    if (this.autoplay && !video.loop) {
+      const slideWrapper = video.closest('.slide-wrapper') as HTMLElement;
+      if (slideWrapper && slideWrapper.classList.contains('next')) {
+        // Clear any existing autoplay timeout to prevent double-advancement
+        if (this.autoplayTimeoutId !== null) {
+          clearTimeout(this.autoplayTimeoutId);
+          this.autoplayTimeoutId = null;
+        }
+        
+        // Advance to next slide immediately
+        this.goto(this.currentIndex + 1);
+      }
+    }
   }
 
   private handleVideoError(e: Event) {
     const video = e.target as HTMLVideoElement;
-    console.error(`[DEBUG] Video error: readyState=${video.readyState}, networkState=${video.networkState}`, video.error, video.src);
+    console.error('Video error:', video.error);
   }
 
   private setupSwipeHandlers() {
@@ -463,12 +451,6 @@ export class PwSlideshow extends LitElement {
         style="${style}"
       />`;
     } else if (mime_type.startsWith('video')) {
-      // Calculate dynamic slide time factor and store as CSS custom property for videos too
-      const dynamicTimeFactor = this.calculateDynamicSlideTimeFactorForPhoto(photo);
-      const style = `--data-dynamic-time-factor: ${dynamicTimeFactor}`;
-
-      console.log(`[DEBUG] Creating video element for ${photo.title || 'Video'} in theme=${this.theme}, dynamicTimeFactor=${dynamicTimeFactor}`, uri);
-      
       return html`
         <video
           src=${uri}
@@ -477,11 +459,7 @@ export class PwSlideshow extends LitElement {
           muted
           preload="metadata"
           title="${photo.title || 'Video'}"
-          style="${style}"
-          @loadedmetadata=${(e: Event) => this.handleVideoLoadedMetadata(e)}
           @canplay=${(e: Event) => this.handleVideoCanPlay(e)}
-          @play=${(e: Event) => this.handleVideoPlay(e)}
-          @pause=${(e: Event) => this.handleVideoPause(e)}
           @ended=${(e: Event) => this.handleVideoEnded(e)}
           @error=${(e: Event) => this.handleVideoError(e)}
         >
@@ -547,6 +525,7 @@ export class PwSlideshow extends LitElement {
         display: flex;
         align-items: center;
         justify-content: center;
+        background: black;
       }
 
       .slide-wrapper img,
@@ -640,59 +619,56 @@ export class PwSlideshow extends LitElement {
         animation-timing-function: linear;
       }
 
-      :host([theme='ken-burns']) .slide-wrapper img,
-      :host([theme='ken-burns']) .slide-wrapper video {
+      /* Ken burns mode: images get cover + animations, videos get contain (like carousel) */
+      :host([theme='ken-burns']) .slide-wrapper img {
         object-fit: cover;
       }
 
-      /* Position-dependent starting positions and animations */
-      :host([theme='ken-burns']) .slide-wrapper:nth-child(4n + 1) img,
-      :host([theme='ken-burns']) .slide-wrapper:nth-child(4n + 1) video {
+      :host([theme='ken-burns']) .slide-wrapper video {
+        object-fit: contain;
+        object-position: 50% 50%;
+      }
+
+      /* Position-dependent starting positions for images only */
+      :host([theme='ken-burns']) .slide-wrapper:nth-child(4n + 1) img {
         object-position: top left;
       }
 
-      :host([theme='ken-burns']) .slide-wrapper:nth-child(4n + 2) img,
-      :host([theme='ken-burns']) .slide-wrapper:nth-child(4n + 2) video {
+      :host([theme='ken-burns']) .slide-wrapper:nth-child(4n + 2) img {
         object-position: bottom right;
       }
 
-      :host([theme='ken-burns']) .slide-wrapper:nth-child(4n + 3) img,
-      :host([theme='ken-burns']) .slide-wrapper:nth-child(4n + 3) video {
+      :host([theme='ken-burns']) .slide-wrapper:nth-child(4n + 3) img {
         object-position: bottom left;
       }
 
-      :host([theme='ken-burns']) .slide-wrapper:nth-child(4n + 4) img,
-      :host([theme='ken-burns']) .slide-wrapper:nth-child(4n + 4) video {
+      :host([theme='ken-burns']) .slide-wrapper:nth-child(4n + 4) img {
         object-position: top right;
       }
 
-      /* Position-dependent animations for active slides */
-      :host([theme='ken-burns']) .next:nth-child(4n + 1) img,
-      :host([theme='ken-burns']) .next:nth-child(4n + 1) video {
+      /* Position-dependent animations for images only (videos excluded) */
+      :host([theme='ken-burns']) .next:nth-child(4n + 1) img {
         animation-name: ken-burns-pan-1, ken-burns-scale;
         animation-fill-mode: forwards;
         animation-timing-function: linear;
         /* animation-duration set dynamically via JavaScript */
       }
 
-      :host([theme='ken-burns']) .next:nth-child(4n + 2) img,
-      :host([theme='ken-burns']) .next:nth-child(4n + 2) video {
+      :host([theme='ken-burns']) .next:nth-child(4n + 2) img {
         animation-name: ken-burns-pan-2, ken-burns-scale;
         animation-fill-mode: forwards;
         animation-timing-function: linear;
         /* animation-duration set dynamically via JavaScript */
       }
 
-      :host([theme='ken-burns']) .next:nth-child(4n + 3) img,
-      :host([theme='ken-burns']) .next:nth-child(4n + 3) video {
+      :host([theme='ken-burns']) .next:nth-child(4n + 3) img {
         animation-name: ken-burns-pan-3, ken-burns-scale;
         animation-fill-mode: forwards;
         animation-timing-function: linear;
         /* animation-duration set dynamically via JavaScript */
       }
 
-      :host([theme='ken-burns']) .next:nth-child(4n + 4) img,
-      :host([theme='ken-burns']) .next:nth-child(4n + 4) video {
+      :host([theme='ken-burns']) .next:nth-child(4n + 4) img {
         animation-name: ken-burns-pan-4, ken-burns-scale;
         animation-fill-mode: forwards;
         animation-timing-function: linear;
