@@ -16,6 +16,8 @@ test_delegation.py
 test_photo_authorization.py
 TODO.md
 package-lock.json 
+debug_access_denied.sh
+monitor_logs.sh
 
 # machine generated data
 __pycache__/
