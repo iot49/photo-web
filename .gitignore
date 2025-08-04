@@ -15,7 +15,7 @@ test_auth.py
 test_delegation.py
 test_photo_authorization.py
 TODO.md
-
+package-lock.json 
 
 # machine generated data
 __pycache__/
