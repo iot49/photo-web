@@ -9,14 +9,68 @@ from sqlmodel import Session, SQLModel, create_engine, select
 class DatabaseManager:
     """Database manager for SQLite operations."""
 
-    def __init__(self, database_url: str = "sqlite:///./auth.db"):
-        """Initialize database connection."""
+    def __init__(self, database_url: str):
+        """Initialize database connection.
+
+        Args:
+            database_url: SQLite database URL (e.g., 'sqlite:///./data/auth.db')
+        """
         self.engine = create_engine(database_url, echo=False)
         self.create_tables()
 
     def create_tables(self):
         """Create database tables."""
         SQLModel.metadata.create_all(self.engine)
+        self._migrate_config_column()
+
+    def _migrate_config_column(self):
+        """Add config column to existing user table if it doesn't exist."""
+        import logging
+        import traceback
+
+        logger = logging.getLogger(__name__)
+
+        try:
+            from sqlalchemy import text
+
+            with self.get_session() as session:
+                # Check if config column exists
+                result = session.execute(text("PRAGMA table_info(user)"))
+                columns = result.fetchall()
+                column_names = [col[1] for col in columns]
+
+                logger.warning(f"MIGRATION: Current user table columns: {column_names}")
+
+                if "config" not in column_names:
+                    logger.warning(
+                        "MIGRATION: Adding missing 'config' column to user table..."
+                    )
+                    # Add the config column with default value
+                    session.execute(
+                        text("ALTER TABLE user ADD COLUMN config TEXT DEFAULT '{}'")
+                    )
+                    session.commit()
+                    logger.warning(
+                        "MIGRATION: ✓ Successfully added 'config' column to user table"
+                    )
+
+                    # Verify the column was added
+                    result = session.execute(text("PRAGMA table_info(user)"))
+                    columns = result.fetchall()
+                    new_column_names = [col[1] for col in columns]
+                    logger.warning(
+                        f"MIGRATION: Updated user table columns: {new_column_names}"
+                    )
+                else:
+                    logger.warning(
+                        "MIGRATION: ✓ 'config' column already exists in user table"
+                    )
+
+        except Exception as e:
+            logger.error(f"MIGRATION ERROR: Error during config column migration: {e}")
+            logger.error(f"MIGRATION ERROR: Traceback: {traceback.format_exc()}")
+            # Don't raise the exception - let the app continue to work
+            # The column will be created by SQLModel on next restart
 
     def get_session(self):
         """Get database session."""
@@ -153,8 +207,10 @@ def get_database_manager() -> DatabaseManager:
     """Get the global database manager instance."""
     global db_manager
     if db_manager is None:
-        # Get database URL from environment or use default
-        database_url = os.getenv("DATABASE_URL", "sqlite:///./auth.db")
+        # Get database URL from environment (required)
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise ValueError("DATABASE_URL environment variable is required")
         db_manager = DatabaseManager(database_url)
     return db_manager
 

@@ -15,6 +15,7 @@ Key Features:
 Environment Variables:
 - AUTH_COOKIE_EXPIRATION_DAYS: Session cookie expiration (default: 14 days)
 - ROOT_DOMAIN: Domain for session cookies (default: dev49.org)
+- DATABASE_URL: SQLite database URL (default: sqlite:///./data/auth.db)
 """
 
 import json
