@@ -7,7 +7,10 @@ from typing import Optional
 from doc_utils import dedent_and_convert_to_html
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
-from imagemagick_service import process_image_with_imagemagick_service
+from imagemagick_service import (
+    process_image_with_imagemagick_service,
+    process_pdf_with_imagemagick_service,
+)
 from models import DB
 
 logger = logging.getLogger(__name__)
@@ -148,6 +151,7 @@ def process_image_with_imagemagick(
     
     **Format Handling:**
     - HEIC images automatically converted to JPEG using ImageMagick
+    - PDF files automatically converted to PNG using ImageMagick
     - Other formats served as-is when possible
     - Quality parameter applies only to JPEG conversion
     
@@ -192,6 +196,96 @@ def process_image_with_imagemagick(
         },
     },
 )
+async def serve_photo_image_original(
+    photo_id: str,
+    request: Request,
+    quality: Optional[int] = Query(
+        85, ge=1, le=100, description="JPEG quality (1-100) for image conversion"
+    ),
+    db: DB = Depends(get_db),
+):
+    """
+    Serve the original full-resolution photo image or PDF.
+
+    Returns the photo in its original resolution and format, with automatic
+    format conversion from HEIC to JPEG and PDF to PNG for browser compatibility.
+
+    Args:
+        photo_id: The UUID of the photo to serve
+        quality: JPEG quality (1-100, default 85) for image conversion
+        db: Photos database dependency
+
+    Returns:
+        Original image as JPEG/PNG/TIFF or converted format for compatibility.
+        PDFs are converted to PNG, HEIC images converted to JPEG.
+
+    Raises:
+        HTTPException: 404 for missing photo/file, 500 for processing errors
+    """
+    logger.info(f"Serving original photo {photo_id} - checking database")
+    photo = db.photos.get(photo_id)
+    if not photo:
+        logger.error(f"Photo {photo_id} not found in database")
+        raise HTTPException(status_code=404, detail="Photo not found")
+
+    logger.info(
+        f"Photo {photo_id} found: realm={photo.realm}, path exists={os.path.exists(photo.path) if photo.path else False}"
+    )
+
+    path = photo.path
+    if not path or not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Photo file not found")
+
+    # Check if this is a PDF file (check both UTI and MIME type)
+    is_pdf = (
+        photo.uti == "com.adobe.pdf"
+        or photo.mime_type == "application/pdf"
+        or (photo.path and photo.path.lower().endswith(".pdf"))
+    )
+
+    logger.debug(
+        f"Original PDF detection: uti='{photo.uti}', mime_type='{photo.mime_type}', "
+        f"path='{photo.path}', is_pdf={is_pdf}"
+    )
+
+    # Check if format conversion is needed (HEIC/TIFF always need conversion to JPEG)
+    needs_conversion = photo.uti in ["public.heic", "public.tiff"]
+
+    # Process if conversion is needed or if it's a PDF
+    needs_processing = needs_conversion or is_pdf
+
+    if not needs_processing:
+        logger.info("No processing needed, returning original file")
+        return FileResponse(path, media_type=photo.mime_type)
+
+    # Process based on file type
+    try:
+        if is_pdf:
+            logger.debug("Processing original PDF with ImageMagick service")
+            image_bytes = process_pdf_with_imagemagick_service(
+                path, photo.width, photo.height, quality, None
+            )
+            media_type = "image/png"
+            logger.info(
+                f"ImageMagick processed original PDF: {photo.width}x{photo.height} (PNG)"
+            )
+        else:
+            logger.debug("Processing original image with ImageMagick service")
+            image_bytes = process_image_with_imagemagick_service(
+                path, photo.width, photo.height, quality, None
+            )
+            media_type = "image/jpeg"
+            logger.info(
+                f"ImageMagick processed original: {photo.width}x{photo.height} (quality: {quality})"
+            )
+
+        return StreamingResponse(io.BytesIO(image_bytes), media_type=media_type)
+
+    except Exception as e:
+        logger.error(f"Error processing original image {path}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
+
+
 @router.get(
     "/api/photos/{photo_id}/img{size_suffix}",
     tags=["photos"],
@@ -216,6 +310,7 @@ def process_image_with_imagemagick(
     - Smaller sizes use lower quality for faster loading
     - Larger sizes maintain higher quality for detail
     - HEIC images always converted to JPEG using ImageMagick
+    - PDF files converted to PNG using ImageMagick
     
     **Caching:**
     - Processed images cached at multiple levels
@@ -231,10 +326,10 @@ def process_image_with_imagemagick(
     responses={
         200: {
             "description": "Scaled photo image successfully served",
-            "content": {"image/jpeg": {}},
+            "content": {"image/jpeg": {}, "image/png": {}},
             "headers": {
                 "Content-Type": {
-                    "description": "Always image/jpeg for scaled images",
+                    "description": "image/jpeg for images, image/png for PDFs",
                     "schema": {"type": "string", "example": "image/jpeg"},
                 },
                 "Cache-Control": {
@@ -289,20 +384,20 @@ async def serve_photo_image_sized(
     db: DB = Depends(get_db),
 ):
     """
-    Serve a photo image scaled to common screen sizes using ImageMagick.
+    Serve a photo image or PDF scaled to common screen sizes using ImageMagick.
 
     Provides responsive image serving with automatic scaling and format
-    conversion. Supports all image formats including HEIC through ImageMagick.
+    conversion. Supports all image formats including HEIC and PDF files through ImageMagick.
 
     Args:
         photo_id: The UUID of the photo to serve
         size_suffix: Size suffix like "-sm", "-md", etc. (empty for original)
-        quality: JPEG quality (1-100, default 75)
+        quality: JPEG quality (1-100, default 75) - applies to images only
         test: When true, embed size-suffix text overlay for debugging
         db: Photos database dependency
 
     Returns:
-        Image scaled to the specified dimensions as JPEG.
+        Image scaled to the specified dimensions as JPEG for images or PNG for PDFs.
         No upscaling is performed - smaller originals returned at native size.
         Test mode adds size-suffix text overlay in lower right corner.
 
@@ -353,6 +448,18 @@ async def serve_photo_image_sized(
             f"URL: {request.url}  Query params: {dict(request.query_params)} test-enabled: {test}"
         )
 
+        # Check if this is a PDF file (check both UTI and MIME type)
+        is_pdf = (
+            photo.uti == "com.adobe.pdf"
+            or photo.mime_type == "application/pdf"
+            or (photo.path and photo.path.lower().endswith(".pdf"))
+        )
+
+        logger.debug(
+            f"PDF detection: uti='{photo.uti}', mime_type='{photo.mime_type}', "
+            f"path='{photo.path}', is_pdf={is_pdf}"
+        )
+
         # Check if format conversion is needed (HEIC/TIFF always need conversion to JPEG)
         needs_conversion = photo.uti in ["public.heic", "public.tiff"]
 
@@ -362,11 +469,11 @@ async def serve_photo_image_sized(
         )
 
         logger.debug(
-            f"Processing flags: needs_conversion={needs_conversion}, needs_scaling={needs_scaling}, test={test}"
+            f"Processing flags: is_pdf={is_pdf}, needs_conversion={needs_conversion}, needs_scaling={needs_scaling}, test={test}"
         )
 
-        # Process image if conversion, scaling, or test overlay is needed
-        needs_processing = needs_conversion or needs_scaling or test
+        # Process image if conversion, scaling, test overlay is needed, or if it's a PDF
+        needs_processing = needs_conversion or needs_scaling or test or is_pdf
 
         if not needs_processing:
             logger.info("No processing needed, returning original file")
@@ -379,18 +486,28 @@ async def serve_photo_image_sized(
             size_suffix if test and size_suffix else ("original" if test else None)
         )
 
-        # Process with ImageMagick service - this is the only processing method available
-        logger.debug("Processing image with ImageMagick service")
-        image_bytes = process_image_with_imagemagick_service(
-            path, width, height, quality, test_overlay
-        )
-
-        logger.info(
-            f"ImageMagick processed: {photo.width}x{photo.height} -> {width}x{height} (quality: {quality})"
-        )
+        # Process based on file type
+        if is_pdf:
+            logger.debug("Processing PDF with ImageMagick service")
+            image_bytes = process_pdf_with_imagemagick_service(
+                path, width, height, quality, test_overlay
+            )
+            media_type = "image/png"
+            logger.info(
+                f"ImageMagick processed PDF: {photo.width}x{photo.height} -> {width}x{height} (PNG)"
+            )
+        else:
+            logger.debug("Processing image with ImageMagick service")
+            image_bytes = process_image_with_imagemagick_service(
+                path, width, height, quality, test_overlay
+            )
+            media_type = "image/jpeg"
+            logger.info(
+                f"ImageMagick processed: {photo.width}x{photo.height} -> {width}x{height} (quality: {quality})"
+            )
 
         # Return the processed image
-        return StreamingResponse(io.BytesIO(image_bytes), media_type="image/jpeg")
+        return StreamingResponse(io.BytesIO(image_bytes), media_type=media_type)
 
     except Exception as e:
         logger.error(f"Error processing image {path}: {e}")

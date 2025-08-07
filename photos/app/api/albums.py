@@ -106,10 +106,18 @@ async def get_album_details(
 
     logger.debug(f"User accessing album {album_uuid}")
 
-    return [
-        PhotoModel.model_validate(db.photos.get(photo_uuid))
-        for photo_uuid in album.photos
-    ]
+    photos = []
+    for photo_uuid in album.photos:
+        photo_data = db.photos.get(photo_uuid)
+        photo_model = PhotoModel.model_validate(photo_data)
+
+        # Convert PDF MIME type to image/png since PDFs are served as PNG images
+        if photo_model.mime_type == "application/pdf":
+            photo_model.mime_type = "image/png"
+
+        photos.append(photo_model)
+
+    return photos
 
 
 @router.get(

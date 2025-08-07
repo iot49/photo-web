@@ -223,3 +223,170 @@ def check_imagemagick_service() -> bool:
     except Exception as e:
         logger.error(f"Failed to check ImageMagick service: {str(e)}")
         return False
+
+
+def process_pdf_with_imagemagick_service(
+    input_path: str,
+    width: int,
+    height: int,
+    quality: int = 85,
+    test_overlay: Optional[str] = None,
+) -> bytes:
+    """
+    Process PDF files by converting the first page to PNG using the ImageMagick Docker service.
+
+    Args:
+        input_path: Path to the input PDF file
+        width: Target width in pixels
+        height: Target height in pixels
+        quality: Not used for PNG output, kept for API compatibility
+        test_overlay: Optional text to overlay for testing
+
+    Returns:
+        bytes: Processed image as PNG bytes
+
+    Raises:
+        HTTPException: If PDF processing fails
+    """
+    try:
+        # Create unique temporary directory for this operation
+        with tempfile.TemporaryDirectory(prefix="imagemagick_pdf_") as temp_dir:
+            # Copy input file to temp directory with a clean name
+            temp_input = os.path.join(temp_dir, "input.pdf")
+            temp_output = os.path.join(temp_dir, "output.png")
+
+            shutil.copy2(input_path, temp_input)
+
+            # Build ImageMagick command for PDF to PNG conversion
+            magick_cmd = [
+                "magick",
+                f"/images/{os.path.basename(temp_input)}[0]",  # [0] selects first page
+                "-density",
+                "300",  # High DPI for good quality
+                "-auto-orient",  # Handle orientation
+                "-resize",
+                f"{width}x{height}>",  # Don't upscale (> means only shrink)
+                "-strip",  # Remove metadata for smaller file size
+                "-background",
+                "white",  # Set background color for transparency
+                "-alpha",
+                "remove",  # Remove alpha channel for consistent output
+            ]
+
+            # Add test overlay if requested
+            if test_overlay:
+                # Calculate font size based on image width (5% of width, min 20, max 100)
+                font_size = max(20, min(100, int(0.05 * width)))
+                magick_cmd.extend(
+                    [
+                        "-gravity",
+                        "SouthEast",
+                        "-pointsize",
+                        str(font_size),
+                        "-fill",
+                        "black",
+                        "-stroke",
+                        "white",
+                        "-strokewidth",
+                        "2",
+                        "-annotate",
+                        "+50+50",
+                        test_overlay,
+                    ]
+                )
+
+            # Output file
+            magick_cmd.append(f"/images/{os.path.basename(temp_output)}")
+
+            # Convert the input path to the ImageMagick container's perspective
+            if input_path.startswith("/photo_db"):
+                # Already in the correct format for ImageMagick container
+                container_input_path = input_path
+            else:
+                # This shouldn't happen with the new setup, but handle it gracefully
+                container_input_path = input_path
+
+            # Create output file in shared volume for result
+            shared_dir = "/tmp/imagemagick"
+            os.makedirs(shared_dir, exist_ok=True)
+
+            # Generate unique filename to avoid conflicts
+            timestamp = str(int(time.time() * 1000000))
+            shared_output = os.path.join(shared_dir, f"output_{timestamp}.png")
+
+            # Update magick command to use direct input path and shared output
+            magick_cmd[1] = f"{container_input_path}[0]"  # [0] for first page
+            magick_cmd[-1] = f"/images/{os.path.basename(shared_output)}"
+
+            # Execute command in ImageMagick container
+            docker_cmd = ["docker", "exec", "imagemagick"] + magick_cmd
+
+            logger.debug(
+                f"Running ImageMagick PDF service command: {' '.join(docker_cmd)}"
+            )
+
+            # Execute the command
+            result = subprocess.run(
+                docker_cmd,
+                capture_output=True,
+                text=True,
+                timeout=60,  # 60 second timeout
+            )
+
+            if result.returncode != 0:
+                error_msg = result.stderr or result.stdout or "Unknown error"
+                logger.error(f"ImageMagick PDF service command failed: {error_msg}")
+
+                # Check for specific PDF-related errors
+                if (
+                    "no decode delegate" in error_msg.lower()
+                    or "pdf" in error_msg.lower()
+                ):
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"PDF format processing failed: {error_msg}. This may indicate PDF support issues.",
+                    )
+                else:
+                    raise HTTPException(
+                        status_code=500, detail=f"PDF processing failed: {error_msg}"
+                    )
+
+            # Read the processed image from shared volume
+            if not os.path.exists(shared_output):
+                raise HTTPException(
+                    status_code=500,
+                    detail="ImageMagick PDF processing completed but output file not found",
+                )
+
+            with open(shared_output, "rb") as f:
+                image_bytes = f.read()
+
+            # Clean up shared files
+            try:
+                os.remove(shared_output)
+            except OSError:
+                pass  # Ignore cleanup errors
+
+            logger.info(
+                f"ImageMagick service processed PDF: {input_path} -> {width}x{height} (PNG)"
+            )
+            return image_bytes
+
+    except subprocess.TimeoutExpired:
+        logger.error(
+            f"ImageMagick PDF service command timed out for file: {input_path}"
+        )
+        raise HTTPException(status_code=500, detail="PDF processing timed out")
+    except FileNotFoundError:
+        logger.error(
+            "Docker command not found - ensure Docker is installed and running"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Docker not available - PDF processing service unavailable",
+        )
+    except Exception as e:
+        logger.error(
+            f"Unexpected error in ImageMagick PDF service processing: {str(e)}"
+        )
+        raise HTTPException(status_code=500, detail=f"PDF processing error: {str(e)}")
