@@ -422,7 +422,7 @@ async def authorize_access(request: Request) -> AuthorizationResponse:
             f"uri={uri} realm={realm} roles={roles} authorize={realm in roles}"
         )
 
-        if realm in roles:
+        if realm.lower() in roles:
             return AuthorizationResponse(status=f"authorized {uri} {realm} in {roles}")
 
         raise HTTPException(
