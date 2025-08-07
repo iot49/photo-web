@@ -28,3 +28,6 @@ nginx/html/ui/
 nginx/html/static/docs/
 auth.db
 uv.lock
+
+# podman/container configuration
+.config/

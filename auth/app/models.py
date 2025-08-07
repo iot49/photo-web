@@ -37,6 +37,10 @@ class UserBase(SQLModel):
     last_login: str = Field(
         default="", description="Last login timestamp in UTC string format"
     )
+    config: str = Field(
+        default="{}",
+        description="User configuration as JSON string (default: empty dict)",
+    )
 
     model_config = ConfigDict(extra="ignore")
 
@@ -63,6 +67,7 @@ class User(UserBase, table=True, extend_existing=True):
                 "logged_in": True,
                 "picture": "https://example.com/profile.jpg",
                 "created_at": "2025-01-01",
+                "config": '{"theme": "dark", "autoplay": true}',
             }
         }
 
@@ -83,6 +88,7 @@ class UserUpdate(SQLModel):
     picture: Optional[str] = None
     terms_accepted: Optional[str] = None
     created_at: Optional[str] = None
+    config: Optional[str] = None
 
 
 class UserResponse(UserBase):
