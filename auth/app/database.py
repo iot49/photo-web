@@ -21,10 +21,9 @@ class DatabaseManager:
     def create_tables(self):
         """Create database tables."""
         SQLModel.metadata.create_all(self.engine)
-        self._migrate_config_column()
 
-    def _migrate_config_column(self):
-        """Add config column to existing user table if it doesn't exist."""
+    def run_migrations(self):
+        """Run database migrations. Should be called once during application startup."""
         import logging
         import traceback
 
@@ -34,12 +33,37 @@ class DatabaseManager:
             from sqlalchemy import text
 
             with self.get_session() as session:
+                # Create migrations table if it doesn't exist
+                session.execute(
+                    text("""
+                    CREATE TABLE IF NOT EXISTS migrations (
+                        id INTEGER PRIMARY KEY,
+                        name TEXT UNIQUE NOT NULL,
+                        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                )
+
+                # Check if config column migration has already been applied
+                result = session.execute(
+                    text(
+                        "SELECT COUNT(*) FROM migrations WHERE name = 'add_config_column'"
+                    )
+                )
+                migration_exists = result.scalar() > 0
+
+                if migration_exists:
+                    logger.warning(
+                        "MIGRATION: ✓ 'config' column migration already applied"
+                    )
+                    return
+
+                logger.warning("MIGRATION: Starting config column migration...")
+
                 # Check if config column exists
                 result = session.execute(text("PRAGMA table_info(user)"))
                 columns = result.fetchall()
                 column_names = [col[1] for col in columns]
-
-                logger.warning(f"MIGRATION: Current user table columns: {column_names}")
 
                 if "config" not in column_names:
                     logger.warning(
@@ -49,28 +73,23 @@ class DatabaseManager:
                     session.execute(
                         text("ALTER TABLE user ADD COLUMN config TEXT DEFAULT '{}'")
                     )
-                    session.commit()
                     logger.warning(
                         "MIGRATION: ✓ Successfully added 'config' column to user table"
                     )
 
-                    # Verify the column was added
-                    result = session.execute(text("PRAGMA table_info(user)"))
-                    columns = result.fetchall()
-                    new_column_names = [col[1] for col in columns]
-                    logger.warning(
-                        f"MIGRATION: Updated user table columns: {new_column_names}"
-                    )
-                else:
-                    logger.warning(
-                        "MIGRATION: ✓ 'config' column already exists in user table"
-                    )
+                # Record that this migration has been applied
+                session.execute(
+                    text("INSERT INTO migrations (name) VALUES ('add_config_column')")
+                )
+                session.commit()
+                logger.warning(
+                    "MIGRATION: ✓ Config column migration completed and recorded"
+                )
 
         except Exception as e:
             logger.error(f"MIGRATION ERROR: Error during config column migration: {e}")
             logger.error(f"MIGRATION ERROR: Traceback: {traceback.format_exc()}")
             # Don't raise the exception - let the app continue to work
-            # The column will be created by SQLModel on next restart
 
     def get_session(self):
         """Get database session."""
@@ -216,5 +235,6 @@ def get_database_manager() -> DatabaseManager:
 
 
 def init_database():
-    """Initialize the database."""
-    get_database_manager()
+    """Initialize the database and run migrations."""
+    db_manager = get_database_manager()
+    db_manager.run_migrations()

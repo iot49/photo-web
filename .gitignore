@@ -18,6 +18,7 @@ TODO.md
 package-lock.json 
 debug_access_denied.sh
 monitor_logs.sh
+TEST.md
 
 # machine generated data
 __pycache__/
@@ -29,5 +30,3 @@ nginx/html/static/docs/
 auth.db
 uv.lock
 
-# podman/container configuration
-.config/

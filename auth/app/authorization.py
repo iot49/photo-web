@@ -146,8 +146,13 @@ class AuthorizationManager:
         if not request:
             logger.error("Request object required for delegation but not provided")
             return False
+
+        logger.warning(
+            f"DELEGATION: Starting delegation to {rule.delegation_url} for URI {uri}"
+        )
         try:
             delegation_url = rule.delegation_url
+            logger.warning(f"DELEGATION: Attempting connection to {delegation_url}")
             # Prepare headers to forward to delegation service
             headers = {
                 "X-Forwarded-Uri": uri,
@@ -180,18 +185,18 @@ class AuthorizationManager:
 
                 return authorized
 
-        except httpx.TimeoutException:
+        except httpx.TimeoutException as e:
             logger.error(
-                f"Timeout when delegating authorization to {rule.delegation_url}", e
+                f"DELEGATION ERROR: Timeout when delegating authorization to {rule.delegation_url}: {e}"
             )
             return False
         except httpx.RequestError as e:
             logger.error(
-                f"Error delegating authorization to {rule.delegation_url}: {e}", e
+                f"DELEGATION ERROR: Request error when delegating authorization to {rule.delegation_url}: {e}"
             )
             return False
         except Exception as e:
-            logger.error(f"Unexpected error during delegation: {e}", e)
+            logger.error(f"DELEGATION ERROR: Unexpected error during delegation: {e}")
             return False
 
 

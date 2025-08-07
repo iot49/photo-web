@@ -17,6 +17,16 @@ interface User {
   created_at: string;
 }
 
+/*
+TODO: change roles input field from text to sl-select with multiple clearable set
+Options include
+* public
+* protected
+* private
+* admin
+* All entries from https://dev49.org/files/api/root field 'folders'
+*/
+
 /**
  * User management component that shows all users with editable fields
  */
