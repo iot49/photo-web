@@ -24,6 +24,7 @@ import '@shoelace-style/shoelace/dist/components/divider/divider.js';
 import '@shoelace-style/shoelace/dist/components/relative-time/relative-time.js';
 import '@shoelace-style/shoelace/dist/components/select/select.js';
 import '@shoelace-style/shoelace/dist/components/option/option.js';
+import '@shoelace-style/shoelace/dist/components/switch/switch.js';
 
 // Set the base path for Shoelace assets
 import { setBasePath } from '@shoelace-style/shoelace/dist/utilities/base-path.js';

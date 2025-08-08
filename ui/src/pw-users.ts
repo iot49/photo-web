@@ -43,6 +43,9 @@ export class PwUsers extends LitElement {
   @state()
   private folderOptions: string[] = [];
 
+  @state()
+  private showDetails = false;
+
   override async connectedCallback() {
     super.connectedCallback();
     this.users = await get_json('/auth/users');
@@ -153,6 +156,10 @@ export class PwUsers extends LitElement {
     this.editForm = { ...this.editForm, [field]: value };
   }
 
+  private toggleDetails() {
+    this.showDetails = !this.showDetails;
+  }
+
   private formatDate(dateString: string, defaultText: string = 'Unknown'): string {
     if (!dateString) return defaultText;
     try {
@@ -182,54 +189,60 @@ export class PwUsers extends LitElement {
                 </div>
               `}
         </td>
-        <td class="email">${user.email}</td>
-        <td class="roles">
-          ${isEditing
-            ? html`
-                <sl-select
-                  multiple
-                  clearable
-                  hoist
-                  placeholder="Select roles"
-                  .value=${this.editForm.roles ? this.editForm.roles.split(',').filter(r => r.trim()).map(role => {
-                    // Convert folder names with spaces to underscore format for sl-select
-                    return this.folderOptions.includes(role.replace(/_/g, ' ')) ? role.replace(/\s+/g, '_') : role;
-                  }) : []}
-                  @sl-change=${(e: CustomEvent) => {
-                    this.handleSelectInput('roles', e);
-                  }}
-                >
-                  <sl-option value="public">public</sl-option>
-                  <sl-option value="protected">protected</sl-option>
-                  <sl-option value="private">private</sl-option>
-                  <sl-option value="admin">admin</sl-option>
-                  ${this.folderOptions.map(option => {
-                    // Replace spaces with underscores for the value, but keep original for display
-                    const sanitizedValue = option.replace(/\s+/g, '_');
-                    return html`<sl-option value=${sanitizedValue}>${option}</sl-option>`;
-                  })}
-                </sl-select>
-              `
-            : html` <span class="roles-list">${user.roles}</span> `}
+        <td class="email">
+          ${user.email}
         </td>
-        <td class="enabled">
-          ${isEditing
-            ? html`
-                <input
-                  type="checkbox"
-                  .checked=${this.editForm.enabled || false}
-                  @change=${(e: Event) => this.handleFormInput('enabled', e)}
-                  class="edit-checkbox"
-                />
-              `
-            : html` <span class="badge ${user.enabled ? 'enabled' : 'disabled'}"> ${user.enabled ? 'Enabled' : 'Disabled'} </span> `}
-        </td>
+        ${this.showDetails || isEditing ? html`
+          <td class="roles">
+            ${isEditing
+              ? html`
+                  <sl-select
+                    multiple
+                    clearable
+                    hoist
+                    placeholder="Select roles"
+                    .value=${this.editForm.roles ? this.editForm.roles.split(',').filter(r => r.trim()).map(role => {
+                      // Convert folder names with spaces to underscore format for sl-select
+                      return this.folderOptions.includes(role.replace(/_/g, ' ')) ? role.replace(/\s+/g, '_') : role;
+                    }) : []}
+                    @sl-change=${(e: CustomEvent) => {
+                      this.handleSelectInput('roles', e);
+                    }}
+                  >
+                    <sl-option value="public">public</sl-option>
+                    <sl-option value="protected">protected</sl-option>
+                    <sl-option value="private">private</sl-option>
+                    <sl-option value="admin">admin</sl-option>
+                    ${this.folderOptions.map(option => {
+                      // Replace spaces with underscores for the value, but keep original for display
+                      const sanitizedValue = option.replace(/\s+/g, '_');
+                      return html`<sl-option value=${sanitizedValue}>${option}</sl-option>`;
+                    })}
+                  </sl-select>
+                `
+              : html` <span class="roles-list">${user.roles.replace(/,/g, ' ')}</span> `}
+          </td>
+        ` : ''}
+        ${this.showDetails || isEditing ? html`
+          <td class="enabled">
+            ${isEditing
+              ? html`
+                  <input
+                    type="checkbox"
+                    .checked=${this.editForm.enabled || false}
+                    @change=${(e: Event) => this.handleFormInput('enabled', e)}
+                    class="edit-checkbox"
+                  />
+                `
+              : html` <span class="badge ${user.enabled ? 'enabled' : 'disabled'}"> ${user.enabled ? 'Enabled' : 'Disabled'} </span> `}
+          </td>
+        ` : ''}
         <td class="last-login">
           ${user.last_login
             ? html`<sl-relative-time date="${user.last_login}"></sl-relative-time>`
             : 'Never'}
         </td>
-        <td class="terms-accepted">${this.formatDate(user.terms_accepted, 'Not accepted')}</td>
+        ${this.showDetails ? html`<td class="terms-accepted">${this.formatDate(user.terms_accepted, 'Not accepted')}</td>` : ''}
         <td class="created-at">${this.formatDate(user.created_at)}</td>
         <td class="actions">
           ${isEditing
@@ -278,6 +291,15 @@ export class PwUsers extends LitElement {
 
     return html`
       <pw-nav-page>
+        <div slot="nav-controls" class="header-controls">
+          <sl-switch
+            .checked=${this.showDetails}
+            @sl-change=${() => this.toggleDetails()}
+          >
+            Show details
+          </sl-switch>
+        </div>
+        
         <div class="container">
           <h2>User Management</h2>
 
@@ -286,10 +308,10 @@ export class PwUsers extends LitElement {
               <tr>
                 <th>Name</th>
                 <th>Email</th>
-                <th>Roles</th>
-                <th>Enabled</th>
+                ${this.showDetails || this.editingUser ? html`<th>Roles</th>` : ''}
+                ${this.showDetails || this.editingUser ? html`<th>Enabled</th>` : ''}
                 <th>Last Login</th>
-                <th>Terms Accepted</th>
+                ${this.showDetails ? html`<th>Terms</th>` : ''}
                 <th>Created</th>
                 <th>Actions</th>
               </tr>
@@ -309,6 +331,12 @@ export class PwUsers extends LitElement {
     :host {
       display: block;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
 
     .container {
@@ -416,10 +444,8 @@ export class PwUsers extends LitElement {
       color: #666;
       min-width: 25ch; /* Minimum width of 25 characters */
       max-width: 30ch; /* Limit width to 30 characters */
-      white-space: nowrap; /* Prevent text from wrapping */
-      overflow: hidden; /* Hide overflowing content */
-      text-overflow: ellipsis; /* Display ellipsis for truncated text */
-      display: inline-block; /* Ensure max-width and text-overflow work */
+      white-space: normal; /* Allow text to wrap */
+      display: inline-block; /* Ensure max-width works */
       vertical-align: middle; /* Align with other inline elements */
     }
 
