@@ -25,7 +25,7 @@ ENV DATABASE_URL=sqlite:///./data/auth.db
 # Expose port
 EXPOSE 8000
 
-# Command to run the application
+# Command to run the application with gunicorn
 # Note: --forwarded-allow-ips *
 #       Required to use correct scheme in redirects; * is ok if container exposed only on local network
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--forwarded-allow-ips", "*", "--proxy-headers", "--log-level", "warning"]
+CMD ["gunicorn", "app.main:app", "--bind", "0.0.0.0:8000", "--workers", "2", "--worker-class", "uvicorn.workers.UvicornWorker", "--preload", "--forwarded-allow-ips", "*", "--log-level", "warning"]

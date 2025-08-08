@@ -31,12 +31,27 @@ from database import DatabaseManager, get_database_manager, init_database
 from doc_utils import dedent_and_convert_to_html
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from firebase_util import verify_user
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 logging.basicConfig(level=logging.WARNING)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
+
+# Add middleware to log all incoming requests for debugging
+
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        logger.warning(
+            f"REQUEST DEBUG: {request.method} {request.url.path} - Headers: {dict(request.headers)}"
+        )
+        response = await call_next(request)
+        logger.warning(
+            f"RESPONSE DEBUG: {request.method} {request.url.path} - Status: {response.status_code}"
+        )
+        return response
 
 
 @asynccontextmanager
@@ -129,6 +144,9 @@ app = FastAPI(
         },
     ],
 )
+
+# Add request logging middleware for debugging
+app.add_middleware(RequestLoggingMiddleware)
 
 # Add Session middleware for session caching
 app.add_middleware(
