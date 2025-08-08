@@ -67,15 +67,8 @@ export class PwUsers extends LitElement {
     if (!this.editingUser) return;
 
     try {
-      console.log('COMMIT DEBUG: About to save user:', this.editingUser.email);
-      console.log('COMMIT DEBUG: Data being committed to database:', this.editForm);
-      console.log('COMMIT DEBUG: Roles value:', this.editForm.roles);
-      console.log('COMMIT DEBUG: Roles type:', typeof this.editForm.roles);
-      
       const url = `/auth/users/${this.editingUser.email}`;
       const body = JSON.stringify(this.editForm);
-      
-      console.log('COMMIT DEBUG: JSON payload being sent:', body);
       
       const response = await fetch(url, {
         method: 'PUT',
@@ -146,9 +139,6 @@ export class PwUsers extends LitElement {
       selectedOptions = target.value;
     }
     
-    console.log("SL-select value", selectedOptions)
-    console.log("SL-select value type", typeof selectedOptions)
-    console.log("SL-select value isArray", Array.isArray(selectedOptions))
     
     // Convert back to comma-separated string for storage (our backend expects comma-separated)
     // Also convert underscore values back to original folder names with spaces
@@ -160,9 +150,7 @@ export class PwUsers extends LitElement {
         }).join(',')
       : '';
     
-    console.log("V", value)
     this.editForm = { ...this.editForm, [field]: value };
-    console.log("F", this.editForm)
   }
 
   private formatDate(dateString: string, defaultText: string = 'Unknown'): string {
@@ -201,16 +189,13 @@ export class PwUsers extends LitElement {
                 <sl-select
                   multiple
                   clearable
+                  hoist
                   placeholder="Select roles"
                   .value=${this.editForm.roles ? this.editForm.roles.split(',').filter(r => r.trim()).map(role => {
                     // Convert folder names with spaces to underscore format for sl-select
                     return this.folderOptions.includes(role.replace(/_/g, ' ')) ? role.replace(/\s+/g, '_') : role;
                   }) : []}
                   @sl-change=${(e: CustomEvent) => {
-                    console.log('sl-change event:', e);
-                    console.log('sl-change detail:', e.detail);
-                    console.log('sl-change target:', e.target);
-                    console.log('sl-change target.value:', (e.target as any).value);
                     this.handleSelectInput('roles', e);
                   }}
                 >
@@ -310,12 +295,9 @@ export class PwUsers extends LitElement {
               </tr>
             </thead>
             <tbody>
-              ${this.users
-                .filter(user => this.editingUser?.email === user.email)
-                .map(user => this.renderUserRow(user, true))}
-              ${this.users
-                .filter(user => this.editingUser?.email !== user.email)
-                .map(user => this.renderUserRow(user, false))}
+              ${this.users.map(user =>
+                this.renderUserRow(user, this.editingUser?.email === user.email)
+              )}
             </tbody>
           </table>
         </div>
@@ -523,8 +505,7 @@ export class PwUsers extends LitElement {
       background: #616161;
     }
 
-    .edit-input,
-    .edit-select {
+    .edit-input {
       width: 100%;
       font-size: 0.875rem;
     }
@@ -541,36 +522,12 @@ export class PwUsers extends LitElement {
       box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
     }
 
-    .edit-select::part(form-control-input) {
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      padding: 0.25rem;
-    }
-
-    .edit-select::part(form-control-input):focus-within {
-      border-color: #1976d2;
-      box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
-    }
 
 
     .edit-checkbox {
       transform: scale(1.2);
     }
 
-    /* Make sl-select dropdown taller */
-    .edit-select::part(popup) {
-      position: absolute; /* Allow popup to break out of flow */
-      max-height: 300px; /* Adjust as needed to show more options */
-      overflow: auto; /* Ensure scrollbar if content exceeds max-height */
-      z-index: 9999; /* High z-index to ensure it's on top */
-      width: var(--sl-select-width, auto); /* Match the width of the select */
-    }
-
-    /* Target the menu within the select to ensure it expands */
-    .edit-select::part(menu) {
-      max-height: 950px; /* Slightly less than popup to account for padding/borders */
-      overflow-y: auto;
-    }
 
     @media (max-width: 768px) {
       .container {
