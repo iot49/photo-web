@@ -77,7 +77,38 @@ certificatesResolvers:
 log:
   level: WARN
   format: json
+  filePath: "/var/log/traefik/traefik.log"
 
-# Access logs
+# Enhanced access logs with custom fields for analytics
 accessLog:
   format: json
+  filePath: "/var/log/traefik/access.log"
+  bufferingSize: 100
+  fields:
+    defaultMode: keep
+    names:
+      ClientUsername: drop  # Drop for privacy, we'll get user from auth headers
+    headers:
+      defaultMode: keep
+      names:
+        User-Agent: keep
+        Authorization: drop  # Security - don't log auth tokens
+        X-Forwarded-Roles: keep
+        X-Forwarded-User: keep
+        X-Forwarded-For: keep
+        X-Forwarded-Proto: keep
+        Referer: keep
+        Accept-Language: keep
+
+# Add metrics for Prometheus integration
+metrics:
+  prometheus:
+    addEntryPointsLabels: true
+    addServicesLabels: true
+    addRoutersLabels: true
+    buckets:
+      - 0.1
+      - 0.3
+      - 1.2
+      - 5.0
+      - 10.0

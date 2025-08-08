@@ -5,6 +5,10 @@ volumes:
     driver: local
   nginx-cache:
     driver: local
+  traefik-logs:
+    driver: local
+  analytics-data:
+    driver: local
 
 networks:
   ingress:
@@ -30,6 +34,7 @@ services:
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./traefik/traefik-dynamic.yml:/etc/traefik/traefik-dynamic.yml:ro
       - traefik-certs:/var/traefik/certs
+      - traefik-logs:/var/log/traefik
     labels:
       - traefik.enable=true
       # Dashboard router (for UI)
@@ -74,12 +79,12 @@ services:
       - "traefik.http.routers.nginx.tls=true"
       - "traefik.http.routers.nginx.tls.certresolver=cloudflare"
       - "traefik.http.routers.nginx.priority=20"
-      - "traefik.http.routers.nginx.middlewares=authorize@file,local-rate-limit@file"
+      - "traefik.http.routers.nginx.middlewares=analytics-chain@file"
       # Internal unencrypted router for cloudflared (stricter rate limiting)
       - "traefik.http.routers.nginx-internal.rule=Host(`${ROOT_DOMAIN}`)"
       - "traefik.http.routers.nginx-internal.entrypoints=webinternal"
       - "traefik.http.routers.nginx-internal.priority=20"
-      - "traefik.http.routers.nginx-internal.middlewares=authorize@file,cloudflared-rate-limit@file"
+      - "traefik.http.routers.nginx-internal.middlewares=analytics-cloudflared-chain@file"
       - "traefik.http.services.nginx.loadbalancer.server.port=80" # Default nginx port
     networks:
       - ingress
@@ -97,6 +102,7 @@ services:
       - .env
     volumes:
       - auth-data:/app/data # SQLite database storage
+      - analytics-data:/app/analytics # Analytics data storage
     labels:
       - "traefik.enable=true"
       # Unified route for login endpoint with strict rate limiting (both HTTPS and internal)
@@ -176,3 +182,22 @@ services:
       - traefik
     labels:
       - "traefik.enable=false"  # This service doesn't need traefik routing
+
+  analytics:
+    build: ./analytics
+    image: analytics-service:latest
+    container_name: analytics
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - traefik-logs:/logs/traefik:ro
+      - analytics-data:/app/data
+      - ./analytics:/app/src:ro
+    networks:
+      - ingress
+    depends_on:
+      - traefik
+      - auth
+    labels:
+      - "traefik.enable=false"  # Internal service only

@@ -13,6 +13,15 @@ http:
         authResponseHeaders:
           - X-Forwarded-User
           - X-Forwarded-Roles
+          - X-Analytics-Logged
+    
+    # Request tracking middleware for analytics
+    request-tracker:
+      headers:
+        customRequestHeaders:
+          X-Analytics-Enabled: "true"
+        customResponseHeaders:
+          X-Analytics-Processed: "true"
     
     # Rate limiting middleware for Cloudflared requests (stricter limits)
     cloudflared-rate-limit:
@@ -43,4 +52,20 @@ http:
         sourceCriterion:
           ipStrategy:
             depth: 1
+    
+    # Analytics middleware chain for comprehensive tracking
+    analytics-chain:
+      chain:
+        middlewares:
+          - request-tracker
+          - authorize
+          - local-rate-limit
+    
+    # Analytics chain for cloudflared traffic
+    analytics-cloudflared-chain:
+      chain:
+        middlewares:
+          - request-tracker
+          - authorize
+          - cloudflared-rate-limit
     
