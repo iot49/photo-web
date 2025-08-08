@@ -65,6 +65,12 @@ export class PwSlideshow extends LitElement {
   // Timeout ID for autoplay scheduling
   private autoplayTimeoutId: number | null = null;
 
+  // Timeout ID for loadPhotos retry
+  private loadPhotosTimeoutId: number | null = null;
+
+  // Timeout ID for goto retries
+  private gotoTimeoutId: number | null = null;
+
   // Swipe handler instance
   private swipeHandler: SwipeHandler | null = null;
 
@@ -85,7 +91,11 @@ export class PwSlideshow extends LitElement {
         photos.push(await get_json(`/photos/api/albums/${uid}`));
       } catch (error) {
         console.error(`Failed to load photos for album: ${uid}, trying again`, error);
-        setTimeout(() => {
+        // Clear any existing loadPhotos timeout before setting a new one
+        if (this.loadPhotosTimeoutId !== null) {
+          clearTimeout(this.loadPhotosTimeoutId);
+        }
+        this.loadPhotosTimeoutId = window.setTimeout(() => {
           this.loadPhotos();
         }, 1000);
         return;
@@ -109,7 +119,11 @@ export class PwSlideshow extends LitElement {
     /* transition from showing slide at `this.currentIndex` to at `nextIndex`.
      */
     if (this.slideshow == null) {
-      setTimeout(() => this.goto(nextIndex), 300);
+      // Clear any existing goto timeout before setting a new one
+      if (this.gotoTimeoutId !== null) {
+        clearTimeout(this.gotoTimeoutId);
+      }
+      this.gotoTimeoutId = window.setTimeout(() => this.goto(nextIndex), 300);
       return;
     }
     const slides = this.slideshow?.children as unknown as HTMLElement[];
@@ -137,7 +151,11 @@ export class PwSlideshow extends LitElement {
     // If slide has lazy elements but no loaded elements, reschedule goto
     if (hasLazyElements && !hasLoadedElements) {
       console.log(`Slide ${nextIndex} not loaded yet, rescheduling goto in 500ms`);
-      setTimeout(() => this.goto(nextIndex), 500);
+      // Clear any existing goto timeout before setting a new one
+      if (this.gotoTimeoutId !== null) {
+        clearTimeout(this.gotoTimeoutId);
+      }
+      this.gotoTimeoutId = window.setTimeout(() => this.goto(nextIndex), 500);
       return;
     }
 
@@ -303,6 +321,11 @@ export class PwSlideshow extends LitElement {
       clearTimeout(this.autoplayTimeoutId);
       this.autoplayTimeoutId = null;
     }
+    // Also clear goto timeout to prevent conflicts
+    if (this.gotoTimeoutId !== null) {
+      clearTimeout(this.gotoTimeoutId);
+      this.gotoTimeoutId = null;
+    }
     this.goto(this.currentIndex - 1);
   }
 
@@ -311,6 +334,11 @@ export class PwSlideshow extends LitElement {
       clearTimeout(this.autoplayTimeoutId);
       this.autoplayTimeoutId = null;
     }
+    // Also clear goto timeout to prevent conflicts
+    if (this.gotoTimeoutId !== null) {
+      clearTimeout(this.gotoTimeoutId);
+      this.gotoTimeoutId = null;
+    }
     this.goto(this.currentIndex + 1);
   }
 
@@ -318,6 +346,11 @@ export class PwSlideshow extends LitElement {
     if (this.autoplayTimeoutId !== null) {
       clearTimeout(this.autoplayTimeoutId);
       this.autoplayTimeoutId = null;
+    }
+    // Also clear goto timeout to prevent conflicts
+    if (this.gotoTimeoutId !== null) {
+      clearTimeout(this.gotoTimeoutId);
+      this.gotoTimeoutId = null;
     }
     // Use Navigation API or history.pushState to preserve component state
     // This allows pw-main's router to handle navigation and preserve pw-album-browser state
@@ -435,10 +468,18 @@ export class PwSlideshow extends LitElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    // Clean up autoplay timeout when component is removed
+    // Clean up all timeouts when component is removed
     if (this.autoplayTimeoutId !== null) {
       clearTimeout(this.autoplayTimeoutId);
       this.autoplayTimeoutId = null;
+    }
+    if (this.loadPhotosTimeoutId !== null) {
+      clearTimeout(this.loadPhotosTimeoutId);
+      this.loadPhotosTimeoutId = null;
+    }
+    if (this.gotoTimeoutId !== null) {
+      clearTimeout(this.gotoTimeoutId);
+      this.gotoTimeoutId = null;
     }
     // Clean up swipe handler when component is removed
     if (this.swipeHandler) {

@@ -34,6 +34,9 @@ interface NavigateEvent extends Event {
 export class PwMain extends LitElement {
   // Cache for lazily loaded components
   private componentCache = new Map<string, HTMLElement>();
+  
+  // Track active dynamic components to ensure proper cleanup
+  private activeDynamicComponents = new Map<string, HTMLElement>();
   static styles = css`
     .loading {
       display: flex;
@@ -350,10 +353,40 @@ export class PwMain extends LitElement {
     const routeDefinition = routeDefinitions.find((r) => r.routeId === routeId);
     if (routeDefinition?.isDynamic) {
       if (!route.isActive) {
+        // For dynamic components that are becoming inactive, ensure proper cleanup
+        const existingComponent = this.activeDynamicComponents.get(routeId);
+        if (existingComponent) {
+          // Force disconnectedCallback by removing from DOM
+          if (existingComponent.parentNode) {
+            existingComponent.parentNode.removeChild(existingComponent);
+          }
+          // Call disconnectedCallback manually if it exists
+          if (typeof (existingComponent as any).disconnectedCallback === 'function') {
+            (existingComponent as any).disconnectedCallback();
+          }
+          this.activeDynamicComponents.delete(routeId);
+          if (DEBUG) console.log(`Cleaned up dynamic component: ${routeId}`);
+        }
         return html``;
       }
+      
+      // Clean up any existing component before creating new one
+      const existingComponent = this.activeDynamicComponents.get(routeId);
+      if (existingComponent) {
+        if (existingComponent.parentNode) {
+          existingComponent.parentNode.removeChild(existingComponent);
+        }
+        if (typeof (existingComponent as any).disconnectedCallback === 'function') {
+          (existingComponent as any).disconnectedCallback();
+        }
+      }
+      
       if (DEBUG) console.log(`Re-rendering dynamic component for route: ${routeId}`);
       const component = componentFactory();
+      
+      // Store reference to the new component for cleanup
+      this.activeDynamicComponents.set(routeId, component as HTMLElement);
+      
       return html`<div style="display: ${route.display}">${component}</div>`;
     }
 
