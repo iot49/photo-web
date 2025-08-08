@@ -10,7 +10,7 @@ import { SwipeHandler } from './app/swipe';
 /* Lazy loading
 The browser mediated lazy loading configured in photoTemplate does not work: all images are downloaded on page load.
 
-As a fix, we use "manual" lazy loading for img and video html elements. 
+Instead, we use "manual" lazy loading for img and video html elements. 
 1) photoTemplate sets --data-uid and class="lazy" but does not set src, srcset, size. 
 2) on-loaded handler sets class 'loaded'. on-error handler on img/video sets class="load-failed". Css for this class shows an appropriate error instead of the img/video.
 3) a new function "loadPhoto(index: number)" sets those attributes and removes the lazy class. It does nothing if lazy class is not defined.
@@ -33,7 +33,7 @@ to achieve alternate behaviors.
 */
 
 const TRANSITION_MS = 1100; // duration of slide transition in [ms]
-const SLIDE_MS = 3100; // time each slide is shown in [ms]; note: extra wide or tall slides take more time
+const SLIDE_MS = 2500; // time each slide is shown in [ms]; note: extra wide or tall slides take more time
 const PANORAMA_TIME = 2.4; // increase parnorama image animation time by up to this factor
 const SCALE_FACTOR = 1.2; // factor by which the image is scaled during translation
 

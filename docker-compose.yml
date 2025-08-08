@@ -68,18 +68,18 @@ services:
       - nginx-cache:/var/cache/nginx # cache volume
     labels:
       - "traefik.enable=true"
-      # Route root domain and photos/auth paths through nginx (HTTPS)
+      # Route root domain and photos/auth paths through nginx (HTTPS - port 443)
       - "traefik.http.routers.nginx.rule=Host(`${ROOT_DOMAIN}`)"
       - "traefik.http.routers.nginx.entrypoints=websecure"
       - "traefik.http.routers.nginx.tls=true"
       - "traefik.http.routers.nginx.tls.certresolver=cloudflare"
       - "traefik.http.routers.nginx.priority=20"
-      - "traefik.http.routers.nginx.middlewares=authorize@file"
-      # Internal unencrypted router for cloudflared
+      - "traefik.http.routers.nginx.middlewares=authorize@file,local-rate-limit@file"
+      # Internal unencrypted router for cloudflared (stricter rate limiting)
       - "traefik.http.routers.nginx-internal.rule=Host(`${ROOT_DOMAIN}`)"
       - "traefik.http.routers.nginx-internal.entrypoints=webinternal"
       - "traefik.http.routers.nginx-internal.priority=20"
-      - "traefik.http.routers.nginx-internal.middlewares=authorize@file"
+      - "traefik.http.routers.nginx-internal.middlewares=authorize@file,cloudflared-rate-limit@file"
       - "traefik.http.services.nginx.loadbalancer.server.port=80" # Default nginx port
     networks:
       - ingress
@@ -97,7 +97,18 @@ services:
       - .env
     volumes:
       - auth-data:/app/data # SQLite database storage
-    # No direct Traefik labels - accessed through nginx proxy
+    labels:
+      - "traefik.enable=true"
+      # Unified route for login endpoint with strict rate limiting (both HTTPS and internal)
+      - "traefik.http.routers.auth-login.rule=Host(`${ROOT_DOMAIN}`) && PathPrefix(`/auth/login`)"
+      - "traefik.http.routers.auth-login.entrypoints=websecure,webinternal"
+      - "traefik.http.routers.auth-login.tls=true"
+      - "traefik.http.routers.auth-login.tls.certresolver=cloudflare"
+      - "traefik.http.routers.auth-login.priority=100"  # Higher priority than nginx
+      - "traefik.http.routers.auth-login.middlewares=login-rate-limit@file"
+      - "traefik.http.routers.auth-login.service=auth-service"
+      # Service definition
+      - "traefik.http.services.auth-service.loadbalancer.server.port=8000"
     networks:
       - ingress  # Added for traefik middleware access
       

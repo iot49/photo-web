@@ -45,7 +45,7 @@ router = APIRouter(tags=["authentication"])
     - SameSite=Strict prevents CSRF attacks
     - Configurable expiration (default 14 days)
     
-    **Rate Limiting:** 5 requests per minute per IP
+    **Rate Limiting:** 3 requests per minute per IP (implemented via Traefik middleware)
     """,
     responses={
         302: {

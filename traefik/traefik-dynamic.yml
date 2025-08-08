@@ -14,12 +14,33 @@ http:
           - X-Forwarded-User
           - X-Forwarded-Roles
     
-    # Rate limiting middleware for Cloudflared requests
-    cloudflared-throttle:
+    # Rate limiting middleware for Cloudflared requests (stricter limits)
+    cloudflared-rate-limit:
       rateLimit:
-        average: 200
+        average: 40        # More restrictive for cloudflared traffic
         period: "60s"
-        burst: 100
+        burst: 80
         sourceCriterion:
           ipStrategy:
             depth: 1
+    
+    # Rate limiting middleware for direct HTTPS requests (port 443)
+    local-rate-limit:
+      rateLimit:
+        average: 80        # Based on measured 62 req/min average + headroom
+        period: "60s"
+        burst: 150         # Based on measured 120 req/min burst + headroom
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+    
+    # Rate limiting middleware specifically for login endpoints
+    login-rate-limit:
+      rateLimit:
+        average: 3         # 3 requests per minute
+        period: "60s"
+        burst: 5           # Allow small burst for legitimate retries
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+    
