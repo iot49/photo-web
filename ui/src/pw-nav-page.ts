@@ -207,6 +207,7 @@ export class PwNavPage extends LitElement {
         </sl-button>
         <sl-menu>
           <sl-menu-item @click=${() => this.handleNavigation('users')}>Users ...</sl-menu-item>
+          <sl-menu-item @click=${() => this.handleNavigation('analytics')}>Analytics ...</sl-menu-item>
           <sl-menu-item @click=${this.reloadDialog}>Reload DB</sl-menu-item>
           <sl-divider></sl-divider>
           <sl-menu-item @click=${this.clearCacheDialog}>Clear Photo Cache</sl-menu-item>

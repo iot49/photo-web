@@ -418,6 +418,14 @@ export class PwMain extends LitElement {
         isDynamic: true,
       },
       {
+        routeId: 'analytics',
+        description: 'Analytics dashboard (admin only)',
+        matchUris: ['/ui/analytics'],
+        isActive: this.matchesAnyUri(['/ui/analytics']),
+        componentFactory: () => html`<pw-analytics></pw-analytics>`,
+        isDynamic: true,
+      },
+      {
         routeId: 'tests',
         description: 'Test runner and results viewer',
         matchUris: ['/ui/tests'],

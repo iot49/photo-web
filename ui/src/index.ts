@@ -18,4 +18,5 @@ import './pw-files-browser'
 import './pw-slideshow'
 import './pw-tests'
 import './pw-img-size'
+import './pw-analytics'
 

@@ -23,6 +23,8 @@ allow, /auth/term-accepted, public, Terms acceptance endpoint
 allow, /auth/users*, admin, User management
 allow, /auth/roles-csv, admin, Testing
 
+allow, /auth/api/analytics*, admin, Statistics
+
 allow, */health, public, Health checks (auth, files, photos, nginx)
 allow, */docs, public, Swagger docs for all services
 allow, */redoc, public, openapi docs for all services
