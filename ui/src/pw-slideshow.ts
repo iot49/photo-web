@@ -7,6 +7,17 @@ import { consume } from '@lit/context';
 import { albumsContext, srcsetInfoContext } from './app/context';
 import { SwipeHandler } from './app/swipe';
 
+/* Lazy loading
+The browser mediated lazy loading configured in photoTemplate does not work: all images are downloaded on page load.
+
+As a fix, we use "manual" lazy loading for img and video html elements. 
+1) photoTemplate sets --data-uid and class="lazy" but does not set src, srcset, size. 
+2) on-loaded handler sets class 'loaded'. on-error handler on img/video sets class="load-failed". Css for this class shows an appropriate error instead of the img/video.
+3) a new function "loadPhoto(index: number)" sets those attributes and removes the lazy class. It does nothing if lazy class is not defined.
+4) goto(index) calls loadPhoto(index) with index, index+1, index+2, index-1. It then checks the .loaded class. If not present, it reschedules goto in 500ms and returns. Also write a message to the log.
+
+*/
+
 /*
 Themes:
 @property theme switches between different versions of css classes .last and .next
@@ -112,6 +123,24 @@ export class PwSlideshow extends LitElement {
     nextIndex = ((nextIndex % N) + N) % N;
     // console.log(`N = ${N} curr = ${this.currentIndex} next = ${nextIndex}`, slides[nextIndex]);
 
+    // Load photos for current and adjacent slides (index, index+1, index+2, index-1)
+    this.loadPhoto(nextIndex);
+    this.loadPhoto(nextIndex + 1);
+    this.loadPhoto(nextIndex + 2);
+    this.loadPhoto(nextIndex - 1);
+
+    // Check if the current slide has loaded content
+    const currentSlide = slides[nextIndex];
+    const hasLazyElements = currentSlide?.querySelectorAll('.lazy').length > 0;
+    const hasLoadedElements = currentSlide?.querySelectorAll('.loaded').length > 0;
+
+    // If slide has lazy elements but no loaded elements, reschedule goto
+    if (hasLazyElements && !hasLoadedElements) {
+      console.log(`Slide ${nextIndex} not loaded yet, rescheduling goto in 500ms`);
+      setTimeout(() => this.goto(nextIndex), 500);
+      return;
+    }
+
     // hide all slides
     for (let i = 0; i < slides.length; i++) {
       // don't touch current slide for smooth ken-burns transitions, unless we're going to the same slide
@@ -135,17 +164,17 @@ export class PwSlideshow extends LitElement {
     // Set dynamic animation duration for ken-burns theme
     const imgElement = nextSlide.querySelector('img') as HTMLElement;
     const videoElement = nextSlide.querySelector('video') as HTMLVideoElement;
-    
+
     if (this.theme === 'ken-burns') {
       if (imgElement) {
         imgElement.style.animationDuration = `${dynamicSlideMs}ms`;
-        
       }
       // Videos in ken-burns mode don't get animations, but still need to be played
       if (videoElement) {
         // Attempt to play video if it's ready
-        if (videoElement.readyState >= 2) { // HAVE_CURRENT_DATA or higher
-          videoElement.play().catch(error => {
+        if (videoElement.readyState >= 2) {
+          // HAVE_CURRENT_DATA or higher
+          videoElement.play().catch((error) => {
             console.warn('Failed to play video:', error);
           });
         }
@@ -173,7 +202,7 @@ export class PwSlideshow extends LitElement {
         }, SLIDE_MS);
       } else {
         const timeoutMs = dynamicSlideMs - TRANSITION_MS;
-        
+
         this.autoplayTimeoutId = window.setTimeout(() => this.goto(nextIndex + 1), timeoutMs);
       }
     }
@@ -191,21 +220,21 @@ export class PwSlideshow extends LitElement {
       const videoDurationMs = videoElement.duration ? videoElement.duration * 1000 : SLIDE_MS;
       const htmlDuration = videoElement.dataset.duration ? parseInt(videoElement.dataset.duration) : 0;
       const baseDuration = Math.max(SLIDE_MS, videoDurationMs, htmlDuration);
-      
+
       // Set up video looping for short videos
       const shouldLoop = videoDurationMs < SLIDE_MS;
       videoElement.loop = shouldLoop;
-      
+
       return baseDuration;
     } else if (imgElement) {
       // For images: get dynamic time factor from CSS custom property
       let dynamicTimeFactor = 1.0;
       const customProperty = getComputedStyle(imgElement).getPropertyValue('--data-dynamic-time-factor');
       if (customProperty) dynamicTimeFactor = parseFloat(customProperty) || 1.0;
-      
+
       return SLIDE_MS * dynamicTimeFactor;
     }
-    
+
     // Fallback for other content types
     return SLIDE_MS;
   }
@@ -232,10 +261,10 @@ export class PwSlideshow extends LitElement {
         if (this.theme === 'ken-burns' && imgElement) {
           imgElement.style.animationPlayState = 'running';
         }
-        
+
         // Resume video playback if it's a video
         if (videoElement) {
-          videoElement.play().catch(error => {
+          videoElement.play().catch((error) => {
             console.warn('Failed to resume video playback:', error);
           });
         }
@@ -252,11 +281,11 @@ export class PwSlideshow extends LitElement {
         const currentSlide = slides[this.currentIndex];
         const imgElement = currentSlide?.querySelector('img') as HTMLElement;
         const videoElement = currentSlide?.querySelector('video') as HTMLVideoElement;
-        
+
         if (this.theme === 'ken-burns' && imgElement) {
           imgElement.style.animationPlayState = 'paused';
         }
-        
+
         if (videoElement) {
           videoElement.pause();
         }
@@ -304,12 +333,12 @@ export class PwSlideshow extends LitElement {
 
   private handleVideoCanPlay(e: Event) {
     const video = e.target as HTMLVideoElement;
-    
+
     // Try to play video immediately when it can play in ken-burns mode
     if (this.theme === 'ken-burns') {
       const slideWrapper = video.closest('.slide-wrapper') as HTMLElement;
       if (slideWrapper && slideWrapper.classList.contains('next')) {
-        video.play().catch(error => {
+        video.play().catch((error) => {
           console.warn('Failed to play video on canplay:', error);
         });
       }
@@ -318,7 +347,7 @@ export class PwSlideshow extends LitElement {
 
   private handleVideoEnded(e: Event) {
     const video = e.target as HTMLVideoElement;
-    
+
     // If autoplay is enabled and this video is not set to loop, advance to next slide
     if (this.autoplay && !video.loop) {
       const slideWrapper = video.closest('.slide-wrapper') as HTMLElement;
@@ -328,7 +357,7 @@ export class PwSlideshow extends LitElement {
           clearTimeout(this.autoplayTimeoutId);
           this.autoplayTimeoutId = null;
         }
-        
+
         // Advance to next slide immediately
         this.goto(this.currentIndex + 1);
       }
@@ -338,6 +367,55 @@ export class PwSlideshow extends LitElement {
   private handleVideoError(e: Event) {
     const video = e.target as HTMLVideoElement;
     console.error('Video error:', video.error);
+    video.classList.add('load-failed');
+  }
+
+  private handleLoad(e: Event) {
+    const img = e.target as HTMLElement;
+    img.classList.add('loaded');
+  }
+
+  private handleImageError(e: Event) {
+    const img = e.target as HTMLImageElement;
+    console.error('Image load error:', img.src);
+    img.classList.add('load-failed');
+  }
+
+  /**
+   * Load photo at specified index by setting src attributes and removing lazy class
+   */
+  private loadPhoto(index: number) {
+    const slides = this.slideshow?.children as unknown as HTMLElement[];
+
+    const N = slides.length;
+    index = ((index % N) + N) % N;
+    if (this.slideshow == null) return;
+
+    const slide = slides[index];
+    const lazyElements = slide.querySelectorAll('.lazy');
+
+    lazyElements.forEach((element) => {
+      if (element.classList.contains('lazy')) {
+        if (element.tagName === 'IMG') {
+          const img = element as HTMLImageElement;
+          const dataSrc = img.getAttribute('data-src');
+          const dataSrcset = img.getAttribute('data-srcset');
+          const dataSizes = img.getAttribute('data-sizes');
+
+          if (dataSrc) img.src = dataSrc;
+          if (dataSrcset) img.srcset = dataSrcset;
+          if (dataSizes) img.sizes = dataSizes;
+
+          img.classList.remove('lazy');
+        } else if (element.tagName === 'VIDEO') {
+          const video = element as HTMLVideoElement;
+          const dataSrc = video.getAttribute('data-src');
+
+          if (dataSrc) video.src = dataSrc;
+          video.classList.remove('lazy');
+        }
+      }
+    });
   }
 
   private setupSwipeHandlers() {
@@ -351,7 +429,7 @@ export class PwSlideshow extends LitElement {
       minSwipeDistance: 50,
       onSwipeLeft: () => this.handleNextClick(),
       onSwipeRight: () => this.handlePrevClick(),
-      preventDefaultOnSwipe: true
+      preventDefaultOnSwipe: true,
     });
   }
 
@@ -429,6 +507,7 @@ export class PwSlideshow extends LitElement {
   }
 
   private photoTemplate(photo: PhotoModel) {
+    // lazy loading of images and videos (goto/loadPhoto)
     const mime_type = photo.mime_type;
     const uri = `/photos/api/photos/${photo.uuid}/img`;
     if (mime_type.startsWith('image')) {
@@ -443,17 +522,20 @@ export class PwSlideshow extends LitElement {
       const style = `--data-dynamic-time-factor: ${dynamicTimeFactor}`;
 
       return html` <img
-        src=${uri}
-        srcset=${this.srcsetInfo.srcsetFor(photo)}
-        sizes="100vw"
+        data-src="${uri}"
+        data-srcset="${this.srcsetInfo.srcsetFor(photo)}"
+        data-sizes="100vw"
+        class="lazy"
         alt="${photo.title || 'Photo'}"
-        loading="lazy"
         style="${style}"
+        @load=${(e: Event) => this.handleLoad(e)}
+        @error=${(e: Event) => this.handleImageError(e)}
       />`;
     } else if (mime_type.startsWith('video')) {
       return html`
         <video
-          src=${uri}
+          data-src="${uri}"
+          class="lazy"
           controls
           autoplay
           muted
@@ -462,6 +544,7 @@ export class PwSlideshow extends LitElement {
           @canplay=${(e: Event) => this.handleVideoCanPlay(e)}
           @ended=${(e: Event) => this.handleVideoEnded(e)}
           @error=${(e: Event) => this.handleVideoError(e)}
+          @loadeddata=${(e: Event) => this.handleLoad(e)}
         >
           Your browser does not support the video tag.
         </video>
@@ -758,7 +841,7 @@ export class PwSlideshow extends LitElement {
       /* Show overlay content when hovering over #overlays with auto-fade */
       #overlays:hover sl-icon,
       #overlays:hover p,
-      #overlays:hover  {
+      #overlays:hover {
         opacity: 0.9;
         animation: overlay-auto-fade 2.5s ease-out forwards;
       }
@@ -788,6 +871,28 @@ export class PwSlideshow extends LitElement {
         text-align: center;
         background: black;
         box-sizing: border-box;
+      }
+
+      /* Load failed state */
+      .load-failed {
+        position: relative;
+        background: #333;
+      }
+
+      .load-failed::after {
+        content: "Failed to load image";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #ccc;
+        font-size: 1.5rem;
+        text-align: center;
+        pointer-events: none;
+      }
+
+      video.load-failed::after {
+        content: "Failed to load video";
       }
     `,
   ];

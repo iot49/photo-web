@@ -79,7 +79,7 @@ services:
       - "traefik.http.routers.nginx-internal.rule=Host(`${ROOT_DOMAIN}`)"
       - "traefik.http.routers.nginx-internal.entrypoints=webinternal"
       - "traefik.http.routers.nginx-internal.priority=20"
-      - "traefik.http.routers.nginx-internal.middlewares=cloudflared-throttle@file,authorize@file"
+      - "traefik.http.routers.nginx-internal.middlewares=authorize@file"
       - "traefik.http.services.nginx.loadbalancer.server.port=80" # Default nginx port
     networks:
       - ingress
