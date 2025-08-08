@@ -3,6 +3,8 @@ import { customElement, property } from 'lit/decorators.js';
 import { test_authorize } from './tests/authorize.js';
 import { test_photos_files } from './tests/auth-photos-files.js';
 import { nginx_cache } from './tests/nginx-cache.js';
+import { test_files_performance } from './tests/files-performance.js';
+import { test_frontend_lazy_loading } from './tests/frontend-lazy-loading.js';
 
 @customElement('pw-tests')
 export class PwTests extends LitElement {
@@ -121,6 +123,22 @@ export class PwTests extends LitElement {
     }
   }
 
+  private async runFilesPerformanceTest() {
+    try {
+      await test_files_performance(this);
+    } catch (error) {
+      this.err(`Error running files performance test: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async runFrontendLazyLoadingTest() {
+    try {
+      await test_frontend_lazy_loading(this);
+    } catch (error) {
+      this.err(`Error running frontend lazy loading test: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   private navTemplate() {
     return html`
       <div class="nav-controls-container" slot="nav-controls">
@@ -132,6 +150,12 @@ export class PwTests extends LitElement {
         </sl-tooltip>
         <sl-tooltip content="Run Nginx Cache Test">
           <div class="nav-control-item" @click=${this.runNginxCacheTest}>Cache</div>
+        </sl-tooltip>
+        <sl-tooltip content="Run Files API Performance Test">
+          <div class="nav-control-item" @click=${this.runFilesPerformanceTest}>Files Perf</div>
+        </sl-tooltip>
+        <sl-tooltip content="Run Frontend Lazy Loading Test">
+          <div class="nav-control-item" @click=${this.runFrontendLazyLoadingTest}>Lazy Load</div>
         </sl-tooltip>
       </div>
     `;
