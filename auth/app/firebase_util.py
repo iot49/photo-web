@@ -12,6 +12,7 @@ logger = logging.getLogger("uvicorn.error")
 # validity of user info cache
 CACHE_VALID_MINUTES = 60
 
+
 # initialize firebase
 try:
     cred = credentials.Certificate("app/service-account.json")

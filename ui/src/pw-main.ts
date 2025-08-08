@@ -123,8 +123,7 @@ export class PwMain extends LitElement {
     };
 
     // Listen for both login and logout events with the same handler
-    window.addEventListener('pw-login', refreshData);
-    window.addEventListener('pw-logout', refreshData);
+    window.addEventListener('pw-me-changed', refreshData);
   }
 
   private checkTermsAcceptance() {

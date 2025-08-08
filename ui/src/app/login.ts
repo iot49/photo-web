@@ -59,7 +59,7 @@ export async function login(redirect: string) {
             if (response.redirected) {
               console.log('Login redirect', response.url);
               // Emit pw-login event before redirect
-              window.dispatchEvent(new CustomEvent('pw-login'));
+              window.dispatchEvent(new CustomEvent('pw-me-changed'));
               window.location.href = response.url;
             } else if (!response.ok) {
               // Handle error responses
@@ -72,7 +72,7 @@ export async function login(redirect: string) {
             // console.error(`Login fetch error "${err}"`, err);
           })
           .finally(function () {
-            window.dispatchEvent(new CustomEvent('pw-login'));
+            window.dispatchEvent(new CustomEvent('pw-me-changed'));
           });
       });
     })
@@ -93,7 +93,7 @@ export async function logout(redirect: string) {
     if (response.redirected) {
       console.log('LOGOUT redirect', response.url);
       // Emit pw-logout event before redirect
-      window.dispatchEvent(new CustomEvent('pw-logout'));
+      window.dispatchEvent(new CustomEvent('pw-me-changed'));
       window.location.href = response.url;
     } else if (!response.ok) {
       // Handle error responses
@@ -105,6 +105,6 @@ export async function logout(redirect: string) {
     // Logout fetch ERROR "TypeError: Failed to fetch"
     // console.error(`Logout fetch error "${err}"`, err);
   } finally {
-    window.dispatchEvent(new CustomEvent('pw-logout'));
+    window.dispatchEvent(new CustomEvent('pw-me-changed'));
   }
 }

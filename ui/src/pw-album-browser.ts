@@ -236,13 +236,13 @@ export class PwAlbumBrowser extends LitElement {
   override connectedCallback(): void {
     super.connectedCallback();
     // Listen for logout events to reset playlist
-    document.addEventListener('pw-logout', this.handleLogout);
+    document.addEventListener('pw-me-changed', this.handleLogout);
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     // Clean up event listener
-    document.removeEventListener('pw-logout', this.handleLogout);
+    document.removeEventListener('pw-me-changed', this.handleLogout);
   }
 
   protected override firstUpdated(_changedProperties: PropertyValues): void {

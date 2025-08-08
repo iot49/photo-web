@@ -127,7 +127,19 @@ class DatabaseManager:
     def get_user_by_email(self, email: str) -> Optional[User]:
         """Get user by email."""
         with self.get_session() as session:
-            return session.exec(select(User).where(User.email == email)).first()
+            user = session.exec(select(User).where(User.email == email)).first()
+
+            # Add admin role if this is the super user
+            if user:
+                if user.email == os.getenv("SUPER_USER_EMAIL"):
+                    # Ensure admin role is present
+                    roles = set(
+                        [role.strip() for role in user.roles.split(",") if role.strip()]
+                    )
+                    roles.add("admin")
+                    user.roles = ",".join(sorted(roles))
+
+            return user
 
     def get_user_by_id(self, user_id: int) -> Optional[User]:
         """Get user by ID."""

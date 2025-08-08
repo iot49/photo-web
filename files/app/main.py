@@ -10,7 +10,7 @@ from pydantic import BaseModel, DirectoryPath, Field
 
 # excludes (may use * and ? wildcards)
 EXCLUDE_FILES = [".DS_Store"]
-EXCLUDE_FOLDERS = ["__pycache__", ".venv", ".git", ".*cache"]
+EXCLUDE_FOLDERS = ["__pycache__", ".venv", ".git", ".*cache", "$RECYCLE.BIN"]
 
 # Setup logging first
 logger = logging.getLogger(__name__)
@@ -218,6 +218,57 @@ async def get_roots(request: Request) -> FolderModel:
         if os.path.isdir(folder) and not is_folder_empty(folder)
     ]
     return FolderModel(path="", folders=sorted(roots))
+
+
+@app.get(
+    "/api/folders",
+    response_model=List[str],
+    summary="Get All Top-Level Folders",
+    description=dedent_and_convert_to_html(
+        "Retrieve a list of all top-level folders in the document repository, excluding system folders."
+    ),
+    responses={
+        200: {
+            "description": "Successfully retrieved top-level folders",
+            "content": {
+                "application/json": {
+                    "example": ["admin", "public", "private", "some_other_folder"]
+                }
+            },
+        },
+        500: {
+            "description": "Internal server error",
+            "model": ErrorResponse,
+        },
+    },
+    tags=["Documents"],
+)
+async def get_all_top_level_folders() -> List[str]:
+    """
+    Get all top-level folders in the document repository, excluding system folders.
+
+    This endpoint provides a list of all directories directly under the document root,
+    filtering out any folders that match the EXCLUDE_FOLDERS patterns.
+
+    Returns:
+        List[str]: A sorted list of top-level folder names.
+    """
+    try:
+        top_level_items = os.listdir(
+            "."
+        )  # List items in the current working directory (which is /docs)
+        folders = [
+            item
+            for item in top_level_items
+            if os.path.isdir(item)
+            and not any(fnmatch(item, p) for p in EXCLUDE_FOLDERS)
+        ]
+        return sorted(folders)
+    except Exception as e:
+        logger.error(f"Error listing top-level folders: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Failed to retrieve folders: {str(e)}"
+        )
 
 
 @app.get(

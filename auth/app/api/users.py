@@ -349,14 +349,21 @@ async def update_user(
         HTTPException: 404 if user not found, 500 if database error
     """
     try:
+        logger.warning(
+            f"UPDATE_USER: Received request to update user {email} with data: {user_update.model_dump(exclude_unset=True)}"
+        )
         user = db.update_user(email, user_update)
         if not user:
+            logger.warning(f"UPDATE_USER: User {email} not found in database")
             raise HTTPException(status_code=404, detail="User not found")
+        logger.warning(
+            f"UPDATE_USER: Successfully updated user {email}, new roles: {user.roles}"
+        )
         return user
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error updating user {email}: {e}")
+        logger.error(f"UPDATE_USER ERROR: Error updating user {email}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 

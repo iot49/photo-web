@@ -1,5 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
+import { get_json } from './app/api.js';
 
 /**
  * User interface matching the auth service User model
@@ -17,15 +18,7 @@ interface User {
   created_at: string;
 }
 
-/*
-TODO: change roles input field from text to sl-select with multiple clearable set
-Options include
-* public
-* protected
-* private
-* admin
-* All entries from https://dev49.org/files/api/root field 'folders'
-*/
+// BUG: editing roles a) does not allow to choose any roles, b) clears all existing roles
 
 /**
  * User management component that shows all users with editable fields
@@ -47,44 +40,13 @@ export class PwUsers extends LitElement {
   @state()
   private editForm: Partial<User> = {};
 
-  override connectedCallback() {
+  @state()
+  private folderOptions: string[] = [];
+
+  override async connectedCallback() {
     super.connectedCallback();
-    this.fetchUsers();
-  }
-
-  private async fetchUsers() {
-    this.loading = true;
-    this.error = '';
-
-    try {
-      // Try HTTPS first, fallback to HTTP for development
-      let response;
-      try {
-        response = await fetch('/auth/users', {
-          method: 'GET',
-          credentials: 'include',
-          mode: 'cors',
-        });
-      } catch (httpsError) {
-        console.warn('HTTPS request failed, trying HTTP:', httpsError);
-        response = await fetch('/auth/users', {
-          method: 'GET',
-          credentials: 'include',
-          mode: 'cors',
-        });
-      }
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch users: ${response.status} ${response.statusText}`);
-      }
-
-      this.users = await response.json();
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      this.error = error instanceof Error ? error.message : 'Failed to fetch users';
-    } finally {
-      this.loading = false;
-    }
+    this.users = await get_json('/auth/users');
+    this.folderOptions = await get_json('/files/api/folders');
   }
 
   private startEdit(user: User) {
@@ -105,14 +67,24 @@ export class PwUsers extends LitElement {
     if (!this.editingUser) return;
 
     try {
-      const response = await fetch(`/auth/users/${this.editingUser.email}`, {
+      console.log('COMMIT DEBUG: About to save user:', this.editingUser.email);
+      console.log('COMMIT DEBUG: Data being committed to database:', this.editForm);
+      console.log('COMMIT DEBUG: Roles value:', this.editForm.roles);
+      console.log('COMMIT DEBUG: Roles type:', typeof this.editForm.roles);
+      
+      const url = `/auth/users/${this.editingUser.email}`;
+      const body = JSON.stringify(this.editForm);
+      
+      console.log('COMMIT DEBUG: JSON payload being sent:', body);
+      
+      const response = await fetch(url, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
         mode: 'cors',
-        body: JSON.stringify(this.editForm),
+        body: body,
       });
 
       if (!response.ok) {
@@ -120,8 +92,14 @@ export class PwUsers extends LitElement {
       }
 
       // Refresh the users list
-      await this.fetchUsers();
+      this.users = await get_json('/auth/users');
       this.cancelEdit();
+      window.dispatchEvent(new CustomEvent('pw-me-changed'));
+      
+      // Show message about cache refresh if roles were updated
+      if (this.editForm.roles !== undefined) {
+        alert('User roles updated successfully! Please refresh the page or re-login to see the updated permissions.');
+      }
     } catch (error) {
       console.error('Error updating user:', error);
       this.error = error instanceof Error ? error.message : 'Failed to update user';
@@ -145,7 +123,7 @@ export class PwUsers extends LitElement {
       }
 
       // Refresh the users list
-      await this.fetchUsers();
+      this.users = await get_json('/auth/users');
     } catch (error) {
       console.error('Error deleting user:', error);
       this.error = error instanceof Error ? error.message : 'Failed to delete user';
@@ -156,6 +134,35 @@ export class PwUsers extends LitElement {
     const target = event.target as HTMLInputElement;
     const value = field === 'enabled' ? target.checked : target.value;
     this.editForm = { ...this.editForm, [field]: value };
+  }
+
+  private handleSelectInput(field: keyof User, event: CustomEvent) {
+    // For sl-select with multiple, event.detail.value should be an array
+    let selectedOptions = event.detail.value as string[] | undefined;
+    
+    // Fallback: if event.detail.value is undefined, try to get value from target
+    if (!selectedOptions) {
+      const target = event.target as any;
+      selectedOptions = target.value;
+    }
+    
+    console.log("SL-select value", selectedOptions)
+    console.log("SL-select value type", typeof selectedOptions)
+    console.log("SL-select value isArray", Array.isArray(selectedOptions))
+    
+    // Convert back to comma-separated string for storage (our backend expects comma-separated)
+    // Also convert underscore values back to original folder names with spaces
+    const value = selectedOptions && Array.isArray(selectedOptions)
+      ? selectedOptions.map(option => {
+          // Check if this is a sanitized folder option and convert back to original
+          const originalFolder = this.folderOptions.find(folder => folder.replace(/\s+/g, '_') === option);
+          return originalFolder || option;
+        }).join(',')
+      : '';
+    
+    console.log("V", value)
+    this.editForm = { ...this.editForm, [field]: value };
+    console.log("F", this.editForm)
   }
 
   private formatDate(dateString: string, defaultText: string = 'Unknown'): string {
@@ -191,13 +198,32 @@ export class PwUsers extends LitElement {
         <td class="roles">
           ${isEditing
             ? html`
-                <input
-                  type="text"
-                  .value=${this.editForm.roles || ''}
-                  @input=${(e: Event) => this.handleFormInput('roles', e)}
-                  class="edit-input"
-                  placeholder="e.g., public,admin"
-                />
+                <sl-select
+                  multiple
+                  clearable
+                  placeholder="Select roles"
+                  .value=${this.editForm.roles ? this.editForm.roles.split(',').filter(r => r.trim()).map(role => {
+                    // Convert folder names with spaces to underscore format for sl-select
+                    return this.folderOptions.includes(role.replace(/_/g, ' ')) ? role.replace(/\s+/g, '_') : role;
+                  }) : []}
+                  @sl-change=${(e: CustomEvent) => {
+                    console.log('sl-change event:', e);
+                    console.log('sl-change detail:', e.detail);
+                    console.log('sl-change target:', e.target);
+                    console.log('sl-change target.value:', (e.target as any).value);
+                    this.handleSelectInput('roles', e);
+                  }}
+                >
+                  <sl-option value="public">public</sl-option>
+                  <sl-option value="protected">protected</sl-option>
+                  <sl-option value="private">private</sl-option>
+                  <sl-option value="admin">admin</sl-option>
+                  ${this.folderOptions.map(option => {
+                    // Replace spaces with underscores for the value, but keep original for display
+                    const sanitizedValue = option.replace(/\s+/g, '_');
+                    return html`<sl-option value=${sanitizedValue}>${option}</sl-option>`;
+                  })}
+                </sl-select>
               `
             : html` <span class="roles-list">${user.roles}</span> `}
         </td>
@@ -249,7 +275,7 @@ export class PwUsers extends LitElement {
         <div class="container">
           <div class="error">
             <p>Error: ${this.error}</p>
-            <button @click=${this.fetchUsers}>Retry</button>
+            <button @click=${async (_: any) => this.users = await get_json('/auth/users')}>Retry</button>
           </div>
         </div>
       `;
@@ -357,6 +383,8 @@ export class PwUsers extends LitElement {
       padding: 0.75rem;
       text-align: left;
       border-bottom: 1px solid #e0e0e0;
+      /* Allow dropdowns to overflow table cells */
+      overflow: visible;
     }
 
     .users-table th {
@@ -404,6 +432,13 @@ export class PwUsers extends LitElement {
     .roles-list {
       font-size: 0.875rem;
       color: #666;
+      min-width: 25ch; /* Minimum width of 25 characters */
+      max-width: 30ch; /* Limit width to 30 characters */
+      white-space: nowrap; /* Prevent text from wrapping */
+      overflow: hidden; /* Hide overflowing content */
+      text-overflow: ellipsis; /* Display ellipsis for truncated text */
+      display: inline-block; /* Ensure max-width and text-overflow work */
+      vertical-align: middle; /* Align with other inline elements */
     }
 
     .badge {
@@ -488,12 +523,16 @@ export class PwUsers extends LitElement {
       background: #616161;
     }
 
-    .edit-input {
+    .edit-input,
+    .edit-select {
       width: 100%;
+      font-size: 0.875rem;
+    }
+
+    .edit-input {
       padding: 0.25rem;
       border: 1px solid #ccc;
       border-radius: 4px;
-      font-size: 0.875rem;
     }
 
     .edit-input:focus {
@@ -502,8 +541,35 @@ export class PwUsers extends LitElement {
       box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
     }
 
+    .edit-select::part(form-control-input) {
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 0.25rem;
+    }
+
+    .edit-select::part(form-control-input):focus-within {
+      border-color: #1976d2;
+      box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
+    }
+
+
     .edit-checkbox {
       transform: scale(1.2);
+    }
+
+    /* Make sl-select dropdown taller */
+    .edit-select::part(popup) {
+      position: absolute; /* Allow popup to break out of flow */
+      max-height: 300px; /* Adjust as needed to show more options */
+      overflow: auto; /* Ensure scrollbar if content exceeds max-height */
+      z-index: 9999; /* High z-index to ensure it's on top */
+      width: var(--sl-select-width, auto); /* Match the width of the select */
+    }
+
+    /* Target the menu within the select to ensure it expands */
+    .edit-select::part(menu) {
+      max-height: 950px; /* Slightly less than popup to account for padding/borders */
+      overflow-y: auto;
     }
 
     @media (max-width: 768px) {
