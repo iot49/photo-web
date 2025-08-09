@@ -8,27 +8,27 @@ Photo Web provides a secure, web-based interface for accessing your Apple Photos
 
 ### Requirements
 
-**Note:** all accounts are **free**, except for the need to purchase a domain name (about \$10/year, depending on name).
+**Note:** All required accounts are **free**, except for a domain name (~$10/year).
 
-1. Server with access to Apple Photos library. On MacOS the library is usually at `/Users/<user-name>/Pictures/Photos Library.photoslibrary` and synchronized automatically via [iCloud](https://www.icloud.com/). Serving from e.g. Linux should be possible, but I have not tried it (iCloud is a bit special :smile:, perhaps [icloud-docker](https://github.com/mandarons/icloud-docker) could be used). A (recycled) Mac Mini works well.
+1. Server with access to Apple Photos library. On macOS, the library is typically at `/Users/<user-name>/Pictures/Photos Library.photoslibrary` and syncs automatically via [iCloud](https://www.icloud.com/). Linux deployment is possible but untested (consider [icloud-docker](https://github.com/mandarons/icloud-docker)). A Mac Mini works well for this purpose.
    
-   On the Mac, go to settings, Privacy & Security, Full Disk Access and **give Docker full access**. The photos library is mounted read-only (into the photos container), but Docker needs full access for this to work.
+   **Important:** On Mac, go to System Settings → Privacy & Security → Full Disk Access and **enable Docker**. The photos library mounts read-only, but Docker requires full access.
 
-2. Docker and docker compose (installed on the server). E.g. [Docker Desktop](https://docs.docker.com/desktop/) on the Mac.
+2. [Docker Desktop](https://docs.docker.com/desktop/) with Docker Compose
 
-3. `npm`. Install with `brew install node`.
+3. Node.js and npm (`brew install node` on Mac)
 
-4. A [Cloudflare Account](https://www.cloudflare.com/). Used for domain name registration and global access to the app (if desired).
+4. [Cloudflare Account](https://www.cloudflare.com/) for domain registration and global access
 
-5. A [Firebase Account](https://firebase.google.com/). Used for user authentication (with Google).
+5. [Firebase Account](https://firebase.google.com/) for Google authentication
 
-6. [Mkdocs](https://www.mkdocs.org/user-guide/installation/) installation (to create the documentation, if desired).
+6. [MkDocs](https://www.mkdocs.org/user-guide/installation/) (optional, for documentation)
 
 ### Steps
 
 #### Clone the Repository
 
-Go to the folder where you want to install photo-web and clone the source from github:
+Navigate to your desired installation directory and clone the repository:
 
 ```{bash}
 git clone https://github.com/iot49/photo-web.git
@@ -38,13 +38,13 @@ cp .env.example .env
 
 #### Get a Domain Name
 
-Login to [Cloudflare](https://www.cloudflare.com/) and purchase a domain name, e.g. `your-domain.com`. Update `ROOT_DOMAIN` in the `.env` file.
+Log in to [Cloudflare](https://www.cloudflare.com/), purchase a domain (e.g., `your-domain.com`), and update `ROOT_DOMAIN` in the `.env` file.
 
 > [!NOTE]
-> All access to photo web is encrypted (i.e. https). Because of this a domain name is required even for local access.
+> All access uses HTTPS encryption, requiring a domain name even for local access.
 
 > [!TIP]
-> Modify the `traefik` configuration if you prefer a different registar.
+> Modify the Traefik configuration to use a different registrar.
 
 #### Create a Cloudflare API Token (CF_API_TOKEN)
 
@@ -144,7 +144,7 @@ Login to [Cloudflare](https://www.cloudflare.com/) and purchase a domain name, e
 #### Configure Authorized Domains
 
 > [!TIP]
-> If you can't find the right section, try asking Gemini. I find it exceedingly difficult to navigate the Firebase console.
+> The Firebase console can be challenging to navigate. Use search or the built-in Gemini assistant.
 
 1. In the Firebase Console, go to **Overview** → **Authentication** → **Get Started** → **Settings** → **Authorized domains**
 2. Add your domain (the one you registered with Cloudflare) to the authorized domains list
@@ -156,14 +156,14 @@ Login to [Cloudflare](https://www.cloudflare.com/) and purchase a domain name, e
 
 #### Create Service Account Configuration File
 
-1. Head to Project Settings: In your Firebase console for the bg-photo-web project, look for the little gear icon (Settings) next to "Project overview" in the left-hand navigation bar. Click on it, then select "Project settings"
-2. Navigate to Service Accounts: Once you're in Project settings, click on the "Service accounts" tab. This is where you'll manage the service accounts associated with your project.
-3. Generate a New Private Key: On the "Service accounts" page, you'll see information about your default service account. To get your service-account.json file, look for a button that says "Generate new private key" or something similar. Click this button.
-4. Confirm and Download: A confirmation prompt will appear. Click "Generate key" (or "Generate new private key") again to confirm. Your browser will then automatically download a JSON file. This is your service-account.json file (it might have a slightly different name initially, like bg-photo-web-firebase-adminsdk-xxxxx-xxxxxx.json). Copy this file to `auth/firebase-secrets/service-account.json`
+1. **Access Project Settings:** Click the gear icon ⚙️ next to "Project overview" and select "Project settings"
+2. **Navigate to Service Accounts:** Click the "Service accounts" tab
+3. **Generate Private Key:** Click "Generate new private key"
+4. **Download and Save:** Confirm by clicking "Generate key" again. Save the downloaded JSON file as `auth/firebase-secrets/service-account.json`
 
 ### Start the App
 
-Go to the `photo-web/ui` folder and run the following commands from the terminal:
+Navigate to the `photo-web/ui` directory and run:
 
 ```bash
 npm install
@@ -173,17 +173,17 @@ docker compose up -d
 docker compose logs -f
 ```
 
-Check the log for errors. If everything goes well, you should be able to access the app from anywhere in the world under the domain you purchased, e.g. `https://your-domain.com`.
+Check the logs for errors. If successful, access your app globally at `https://your-domain.com`.
 
-Repeat these steps to restart the app. For shutting down, run
+To restart the app, repeat the above steps. To shut down:
 
 ```bash
 docker compose down
 ```
 
-Optionally (and for better efficiency), set up a local DNS server to point your domain to the server photo-web is running on. Many routers have build-in DNS servers that can do this. Now when accessing photo-web locally, all traffic is handled locally. Depending on your internet connection you may see faster speed. Away from home Cloudflare takes care of forwarding access from the internet to your server. Point `your-domain.com` and `traefik.your-domain.com` to the server. The latter entry is only required to access the Traefik dashboard.
+**Optional:** Configure your router's DNS to point your domain to the local server for faster local access. Point both `your-domain.com` and `traefik.your-domain.com` to the server (the latter for Traefik dashboard access).
 
-Optionally build the documentation. From the project root run
+**Optional:** Build documentation from the project root:
 
 ```bash
 pip install mkdocs>=1.5.0
@@ -196,7 +196,7 @@ The documentation will be available at `https://<your-domain>/static/docs/`.
 
 ### Updating
 
-To update to the lastest version availabe on github, run the following commands in your project folder:
+To update to the latest version from GitHub:
 
 ```bash
 git pull
@@ -208,4 +208,4 @@ cd ui && npm install && npm run build
 
 ## Architecture
 
-The [Project Brief](./projectBrief.md) provides a concise overview. The AI generated documentation in the `./docs` (render with `mkdocs build`) a rather *extensive* AI generated discussion.
+The [Project Brief](./projectBrief.md) provides a concise overview. The `./docs` directory contains extensive AI-generated documentation (build with `mkdocs build`).

@@ -4,10 +4,10 @@ Photo Web is a web application for playing Apple Photo Albums and viewing docume
 
 ## Features
 
-The application comprises a backend and web client. Acccess to the backend  is exclusively via https to `${ROOT_DOMAIN}` with a valid certificate. The web client is a single page application (SPA) that can be accessed via http (redirected to https) or https.
+The application comprises a backend and web client. Access to the backend is exclusively via HTTPS to `${ROOT_DOMAIN}` with a valid certificate. The web client is a single page application (SPA) accessible via HTTP (redirected to HTTPS) or HTTPS.
 
 > [!TIP]
-> Encrypted access applies even to testing and development (ingress to `localhost` fails). Hence it is imperative to set up a DNS server for `${ROOT_DOMAIN}` (e.g. adding `127.0.0.1 dev49.org` to `/etc/hosts` on Linux or macOS). Testing strategies include
+> Encrypted access applies to testing and development (ingress to `localhost` fails). Set up DNS for `${ROOT_DOMAIN}` (e.g., add `127.0.0.1 dev49.org` to `/etc/hosts` on Linux/macOS). Testing strategies include:
 >
 > * access via docker exec
 > * adding testing code to the application and accessing it e.g. with curl or the web client
@@ -25,25 +25,24 @@ The backend is a docker stack orchestrated by `docker-compose`. It comprises the
   * port 443
   * port 80 (redirects to port 443)
   * cloudflare tunnel
-* Delegates authetication and authorization to the `auth` service
+* Delegates authentication and authorization to the `auth` service
 * Rate limiting for ingress via cloudflare tunnel (TODO)
 
 #### Auth
 
-The `auth` service uses [firebase](https://firebase.google.com/) for authentication and a custom implementation of role-based access to specific URIs and authorization.
-It is implemented at a [FastAPI](https://fastapi.tiangolo.com/) server. Endpoint documentation is available at `https://${ROOT_DOMAIN}/auth/openapi.json` or formatted at `https://${ROOT_DOMAIN}/auth/redoc` and `https://${ROOT_DOMAIN}/auth/docs`.
+The `auth` service uses [Firebase](https://firebase.google.com/) for authentication and implements custom role-based authorization for specific URIs. Built with [FastAPI](https://fastapi.tiangolo.com/), endpoint documentation is available at `https://${ROOT_DOMAIN}/auth/openapi.json` or formatted at `https://${ROOT_DOMAIN}/auth/redoc` and `https://${ROOT_DOMAIN}/auth/docs`.
 
 ##### Authentication
 
-The `/auth/login` endpoint verifies the user with firebase (currently only login with Google is suppoorted). It automatically adds new users to and SQLite database and stores the login credential in a secure cookie valid for ${AUTH_COOKIE_EXPIRATION_DAYS}. The `/auth/logout` endpoint deletes the login and session cookies. `/auth/me` returns the current user information including name, email, and roles.
+The `/auth/login` endpoint verifies users with Firebase (currently only Google login is supported). It automatically adds new users to an SQLite database and stores login credentials in a secure cookie valid for `${AUTH_COOKIE_EXPIRATION_DAYS}` days. The `/auth/logout` endpoint deletes login and session cookies. `/auth/me` returns current user information including name, email, and roles.
 
 ##### Authorization
 
 Authorization is based on the user's roles and routes defined in `auth/app/roles.csv`. The file has four columns:
 
 * action: allow or deny
-* route pattern (wildards supported, e.g. `*/redoc`)
-* role (e.g. `public`, `private`). Alternatively this field may delegate to a different authorization service identified by its uri on the internal docker network (e.g. `!photos:8000`).
+* route pattern (wildcards supported, e.g., `*/redoc`)
+* role (e.g., `public`, `private`). Alternatively, this field may delegate to a different authorization service identified by its URI on the internal Docker network (e.g., `!photos:8000`).
 * a comment
 
 Sample `roles.csv`:
@@ -68,27 +67,27 @@ Routes that match are accepted or denied based on the first matching rule. If no
 
 The application uses the following roles:
 
-* `public`: All visitors to the website (regardless of loging) are assigned this role. It gives access to the user interface and public albums and documents.
-* `protected`: Authenticated users are assigned the `public` and `protected` roles by default.
-* `private`: Must be explicitly assigned to users by the administrator. It gives access to private albums and documents.
-* `admin`: Gives permission to view and edit users (especially roles) and to reload the photos database.
-* additional roles specify access to documents as expllained below.
+* `public`: All visitors (regardless of login status) are assigned this role. Provides access to the user interface and public albums/documents.
+* `protected`: Authenticated users are assigned both `public` and `protected` roles by default.
+* `private`: Must be explicitly assigned by administrators. Provides access to private albums and documents.
+* `admin`: Allows viewing/editing users (especially roles) and reloading the photos database.
+* Additional roles specify document access as explained below.
 
-Access to photo albums and individual photos works as follows: Albums in folder `Public` of the Apple Photos App are available to all users (based on the `public` role). Matching is case insensitive. Access to albums in folder `Protected` requires the `protected` role for access, and albums in folder `Private` require the `private` role. Individual photos are accessible based on the album's access rights. If a photo is included in more than one album, it is accessible based on the least restrictive album's access rights.
+Photo album access works as follows: Albums in the `Public` folder of Apple Photos are available to all users (via the `public` role). Albums in `Protected` require the `protected` role, and albums in `Private` require the `private` role. Matching is case-insensitive. Individual photos inherit their album's access rights. Photos in multiple albums use the least restrictive access rights.
 
 > [!CAUTION]
 > The public/protected/private access rights are deeply ingrained in the way the `photos` service works. Modification would require a major refactoring of the service.
 
-Access to documents is based on the name of folders in the `${FILES}` directory. Only users with roles that match the folder name can access the documents in that folder. Matching is case insensitive. For example, a user with the `private` role can access documents in the `Private` folder, but not in the `Public` or `Protected` folders. The `public` role gives access to documents in the `Public` folder.
+Document access is based on folder names in the `${FILES}` directory. Users can only access documents in folders matching their roles (case-insensitive). For example, users with the `private` role can access the `Private` folder but not `Public` or `Protected` folders.
 
 > [!TIP]
-> Create a folder `family` in the `${FILES}` directory and add to it information you want to share with family members only. Then add the role `family` to users that should have access. To edit users and roles, login to an account with the `admin` role (e.g. the `SUPER_USER_EMAIL` specified in the `.env` file). Click on the three dots to the left of your avatar and choose `Users ...` from the menu.
+> Create a `family` folder in `${FILES}` for family-only content. Add the `family` role to appropriate users. To edit users and roles, log in with an `admin` account (e.g., `SUPER_USER_EMAIL` from `.env`), click the three dots left of your avatar, and select `Users...`.
 
 #### Nginx
 
-The `nginx` service serves static files from the `ui` directory and proxies requests to the `auth`, `files` and `photos` services. It is also used to cache images served by the `photos` service. The configuration is in `nginx/nginx-proxy.conf`.
+The `nginx` service serves static files from the `ui` directory and proxies requests to the `auth`, `files`, and `photos` services. It caches images from the `photos` service. Configuration is in `nginx/nginx-proxy.conf`.
 
-Processing photos (conversion from `heic` to `jpeg` and scaling) is quite compute intensive. To partially mitigate this issue (short of getting a more powerful server), nginx caches images:
+Photo processing (HEIC to JPEG conversion and scaling) is compute-intensive. Nginx caches images to improve performance:
 
 ```nginx
 # Cache settings for photos - optimized for slow server performance
@@ -105,28 +104,28 @@ proxy_cache_path  /var/cache/nginx/photos
 
 #### Photos
 
-The `photos` service serves album indices and photos directly from the Apple Photos library (mounted into the service with read-only access) extracted with [OSXPhotos](https://github.com/RhetTbull/osxphotos). It is implemented at a [FastAPI](https://fastapi.tiangolo.com/) server. Endpoint documentation is available at `https://${ROOT_DOMAIN}/photos/openapi.json` or formatted at `https://${ROOT_DOMAIN}/photos/redoc` and `https://${ROOT_DOMAIN}/photos/docs`.
+The `photos` service serves album indices and photos directly from the Apple Photos library (read-only mounted) using [OSXPhotos](https://github.com/RhetTbull/osxphotos). Built with [FastAPI](https://fastapi.tiangolo.com/), endpoint documentation is available at `https://${ROOT_DOMAIN}/photos/openapi.json` or formatted at `https://${ROOT_DOMAIN}/photos/redoc` and `https://${ROOT_DOMAIN}/photos/docs`.
 
-The service does not copy the photo library or its contents, but the `/api/photos/{photo_id}/img{size_suffix}` scales images to common sizes and converts `heic` images to `jpg` on the fly. Nginx caching can be used to speed up access to frequently accessed images.
+The service doesn't copy the photo library but scales images and converts HEIC to JPEG on-the-fly via `/api/photos/{photo_id}/img{size_suffix}`. Nginx caching speeds up access to frequently requested images.
 
 #### Files
 
-The `files` service gives read-only access to the `${FILES}` folder. It is implemented at a [FastAPI](https://fastapi.tiangolo.com/) server. Endpoint documentation is available at `https://${ROOT_DOMAIN}/auth/openapi.json` or formatted at `https://${ROOT_DOMAIN}/auth/redoc` and `https://${ROOT_DOMAIN}/auth/docs`.
+The `files` service provides read-only access to the `${FILES}` folder. Built with [FastAPI](https://fastapi.tiangolo.com/), endpoint documentation is available at `https://${ROOT_DOMAIN}/files/openapi.json` or formatted at `https://${ROOT_DOMAIN}/files/redoc` and `https://${ROOT_DOMAIN}/files/docs`.
 
 #### Analytics
 
-The `analytics` serivce analyzes traefik logs. It is implemented at a [FastAPI](https://fastapi.tiangolo.com/) server.
+The `analytics` service analyzes Traefik logs. Built with [FastAPI](https://fastapi.tiangolo.com/).
 
 #### Cloudflare Tunnel
 
-The `cloudflared` service sets up a secure tunnel to `traefik` to provide world-wide access to the application.
+The `cloudflared` service creates a secure tunnel to Traefik for worldwide application access.
 
 ### Frontend
 
-The frontend is a single page application (SPA) based on [LitElement](https://lit.dev/) and scaffolded with [Vite](https://vitejs.dev/). It is written in TypeScript and uses [Shoelace](https://shoelace.style/) for UI components. The frontend is served by the backend and can be accessed at `https://${ROOT_DOMAIN}`. Main components are:
+The frontend is a single-page application (SPA) built with [LitElement](https://lit.dev/) and [Vite](https://vitejs.dev/). Written in TypeScript, it uses [Shoelace](https://shoelace.style/) for UI components. Served by the backend at `https://${ROOT_DOMAIN}`. Main components:
 
-* `pw-main`: Sets up the routing and provides contexts for `me` (user information) and other information used by several components.
-* `pw-nav-page`: Main look-and feel of the application. It contains the header with navigation and main content area.
-* `pw-photo-browser`: Interface for browsing and viewing albums in the Apple Photos library.
-* `pw-slideshow`: Shows photo albums.
-* `pw-files-browser`: The files browser that allows users to browse and view documents in the `${FILES}` folder. Renders common formats like markdown, pdf, and images.
+* `pw-main`: Sets up routing and provides contexts for user information and shared data.
+* `pw-nav-page`: Main application layout with header navigation and content area.
+* `pw-photo-browser`: Interface for browsing Apple Photos library albums.
+* `pw-slideshow`: Displays photo albums as slideshows.
+* `pw-files-browser`: Browse and view documents in `${FILES}` folder. Renders markdown, PDF, and images.
