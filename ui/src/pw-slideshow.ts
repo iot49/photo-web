@@ -33,7 +33,7 @@ to achieve alternate behaviors.
 */
 
 const TRANSITION_MS = 1100; // duration of slide transition in [ms]
-const SLIDE_MS = 2500; // time each slide is shown in [ms]; note: extra wide or tall slides take more time
+const SLIDE_MS = 3100; // time each slide is shown in [ms]; note: extra wide or tall slides take more time
 const PANORAMA_TIME = 2.4; // increase parnorama image animation time by up to this factor
 const SCALE_FACTOR = 1.2; // factor by which the image is scaled during translation
 
