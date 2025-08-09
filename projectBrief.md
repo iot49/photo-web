@@ -42,8 +42,8 @@ graph TB
     
     subgraph "Data Sources"
         APL[Apple Photos Library<br/>Read-only Mount]
-        FD[Files Directory<br/>${FILES}]
-        DB[(SQLite Database<br/>Users & Sessions)]
+        FD["Files Directory<br/>&#36;{FILES}"]
+        DB[("SQLite Database<br/>Users & Sessions")]
     end
     
     CF --> T
