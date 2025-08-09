@@ -30,7 +30,7 @@ graph TB
     subgraph "Docker Network"
         T[Traefik<br/>Reverse Proxy]
         A[Auth Service<br/>Firebase + Roles]
-        N[Nginx<br/>Static Files + Cache]
+        N[Nginx<br/>Static Files + Proxy + Cache]
         P[Photos Service<br/>Apple Photos API]
         F[Files Service<br/>Document Access]
         AN[Analytics Service<br/>Log Analysis]
@@ -50,13 +50,15 @@ graph TB
     HTTPS --> T
     HTTP --> T
     
-    T --> A
     T --> N
-    T --> P
-    T --> F
+    T -.-> A
     T --> AN
     
     N --> SPA
+    N --> P
+    N --> F
+    N --> A
+    
     A --> DB
     P --> APL
     F --> FD
@@ -68,7 +70,7 @@ graph TB
     style F fill:#fce4ec
 ```
 
-**Figure 1: System Architecture** - The complete Photo Web system showing all services and their relationships. Traefik acts as the central ingress point, routing requests to appropriate services while delegating authentication to the Auth service.
+**Figure 1: System Architecture** - The complete Photo Web system showing all services and their relationships. Traefik acts as the central ingress point, routing most requests through Nginx which proxies to Photos and Files services. Auth service has both direct access from Traefik (for login) and proxied access through Nginx.
 
 ### Authentication Flow
 
