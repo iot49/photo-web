@@ -142,24 +142,28 @@ def process_image_with_imagemagick(
     summary="Serve Photo Image (Original)",
     description=dedent_and_convert_to_html(
         """
-    Serve the original full-resolution photo image.
-    
-    Returns the photo in its original resolution and format, with optional
-    format conversion from HEIC to JPEG for browser compatibility.
-    
-    **Access Control:** Photo access inherited from most permissive album
-    
-    **Format Handling:**
-    - HEIC images automatically converted to JPEG using ImageMagick
-    - PDF files automatically converted to PNG using ImageMagick
-    - Other formats served as-is when possible
-    - Quality parameter applies only to JPEG conversion
-    
-    **Performance Notes:**
-    - Original images may be very large (10MB+)
-    - Consider using size variants for better performance
-    - Images are cached after first processing
-    """
+        Serve the original full-resolution photo image.
+        
+        Returns the photo in its original resolution and format, with optional
+        format conversion from HEIC to JPEG for browser compatibility.
+        
+        **Access Control:** Photo access inherited from most permissive album
+        
+        **Format Handling:**
+        - HEIC images automatically converted to JPEG using ImageMagick
+        - PDF files automatically converted to PNG using ImageMagick
+        - Other formats served as-is when possible
+        - Quality parameter applies only to JPEG conversion
+        
+        **Test Mode:**
+        When `test=true`, adds a text overlay showing "original"
+        for debugging responsive image implementations.
+        
+        **Performance Notes:**
+        - Original images may be very large (10MB+)
+        - Consider using size variants for better performance
+        - Images are cached after first processing
+        """
     ),
     responses={
         200: {
@@ -202,6 +206,10 @@ async def serve_photo_image_original(
     quality: Optional[int] = Query(
         85, ge=1, le=100, description="JPEG quality (1-100) for image conversion"
     ),
+    test: bool = Query(
+        False,
+        description="When true, embed 'original' text overlay in image for debugging",
+    ),
     db: DB = Depends(get_db),
 ):
     """
@@ -213,11 +221,13 @@ async def serve_photo_image_original(
     Args:
         photo_id: The UUID of the photo to serve
         quality: JPEG quality (1-100, default 85) for image conversion
+        test: When true, embed "original" text overlay for debugging
         db: Photos database dependency
 
     Returns:
         Original image as JPEG/PNG/TIFF or converted format for compatibility.
         PDFs are converted to PNG, HEIC images converted to JPEG.
+        Test mode adds "original" text overlay in lower right corner.
 
     Raises:
         HTTPException: 404 for missing photo/file, 500 for processing errors
@@ -251,8 +261,8 @@ async def serve_photo_image_original(
     # Check if format conversion is needed (HEIC/TIFF always need conversion to JPEG)
     needs_conversion = photo.uti in ["public.heic", "public.tiff"]
 
-    # Process if conversion is needed or if it's a PDF
-    needs_processing = needs_conversion or is_pdf
+    # Process if conversion is needed, if it's a PDF, or if test overlay is requested
+    needs_processing = needs_conversion or is_pdf or test
 
     if not needs_processing:
         logger.info("No processing needed, returning original file")
@@ -260,10 +270,13 @@ async def serve_photo_image_original(
 
     # Process based on file type
     try:
+        # Determine test overlay text
+        test_overlay = "original" if test else None
+
         if is_pdf:
             logger.debug("Processing original PDF with ImageMagick service")
             image_bytes = process_pdf_with_imagemagick_service(
-                path, photo.width, photo.height, quality, None
+                path, photo.width, photo.height, quality, test_overlay
             )
             media_type = "image/png"
             logger.info(
@@ -272,7 +285,7 @@ async def serve_photo_image_original(
         else:
             logger.debug("Processing original image with ImageMagick service")
             image_bytes = process_image_with_imagemagick_service(
-                path, photo.width, photo.height, quality, None
+                path, photo.width, photo.height, quality, test_overlay
             )
             media_type = "image/jpeg"
             logger.info(

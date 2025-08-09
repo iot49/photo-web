@@ -113,6 +113,10 @@ The service does not copy the photo library or its contents, but the `/api/photo
 
 The `files` service gives read-only access to the `${FILES}` folder. It is implemented at a [FastAPI](https://fastapi.tiangolo.com/) server. Endpoint documentation is available at `https://${ROOT_DOMAIN}/auth/openapi.json` or formatted at `https://${ROOT_DOMAIN}/auth/redoc` and `https://${ROOT_DOMAIN}/auth/docs`.
 
+#### Analytics
+
+The `analytics` serivce analyzes traefik logs. It is implemented at a [FastAPI](https://fastapi.tiangolo.com/) server.
+
 #### Cloudflare Tunnel
 
 The `cloudflared` service sets up a secure tunnel to `traefik` to provide world-wide access to the application.

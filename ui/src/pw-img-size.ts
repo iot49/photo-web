@@ -476,6 +476,10 @@ export class PwImgSize extends LitElement {
         <div class="container">
           <h2>Image Size Test</h2>
 
+          <div style="margin: 10px 0; padding: 10px; background: #e8f4f8; border-radius: 4px; font-size: 14px;">
+            <strong>Current Image URL:</strong> ${this.currentImageSrc || 'Loading...'}
+          </div>
+
           <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 4px;">
             <h3>Download Speed Test</h3>
             <p style="margin: 10px 0; font-size: 14px;">

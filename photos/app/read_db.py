@@ -82,6 +82,23 @@ def _album_location(photos: list[PhotoModelWithPath]) -> Optional[AlbumLocation]
     )
 
 
+def _most_permissive_realm(realm1: str, realm2: str) -> str:
+    """
+    Returns the most permissive realm between two realms.
+
+    Realm hierarchy (most to least permissive):
+    public > protected > private
+    """
+    realm_hierarchy = {"public": 3, "protected": 2, "private": 1}
+
+    # Get hierarchy values, defaulting to 1 (private) for unknown realms
+    value1 = realm_hierarchy.get(realm1, 1)
+    value2 = realm_hierarchy.get(realm2, 1)
+
+    # Return the realm with the higher hierarchy value (more permissive)
+    return realm1 if value1 >= value2 else realm2
+
+
 def read_db(db_path: str, filters: str) -> DB:
     albums: Dict[str, AlbumModelWithPhotos] = {}
     photos: Dict[str, PhotoModelWithPath] = {}
@@ -118,8 +135,10 @@ def read_db(db_path: str, filters: str) -> DB:
         # photo info
         for photo in album.photos:
             if photo.uuid in photos:
-                # update the permissions (realm)
-                photos[photo.uuid]["realm"] = min(photos[photo.uuid]["realm"], realm)
+                # update the permissions (realm) - use most permissive realm
+                photos[photo.uuid]["realm"] = _most_permissive_realm(
+                    photos[photo.uuid]["realm"], realm
+                )
             else:
                 # add the photo
                 info = {
