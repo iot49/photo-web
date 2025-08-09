@@ -149,7 +149,7 @@ The backend is a docker stack orchestrated by `docker-compose` (see Figure 1 for
   * port 80 (redirects to port 443)
   * cloudflare tunnel
 * Delegates authentication and authorization to the `auth` service (see Figures 2 and 3 for detailed authentication and authorization flows)
-* Rate limiting for ingress via cloudflare tunnel (TODO)
+* Rate limiting for ingress
 
 #### Auth
 
