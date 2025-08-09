@@ -13,11 +13,134 @@ The application comprises a backend and web client. Access to the backend is exc
 > * adding testing code to the application and accessing it e.g. with curl or the web client
 > * creating special `test` containers
 
+## Architecture Overview
+
+The Photo Web application follows a microservices architecture with clear separation of concerns. The system comprises multiple Docker services orchestrated through docker-compose, with Traefik serving as the single point of ingress and handling SSL termination.
+
+### System Architecture
+
+```mermaid
+graph TB
+    subgraph "External Access"
+        CF[Cloudflare Tunnel]
+        HTTPS[HTTPS :443]
+        HTTP[HTTP :80]
+    end
+    
+    subgraph "Docker Network"
+        T[Traefik<br/>Reverse Proxy]
+        A[Auth Service<br/>Firebase + Roles]
+        N[Nginx<br/>Static Files + Cache]
+        P[Photos Service<br/>Apple Photos API]
+        F[Files Service<br/>Document Access]
+        AN[Analytics Service<br/>Log Analysis]
+    end
+    
+    subgraph "Frontend"
+        SPA[Single Page App<br/>LitElement + TypeScript]
+    end
+    
+    subgraph "Data Sources"
+        APL[Apple Photos Library<br/>Read-only Mount]
+        FD[Files Directory<br/>${FILES}]
+        DB[(SQLite Database<br/>Users & Sessions)]
+    end
+    
+    CF --> T
+    HTTPS --> T
+    HTTP --> T
+    
+    T --> A
+    T --> N
+    T --> P
+    T --> F
+    T --> AN
+    
+    N --> SPA
+    A --> DB
+    P --> APL
+    F --> FD
+    
+    style T fill:#e1f5fe
+    style A fill:#f3e5f5
+    style N fill:#e8f5e8
+    style P fill:#fff3e0
+    style F fill:#fce4ec
+```
+
+**Figure 1: System Architecture** - The complete Photo Web system showing all services and their relationships. Traefik acts as the central ingress point, routing requests to appropriate services while delegating authentication to the Auth service.
+
+### Authentication Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant T as Traefik
+    participant A as Auth Service
+    participant FB as Firebase
+    participant DB as SQLite DB
+    
+    U->>T: Request /auth/login
+    T->>A: Forward request
+    A->>FB: Verify Google credentials
+    FB-->>A: User info (email, name)
+    A->>DB: Store/update user
+    A->>A: Generate secure cookie
+    A-->>T: Set auth cookie
+    T-->>U: Redirect to app
+    
+    Note over U,DB: Subsequent requests
+    U->>T: Request protected resource
+    T->>A: Validate cookie
+    A->>DB: Check user session
+    A-->>T: User info + roles
+    T->>T: Apply authorization rules
+    T-->>U: Allow/deny access
+```
+
+**Figure 2: Authentication Flow** - Shows how users authenticate through Firebase and how sessions are managed. The Auth service creates secure cookies that are validated on subsequent requests.
+
+### Authorization Flow
+
+```mermaid
+flowchart TD
+    A[Request arrives at Traefik] --> B{Auth cookie present?}
+    B -->|No| C[Assign 'public' role only]
+    B -->|Yes| D[Forward to Auth service]
+    
+    D --> E[Validate cookie]
+    E --> F{Valid session?}
+    F -->|No| C
+    F -->|Yes| G[Get user roles from DB]
+    
+    C --> H[Check roles.csv rules]
+    G --> H
+    
+    H --> I{Route matches rule?}
+    I -->|No match| J[DENY - Default deny]
+    I -->|Match| K{Action = allow?}
+    K -->|No| J
+    K -->|Yes| L{Delegate to service?}
+    
+    L -->|No| M[ALLOW - Grant access]
+    L -->|Yes| N[Forward to target service<br/>for additional auth]
+    
+    N --> O{Service allows?}
+    O -->|Yes| M
+    O -->|No| J
+    
+    style J fill:#ffebee
+    style M fill:#e8f5e8
+    style N fill:#fff3e0
+```
+
+**Figure 3: Authorization Flow** - Illustrates the role-based authorization process using rules.csv. Some routes can delegate authorization decisions to target services for fine-grained access control.
+
 ## Implementation
 
 ### Backend
 
-The backend is a docker stack orchestrated by `docker-compose`. It comprises the following services:
+The backend is a docker stack orchestrated by `docker-compose` (see Figure 1 for the complete system architecture). It comprises the following services:
 
 #### Traefik
 
@@ -25,7 +148,7 @@ The backend is a docker stack orchestrated by `docker-compose`. It comprises the
   * port 443
   * port 80 (redirects to port 443)
   * cloudflare tunnel
-* Delegates authentication and authorization to the `auth` service
+* Delegates authentication and authorization to the `auth` service (see Figures 2 and 3 for detailed authentication and authorization flows)
 * Rate limiting for ingress via cloudflare tunnel (TODO)
 
 #### Auth
@@ -34,11 +157,11 @@ The `auth` service uses [Firebase](https://firebase.google.com/) for authenticat
 
 ##### Authentication
 
-The `/auth/login` endpoint verifies users with Firebase (currently only Google login is supported). It automatically adds new users to an SQLite database and stores login credentials in a secure cookie valid for `${AUTH_COOKIE_EXPIRATION_DAYS}` days. The `/auth/logout` endpoint deletes login and session cookies. `/auth/me` returns current user information including name, email, and roles.
+The `/auth/login` endpoint verifies users with Firebase (currently only Google login is supported), as illustrated in Figure 2. It automatically adds new users to an SQLite database and stores login credentials in a secure cookie valid for `${AUTH_COOKIE_EXPIRATION_DAYS}` days. The `/auth/logout` endpoint deletes login and session cookies. `/auth/me` returns current user information including name, email, and roles.
 
 ##### Authorization
 
-Authorization is based on the user's roles and routes defined in `auth/app/roles.csv`. The file has four columns:
+Authorization follows the flow shown in Figure 3 and is based on the user's roles and routes defined in `auth/app/roles.csv`. The file has four columns:
 
 * action: allow or deny
 * route pattern (wildcards supported, e.g., `*/redoc`)
@@ -63,7 +186,7 @@ allow, /photos/api/reload-db, admin, Reload photos database
 ...
 ```
 
-Routes that match are accepted or denied based on the first matching rule. If no rule matches, access is denied.
+Routes that match are accepted or denied based on the first matching rule. If no rule matches, access is denied. This process is detailed in the authorization flow diagram (Figure 3).
 
 The application uses the following roles:
 
