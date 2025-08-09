@@ -579,7 +579,6 @@ export class PwSlideshow extends LitElement {
           class="lazy"
           controls
           autoplay
-          muted
           preload="metadata"
           title="${photo.title || 'Video'}"
           @canplay=${(e: Event) => this.handleVideoCanPlay(e)}
