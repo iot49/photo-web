@@ -7,6 +7,7 @@ boser-guyon.org
 # misc
 .DS_Store
 .envrc
+.roomodes
 BACKUP/
 memory-bank/
 photo-web-implementation-proposal.md

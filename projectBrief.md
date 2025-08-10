@@ -29,11 +29,11 @@ graph TB
     
     subgraph "Docker Network"
         T[Traefik<br/>Reverse Proxy]
-        A[Auth Service<br/>Firebase + Roles]
+        A[Auth Service<br/>Firebase + Roles + Analytics Collection]
         N[Nginx<br/>Static Files + Proxy + Cache]
         P[Photos Service<br/>Apple Photos API]
         F[Files Service<br/>Document Access]
-        AN[Analytics Service<br/>Log Analysis]
+        AN[Analytics Service<br/>Log Processing + Reports]
     end
     
     subgraph "Frontend"
@@ -44,6 +44,8 @@ graph TB
         APL[Apple Photos Library<br/>Read-only Mount]
         FD["Files Directory<br/>&#36;{FILES}"]
         DB[("SQLite Database<br/>Users & Sessions")]
+        TL[("Traefik Logs<br/>Access Logs")]
+        AD[("Analytics Data<br/>Usage Statistics")]
     end
     
     CF --> T
@@ -52,7 +54,7 @@ graph TB
     
     T --> N
     T -.-> A
-    T --> AN
+    T --> TL
     
     N --> SPA
     N --> P
@@ -60,17 +62,21 @@ graph TB
     N --> A
     
     A --> DB
+    A --> AD
     P --> APL
     F --> FD
+    AN --> TL
+    AN --> AD
     
     style T fill:#e1f5fe
     style A fill:#f3e5f5
     style N fill:#e8f5e8
     style P fill:#fff3e0
     style F fill:#fce4ec
+    style AN fill:#fff8e1
 ```
 
-**Figure 1: System Architecture** - The complete Photo Web system showing all services and their relationships. Traefik acts as the central ingress point, routing most requests through Nginx which proxies to Photos and Files services. Auth service has both direct access from Traefik (for login) and proxied access through Nginx.
+**Figure 1: System Architecture** - The complete Photo Web system showing all services and their relationships. Traefik acts as the central ingress point, routing most requests through Nginx which proxies to Photos and Files services. Auth service has both direct access from Traefik (for login) and proxied access through Nginx, and collects analytics data during authorization. Analytics service processes Traefik logs and auth-collected data to generate usage reports.
 
 ### Authentication Flow
 
@@ -208,6 +214,24 @@ Document access is based on folder names in the `${FILES}` directory. Users can 
 > [!TIP]
 > Create a `family` folder in `${FILES}` for family-only content. Add the `family` role to appropriate users. To edit users and roles, log in with an `admin` account (e.g., `SUPER_USER_EMAIL` from `.env`), click the three dots left of your avatar, and select `Users...`.
 
+##### Analytics Collection & API
+
+The auth service collects comprehensive analytics data during every authorization request and provides API endpoints for accessing usage statistics. This dual functionality enables real-time data collection and administrative reporting.
+
+**Data Collection**: During each [`/authorize`](auth/app/main.py:285) request, the auth service automatically collects:
+- User identification and roles
+- Resource access patterns (albums, photos, files)
+- Request timing and performance metrics
+- Geographic and device information
+- Success/failure rates and error tracking
+
+**Analytics API Endpoints** (Admin access required):
+- [`GET /auth/api/analytics/usage-summary`](auth/app/main.py:571) - Comprehensive usage statistics for specified time periods
+- [`GET /auth/api/analytics/album-stats`](auth/app/main.py:660) - Detailed album access analytics and popularity metrics
+- [`GET /auth/api/analytics/user-activity`](auth/app/main.py:780) - User behavior analysis and engagement patterns
+
+The collected data is stored in [`/app/analytics`](auth/app/analytics.py:22) and processed by the separate analytics service for advanced reporting and trend analysis.
+
 #### Nginx
 
 The `nginx` service serves static files from the `ui` directory and proxies requests to the `auth`, `files`, and `photos` services. It caches images from the `photos` service. Configuration is in `nginx/nginx-proxy.conf`.
@@ -239,7 +263,33 @@ The `files` service provides read-only access to the `${FILES}` folder. Built wi
 
 #### Analytics
 
-The `analytics` service analyzes Traefik logs. Built with [FastAPI](https://fastapi.tiangolo.com/).
+The `analytics` service is an internal log processing and reporting system that analyzes Traefik access logs and auth service analytics data to generate comprehensive usage reports. Built with Python and pandas for data processing.
+
+**Key Features:**
+- **Log Processing**: Continuously processes Traefik access logs in JSON format
+- **Data Aggregation**: Combines Traefik logs with auth service analytics data
+- **Automated Reporting**: Generates daily and weekly analytics reports
+- **Data Retention**: Automatic cleanup of old analytics data (90-day default retention)
+- **Performance Metrics**: Response time analysis and system performance tracking
+
+**Architecture**: The service runs as a background container that:
+1. Reads Traefik access logs from shared volume [`/logs/traefik`](docker-compose.yml:194)
+2. Processes auth service analytics data from [`/app/analytics`](docker-compose.yml:105)
+3. Generates structured reports stored in [`/app/data`](docker-compose.yml:195)
+4. Provides processed data for consumption by auth service API endpoints
+
+**Data Flow:**
+```
+Traefik Access Logs → Analytics Processor → Daily/Weekly Reports
+Auth Service Analytics → Analytics Processor → Usage Statistics
+```
+
+**Generated Reports:**
+- **Daily Reports**: Total requests, unique visitors, popular albums/files, response times
+- **Weekly Summaries**: Aggregated statistics, trending content, user engagement patterns
+- **Long-term Trends**: Performance analysis and capacity planning data
+
+The service operates autonomously with hourly processing cycles and daily summary generation. All analytics data is accessible through the auth service's admin-only API endpoints.
 
 #### Cloudflare Tunnel
 

@@ -109,9 +109,12 @@ class DatabaseManager:
             # Create new user
             user_dict = user_data.model_dump()
 
-            # Set roles to "public,admin" if email equals SUPER_USER_EMAIL
-            super_user_email = os.getenv("SUPER_USER_EMAIL")
-            if super_user_email and user_data.email == super_user_email:
+            # Set roles to "public,admin" if email is in SUPER_USER_EMAIL list
+            super_user_emails = os.getenv("SUPER_USER_EMAIL", "")
+            super_user_list = [
+                email.strip() for email in super_user_emails.split(":") if email.strip()
+            ]
+            if user_data.email in super_user_list:
                 user_dict["roles"] = "public,admin"
 
             # Set created_at to current date if not provided
@@ -129,9 +132,15 @@ class DatabaseManager:
         with self.get_session() as session:
             user = session.exec(select(User).where(User.email == email)).first()
 
-            # Add admin role if this is the super user
+            # Add admin role if this is a super user
             if user:
-                if user.email == os.getenv("SUPER_USER_EMAIL"):
+                super_user_emails = os.getenv("SUPER_USER_EMAIL", "")
+                super_user_list = [
+                    email.strip()
+                    for email in super_user_emails.split(":")
+                    if email.strip()
+                ]
+                if user.email in super_user_list:
                     # Ensure admin role is present
                     roles = set(
                         [role.strip() for role in user.roles.split(",") if role.strip()]
