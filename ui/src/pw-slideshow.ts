@@ -46,6 +46,7 @@ export class PwSlideshow extends LitElement {
   private srcsetInfo!: SrcsetInfo;
 
   @query('#slideshow') slideshow!: HTMLDivElement;
+  @query('#overlays') overlays!: HTMLDivElement;
 
   // colon-separated uid's of albums to display
   @property({ type: String }) playlist = '';
@@ -71,8 +72,14 @@ export class PwSlideshow extends LitElement {
   // Timeout ID for goto retries
   private gotoTimeoutId: number | null = null;
 
+  // Timeout ID for overlay auto-hide
+  private overlayTimeoutId: number | null = null;
+
   // Swipe handler instance
   private swipeHandler: SwipeHandler | null = null;
+
+  // Overlay visibility state
+  @state() private overlaysVisible = false;
 
   // playlist to array of album uid's
   private get uids(): string[] {
@@ -113,6 +120,7 @@ export class PwSlideshow extends LitElement {
     super.firstUpdated(_changedProperties);
     this.goto(0);
     this.setupSwipeHandlers();
+    this.setupOverlayHandlers();
   }
 
   private goto = (nextIndex: number) => {
@@ -316,7 +324,19 @@ export class PwSlideshow extends LitElement {
     this.theme = this.theme === 'ken-burns' ? 'carousel' : 'ken-burns';
   }
 
-  private handlePrevClick() {
+  private handlePrevClick(event?: Event) {
+    // Prevent event bubbling to avoid triggering handleOverlayActivity
+    if (event) {
+      event.stopPropagation();
+    }
+    
+    // Hide overlays immediately
+    this.overlaysVisible = false;
+    if (this.overlayTimeoutId !== null) {
+      clearTimeout(this.overlayTimeoutId);
+      this.overlayTimeoutId = null;
+    }
+    
     if (this.autoplayTimeoutId !== null) {
       clearTimeout(this.autoplayTimeoutId);
       this.autoplayTimeoutId = null;
@@ -329,7 +349,19 @@ export class PwSlideshow extends LitElement {
     this.goto(this.currentIndex - 1);
   }
 
-  private handleNextClick() {
+  private handleNextClick(event?: Event) {
+    // Prevent event bubbling to avoid triggering handleOverlayActivity
+    if (event) {
+      event.stopPropagation();
+    }
+    
+    // Hide overlays immediately
+    this.overlaysVisible = false;
+    if (this.overlayTimeoutId !== null) {
+      clearTimeout(this.overlayTimeoutId);
+      this.overlayTimeoutId = null;
+    }
+    
     if (this.autoplayTimeoutId !== null) {
       clearTimeout(this.autoplayTimeoutId);
       this.autoplayTimeoutId = null;
@@ -466,6 +498,34 @@ export class PwSlideshow extends LitElement {
     });
   }
 
+  private setupOverlayHandlers() {
+    if (!this.overlays) {
+      setTimeout(() => this.setupOverlayHandlers(), 300);
+      return;
+    }
+
+    // Add event listeners for mouse movement and clicks
+    this.overlays.addEventListener('mousemove', this.handleOverlayActivity);
+    this.overlays.addEventListener('click', this.handleOverlayActivity);
+    console.log('Overlay handlers set up successfully');
+  }
+
+  private handleOverlayActivity = () => {
+    // Show overlays
+    this.overlaysVisible = true;
+
+    // Clear existing timeout
+    if (this.overlayTimeoutId !== null) {
+      clearTimeout(this.overlayTimeoutId);
+    }
+
+    // Set new timeout to hide overlays
+    this.overlayTimeoutId = window.setTimeout(() => {
+      this.overlaysVisible = false;
+      this.overlayTimeoutId = null;
+    }, 2000);
+  };
+
   disconnectedCallback() {
     super.disconnectedCallback();
     // Clean up all timeouts when component is removed
@@ -480,6 +540,10 @@ export class PwSlideshow extends LitElement {
     if (this.gotoTimeoutId !== null) {
       clearTimeout(this.gotoTimeoutId);
       this.gotoTimeoutId = null;
+    }
+    if (this.overlayTimeoutId !== null) {
+      clearTimeout(this.overlayTimeoutId);
+      this.overlayTimeoutId = null;
     }
     // Clean up swipe handler when component is removed
     if (this.swipeHandler) {
@@ -527,11 +591,11 @@ export class PwSlideshow extends LitElement {
           <div class="title"><p>...</p></div>
         </div>
       </div>
-      <div id="overlays">
-        <div class="overlay prev-overlay" @click=${() => this.handlePrevClick()}>
+      <div id="overlays" class="${this.overlaysVisible ? 'visible' : ''}">
+        <div class="overlay prev-overlay" @click=${(e: Event) => this.handlePrevClick(e)}>
           <sl-icon name="caret-left"></sl-icon>
         </div>
-        <div class="overlay next-overlay" @click=${() => this.handleNextClick()}>
+        <div class="overlay next-overlay" @click=${(e: Event) => this.handleNextClick(e)}>
           <sl-icon name="caret-right"></sl-icon>
         </div>
         <div class="overlay center-overlay" @click=${() => this.toggleAutoplay()}>
@@ -819,8 +883,8 @@ export class PwSlideshow extends LitElement {
         transition: background-color 0.3s ease;
       }
 
-      /* Show transparent background when hovering over #overlays (when sl-icon elements become visible) */
-      #overlays:hover .overlay {
+      /* Show transparent background when overlays are visible */
+      #overlays.visible .overlay {
         background: rgba(255, 255, 255, 0.2);
       }
 
@@ -866,7 +930,7 @@ export class PwSlideshow extends LitElement {
       #overlays sl-icon,
       #overlays p {
         opacity: 0;
-        transition: opacity 0.3s ease;
+        transition: opacity 0.5s ease;
         color: rgba(255, 255, 255, 0.8);
         pointer-events: none;
         position: absolute;
@@ -878,24 +942,15 @@ export class PwSlideshow extends LitElement {
         text-align: center;
       }
 
-      /* Show overlay content when hovering over #overlays with auto-fade */
-      #overlays:hover sl-icon,
-      #overlays:hover p,
-      #overlays:hover {
+      /* Show overlay content when overlays are visible */
+      #overlays.visible sl-icon,
+      #overlays.visible p {
         opacity: 0.9;
-        animation: overlay-auto-fade 2.5s ease-out forwards;
       }
 
-      @keyframes overlay-auto-fade {
-        0% {
-          opacity: 0.8;
-        }
-        70% {
-          opacity: 0.8;
-        }
-        100% {
-          opacity: 0;
-        }
+      /* Fade out overlay backgrounds */
+      .overlay {
+        transition: background-color 0.5s ease;
       }
 
       /* Title slide */
