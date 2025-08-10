@@ -214,9 +214,14 @@ export class PwNavPage extends LitElement {
           <sl-menu-item @click=${() => this.handleNavigation('/ui/traefik-dashboard')}>Traefik Dashboard ...</sl-menu-item>
           <sl-menu-item @click=${() => this.handleNavigation('tests')}>Tests ...</sl-menu-item>
           <sl-menu-item @click=${() => this.handleNavigation('/ui/img-size-test')}>Image Size Test ...</sl-menu-item>
-          <sl-menu-item @click=${() => this.handleNavigation('/ui/auth-api')}>Auth API ...</sl-menu-item>
-          <sl-menu-item @click=${() => this.handleNavigation('/ui/photos-api')}>Photos API ...</sl-menu-item>
-          <sl-menu-item @click=${() => this.handleNavigation('/ui/files-api')}>Files API ...</sl-menu-item>
+          <sl-menu-item>
+            APIs
+            <sl-menu slot="submenu">
+              <sl-menu-item @click=${() => this.handleNavigation('/ui/auth-api')}>Auth</sl-menu-item>
+              <sl-menu-item @click=${() => this.handleNavigation('/ui/photos-api')}>Photos</sl-menu-item>
+              <sl-menu-item @click=${() => this.handleNavigation('/ui/files-api')}>Files</sl-menu-item>
+            </sl-menu>
+          </sl-menu-item>
         </sl-menu>
       </sl-dropdown>
     `;
