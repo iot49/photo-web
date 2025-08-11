@@ -29,7 +29,7 @@ export interface Me {
   terms_accepted: string;
   created_at: string;
   last_login: string;
-  config: Config; // Always parsed object now
+  config: Config; // Always parsed object (not raw json)
 }
 
 // Helper function to check if user has a specific role

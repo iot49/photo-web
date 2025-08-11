@@ -152,7 +152,7 @@ export class PwMain extends LitElement {
     
     // Schedule delayed database update
     this.configUpdateTimeout = setTimeout(async () => {
-      // Return immediately if user is not logged in
+      // No database to update if user is not logged in
       if (!this.me || !this.me.email) {
         this.configUpdateTimeout = null;
         return;
@@ -191,10 +191,10 @@ export class PwMain extends LitElement {
     const sanitizedConfig: Config = {
       dark_mode: parsedConfig?.dark_mode ?? false,
       slideshow: {
-        duration: clamp(parsedConfig?.slideshow?.duration, 1, 10, 3.1),
+        duration: clamp(parsedConfig?.slideshow?.duration, 1, 12, 3.1),
         transition: clamp(parsedConfig?.slideshow?.transition, 0, 3, 1.1),
         panorama: clamp(parsedConfig?.slideshow?.panorama, 1, 6, 2.4),
-        scale_factor: clamp(parsedConfig?.slideshow?.scale_factor, 0.5, 2, 1.2),
+        scale_factor: clamp(parsedConfig?.slideshow?.scale_factor, 1, 3, 1.2),
         theme: parsedConfig?.slideshow?.theme ?? 'ken-burns'
       }
     };
