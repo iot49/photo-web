@@ -29,7 +29,7 @@ export interface Me {
   terms_accepted: string;
   created_at: string;
   last_login: string;
-  config: Config;
+  config: Config | string; // Can be either parsed object or JSON string from server
 }
 
 export class MeImple implements Me {
@@ -62,14 +62,27 @@ export class MeImple implements Me {
     this.created_at = data.created_at;
     this.last_login = data.last_login;
     
+    // Parse config if it's a string, otherwise use as-is
+    let parsedConfig: Config | undefined;
+    if (typeof data.config === 'string') {
+      try {
+        parsedConfig = JSON.parse(data.config);
+      } catch (error) {
+        console.warn('Failed to parse user config JSON:', error);
+        parsedConfig = undefined;
+      }
+    } else {
+      parsedConfig = data.config;
+    }
+    
     // Ensure config has valid defaults
     this.config = {
-      dark_mode: data.config?.dark_mode ?? false,
+      dark_mode: parsedConfig?.dark_mode ?? false,
       slideshow: {
-        duration: data.config?.slideshow?.duration ?? 3.1,
-        transition: data.config?.slideshow?.transition ?? 1.1,
-        panorama: data.config?.slideshow?.panorama ?? 2.4,
-        scale_factor: data.config?.slideshow?.scale_factor ?? 1.2
+        duration: parsedConfig?.slideshow?.duration ?? 3.1,
+        transition: parsedConfig?.slideshow?.transition ?? 1.1,
+        panorama: parsedConfig?.slideshow?.panorama ?? 2.4,
+        scale_factor: parsedConfig?.slideshow?.scale_factor ?? 1.2
       }
     };
   }

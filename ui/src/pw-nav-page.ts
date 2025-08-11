@@ -1,6 +1,6 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
-import { Me } from './app/me.js';
+import { MeImple } from './app/me.js';
 import { consume } from '@lit/context';
 import { meContext } from './app/context.js';
 import { login, logout } from './app/login.js';
@@ -139,7 +139,16 @@ export class PwNavPage extends LitElement {
 
   @consume({ context: meContext, subscribe: true })
   @property({ attribute: false })
-  private me!: Me;
+  private me!: MeImple;
+
+  override updated(changedProperties: Map<string | number | symbol, unknown>) {
+    super.updated(changedProperties);
+    
+    // Sync theme when me property changes (user logs in or config updates)
+    if (changedProperties.has('me')) {
+      this.syncThemeWithUserConfig();
+    }
+  }
 
   @query('#reload-dialog')
   private reload_dialog!: SlDialog;
@@ -148,6 +157,21 @@ export class PwNavPage extends LitElement {
   private cache_dialog!: SlDialog;
 
   private themeManager = ThemeManager.getInstance();
+
+  override connectedCallback() {
+    super.connectedCallback();
+    this.syncThemeWithUserConfig();
+  }
+
+  private syncThemeWithUserConfig() {
+    // If user is logged in and has a theme preference, apply it
+    if (this.me?.config?.dark_mode !== undefined) {
+      const userTheme = this.me.config.dark_mode ? 'dark' : 'light';
+      if (this.themeManager.getCurrentTheme() !== userTheme) {
+        this.themeManager.setTheme(userTheme);
+      }
+    }
+  }
 
   override render() {
     return html`
@@ -265,8 +289,15 @@ export class PwNavPage extends LitElement {
     return this.me?.roles?.includes('admin') || false;
   }
 
-  private toggleTheme() {
+  private async toggleTheme() {
     this.themeManager.toggleTheme();
+    
+    // Persist theme preference to user config if user is logged in
+    if (this.me?.email) {
+      const isDarkMode = this.themeManager.getCurrentTheme() === 'dark';
+      await this.me.updateConfig({ dark_mode: isDarkMode });
+    }
+    
     // Force a re-render to update the theme display in the menu
     this.requestUpdate();
   }
