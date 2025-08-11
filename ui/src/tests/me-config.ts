@@ -28,8 +28,8 @@ export async function test_me_config(msg: PwTests) {
   if (!canUpdateConfig) {
     msg.err('❌ User must have "protected" or "admin" role to update configuration');
     msg.out('## Authorization Requirements');
-    msg.out('The `/auth/users/{email}/put` endpoint requires:');
-    msg.out('- **"protected"** role (minimum) - allows config updates only');
+    msg.out('The `/auth/users/{email}/me` endpoint requires:');
+    msg.out('- **"public"** role (minimum) - allows config updates only');
     msg.out('- **"admin"** role - allows config and other field updates');
     msg.out('');
     msg.out('**Test cannot proceed without proper authorization.**');
@@ -37,10 +37,37 @@ export async function test_me_config(msg: PwTests) {
   }
 
   // Store original config for restoration
-  const originalConfig = me.config ? JSON.stringify(me.config) : null;
+  const originalConfig = me.config || null;
   const originalRoles = me.roles;
   
-  msg.out(`Original config: ${originalConfig || 'null'}`);
+  // Display original config properly formatted
+  let displayConfig = 'null';
+  if (originalConfig) {
+    try {
+      let configToParse = originalConfig;
+      
+      // Handle multiple layers of JSON escaping by repeatedly parsing until we get an object
+      while (typeof configToParse === 'string') {
+        const parsed = JSON.parse(configToParse);
+        if (typeof parsed === 'object' && parsed !== null) {
+          configToParse = parsed;
+          break;
+        } else {
+          configToParse = parsed;
+        }
+      }
+      
+      displayConfig = JSON.stringify(configToParse, null, 2);
+    } catch (error) {
+      // If parsing fails, show the raw string with some cleanup for readability
+      const rawConfig = String(originalConfig);
+      msg.out(`Original config (raw): ${rawConfig}`);
+      msg.out(`Parse error: ${error instanceof Error ? error.message : String(error)}`);
+      displayConfig = 'Failed to parse - see raw output above';
+    }
+  }
+  
+  msg.out(`Original config: ${displayConfig}`);
   msg.out(`Original roles: ${originalRoles}`);
 
   let configTestsPassed = 0;
@@ -65,7 +92,7 @@ export async function test_me_config(msg: PwTests) {
     };
 
     try {
-      const updateResponse = await put_json(`/auth/users/${me.email}/put`, newSlideshowConfig);
+      const updateResponse = await put_json(`/auth/users/${me.email}/me`, newSlideshowConfig);
       
       if (updateResponse && updateResponse.config) {
         const parsedConfig = JSON.parse(updateResponse.config);
@@ -105,7 +132,7 @@ export async function test_me_config(msg: PwTests) {
     };
 
     try {
-      const updateResponse = await put_json(`/auth/users/${me.email}/put`, darkModeConfig);
+      const updateResponse = await put_json(`/auth/users/${me.email}/me`, darkModeConfig);
       
       if (updateResponse && updateResponse.config) {
         const parsedConfig = JSON.parse(updateResponse.config);
@@ -126,37 +153,29 @@ export async function test_me_config(msg: PwTests) {
       msg.err(`✗ Error updating dark mode: ${error instanceof Error ? error.message : String(error)}`);
     }
 
-    // Test 3: Attempt to update roles (should be ignored for non-admin users)
-    msg.out('## Test 3: Testing role update restrictions...');
+    // Test 3: Test role updates and config separation
+    msg.out('## Test 3: Testing role update and config separation...');
     
     const originalRolesList = userRoles.slice(); // Copy original roles
     const newRoles = [...originalRolesList, 'admin'].join(','); // Add admin role
     
     const roleUpdateData = {
-      roles: newRoles,
-      config: JSON.stringify({
-        dark_mode: true,
-        slideshow: {
-          duration: 7000, // Also update config to verify it still works
-          transition: 1500,
-          panorama: 3,
-          scale_factor: 1.5
-        }
-      })
+      roles: newRoles
     };
 
     try {
-      const updateResponse = await put_json(`/auth/users/${me.email}/put`, roleUpdateData);
+      // First, update roles using admin endpoint
+      const roleUpdateResponse = await put_json(`/auth/users/${me.email}`, roleUpdateData);
       
-      if (updateResponse) {
-        const responseRoles = (updateResponse.roles || 'public').split(',').map((r: string) => r.trim());
+      if (roleUpdateResponse) {
+        const responseRoles = (roleUpdateResponse.roles || 'public').split(',').map((r: string) => r.trim());
         
         if (isAdmin) {
           // Admin users should be able to update roles
           if (responseRoles.includes('admin')) {
             roleTestsPassed++;
             msg.out('✓ Admin user successfully updated roles');
-            msg.out(`  - New roles: ${JSON.stringify(responseRoles)}`);
+            msg.out(`New roles: ${JSON.stringify(responseRoles)}`);
           } else {
             roleTestsFailed++;
             msg.err('✗ Admin user failed to update roles');
@@ -176,16 +195,33 @@ export async function test_me_config(msg: PwTests) {
           }
         }
 
-        // Verify config was still updated even when roles were attempted
-        if (updateResponse.config) {
-          const parsedConfig = JSON.parse(updateResponse.config);
+        // Now separately update config using the /me endpoint
+        const configUpdateData = {
+          config: JSON.stringify({
+            dark_mode: true,
+            slideshow: {
+              duration: 7000,
+              transition: 1500,
+              panorama: 3,
+              scale_factor: 1.5
+            }
+          })
+        };
+
+        const configUpdateResponse = await put_json(`/auth/users/${me.email}/me`, configUpdateData);
+        
+        if (configUpdateResponse && configUpdateResponse.config) {
+          const parsedConfig = JSON.parse(configUpdateResponse.config);
           if (parsedConfig.slideshow && parsedConfig.slideshow.duration === 7000) {
             configTestsPassed++;
-            msg.out('✓ Config updated successfully even with role update attempt');
+            msg.out('✓ Config updated successfully via /me endpoint');
           } else {
             configTestsFailed++;
-            msg.err('✗ Config not updated when combined with role update');
+            msg.err('✗ Config not updated via /me endpoint');
           }
+        } else {
+          configTestsFailed++;
+          msg.err('✗ No config response from /me endpoint');
         }
       } else {
         roleTestsFailed++;
@@ -232,7 +268,7 @@ export async function test_me_config(msg: PwTests) {
     try {
       if (originalConfig) {
         const restoreData = { config: originalConfig };
-        await put_json(`/auth/users/${me.email}/put`, restoreData);
+        await put_json(`/auth/users/${me.email}/me`, restoreData);
         msg.out('✓ Original configuration restored');
       } else {
         msg.out('ℹ No original configuration to restore');

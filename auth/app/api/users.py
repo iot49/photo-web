@@ -282,23 +282,30 @@ async def create_user(user_data: UserCreate, db: DatabaseManager = Depends(get_d
 
 
 @router.put(
-    "/{email}/put",
+    "/{email}",
     response_model=UserResponse,
-    summary="Update User Profile",
+    summary="Update User Profile (Admin Only)",
     description=dedent_and_convert_to_html(
         """
-    Update user profile information with authorization controls.
+    Update user profile information (admin-only endpoint).
     
     **Authorization Rules:**
-    - Requires "protected" or "admin" role to make any changes
-    - Only "admin" role can change fields other than config
-    - Non-admin users can only update their config field
+    - Requires "admin" role
+    - Can only update name, roles, and enabled fields
+    - Cannot update picture, terms_accepted, created_at, or config fields
     
     **Updatable Fields:**
-    - Config (JSON string) - requires protected/admin role
-    - Other fields (name, roles, etc.) - requires admin role
+    - name: User's display name
+    - roles: Comma-separated list of user roles
+    - enabled: Whether the user account is enabled
     
-    **Access Control:** Public endpoint with field-level authorization
+    **Non-updatable Fields:**
+    - picture: Profile picture URL (managed by authentication provider)
+    - terms_accepted: Terms acceptance date (set automatically)
+    - created_at: Account creation date (immutable)
+    - config: User configuration (use /{email}/me endpoint instead)
+    
+    **Access Control:** Requires admin role
     """
     ),
     responses={
@@ -310,18 +317,24 @@ async def create_user(user_data: UserCreate, db: DatabaseManager = Depends(get_d
                         "id": "firebase-uid-123",
                         "email": "user@example.com",
                         "name": "Updated Name",
-                        "picture": "https://example.com/newavatar.jpg",
-                        "roles": "public,protected",
+                        "picture": "https://example.com/avatar.jpg",
+                        "roles": "public,protected,admin",
+                        "enabled": True,
                         "created_at": "2024-01-01T00:00:00Z",
                         "last_login": "2024-01-15T10:30:00Z",
+                        "terms_accepted": "2024-01-01T00:00:00Z",
                         "config": '{"slideshow": {"duration": 5}}',
                     }
                 }
             },
         },
         403: {
-            "description": "Access denied - insufficient permissions",
-            "content": {"application/json": {"example": {"detail": "Access denied"}}},
+            "description": "Access denied - admin role required",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Access denied - admin role required"}
+                }
+            },
         },
         404: {
             "description": "User not found",
@@ -335,23 +348,21 @@ async def create_user(user_data: UserCreate, db: DatabaseManager = Depends(get_d
         },
     },
 )
-async def update_user_profile(
+async def update_user_admin(
     email: str,
     user_update: UserUpdate,
     request: Request,
     db: DatabaseManager = Depends(get_db),
 ):
     """
-    Update user profile with authorization controls.
+    Update user profile (admin-only endpoint).
 
-    Simple authorization logic:
-    - If user has neither "admin" nor "protected" role, do nothing (return 403)
-    - If user doesn't have "admin" role, remove all fields except config
-    - Admin users can update any field
+    Admin users can update name, roles, and enabled fields. The config field
+    should be updated using the /{email}/me endpoint instead.
 
     Args:
         email: Email address of the user to update
-        user_update: User update data with optional fields
+        user_update: User update data with optional fields (config will be ignored)
         request: FastAPI request object to extract user roles
         db: Database manager dependency
 
@@ -359,53 +370,42 @@ async def update_user_profile(
         UserResponse: Updated user information
 
     Raises:
-        HTTPException: 403 if insufficient permissions, 404 if user not found, 500 if database error
+        HTTPException: 403 if not admin, 404 if user not found, 500 if database error
     """
     try:
         # Get user roles from request headers
         user_roles = get_user_roles_from_request(request)
 
-        # Check if user has protected or admin role
-        has_protected_or_admin = "protected" in user_roles or "admin" in user_roles
-        if not has_protected_or_admin:
+        # Check if user has admin role
+        if "admin" not in user_roles:
             logger.debug(
-                f"UPDATE_USER_PROFILE: Access denied for user with roles {user_roles}"
+                f"UPDATE_USER_ADMIN: Access denied for user with roles {user_roles}"
             )
             raise HTTPException(
                 status_code=403,
-                detail="Access denied - requires protected or admin role",
+                detail="Access denied - admin role required",
             )
 
-        # If user is not admin, filter out all fields except config
-        is_admin = "admin" in user_roles
-        if not is_admin:
-            update_data = user_update.model_dump(exclude_unset=True)
-            filtered_data = {}
-            logger.debug(f"PUT user {update_data}")
+        # Filter out config field - admins should use /{email}/me for config updates
+        update_data = user_update.model_dump(exclude_unset=True)
+        if "config" in update_data:
+            del update_data["config"]
+            logger.debug("UPDATE_USER_ADMIN: Removed config field from admin update")
 
-            # Only allow config field for non-admin users
-            if "config" in update_data:
-                filtered_data["config"] = update_data["config"]
-                logger.debug(
-                    f"UPDATE_USER_PROFILE: Non-admin user updating config only {filtered_data}"
-                )
+        if len(update_data) == 0:
+            logger.debug("UPDATE_USER_ADMIN: No valid fields to update")
+            # Still need to return the current user data
+            user = db.get_user_by_email(email)
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+            return user
 
-            if len(filtered_data) == 0:
-                logger.debug(
-                    "UPDATE_USER_PROFILE: No valid fields to update for non-admin user"
-                )
-                # Still need to return the current user data
-                user = db.get_user_by_email(email)
-                if not user:
-                    raise HTTPException(status_code=404, detail="User not found")
-                return user
-
-            user_update = UserUpdate(**filtered_data)
+        user_update_filtered = UserUpdate(**update_data)
 
         # Perform the update
-        user = db.update_user(email, user_update)
+        user = db.update_user(email, user_update_filtered)
         if not user:
-            logger.debug(f"UPDATE_USER_PROFILE: User {email} not found in database")
+            logger.debug(f"UPDATE_USER_ADMIN: User {email} not found in database")
             raise HTTPException(status_code=404, detail="User not found")
 
         # Clear cache for this user after successful database update
@@ -416,15 +416,136 @@ async def update_user_profile(
             )
             if cache_key in request.session:
                 del request.session[cache_key]
-                logger.debug(f"UPDATE_USER_PROFILE: Cleared cache for user {email}")
+                logger.debug(f"UPDATE_USER_ADMIN: Cleared cache for user {email}")
 
-        logger.debug(f"UPDATE_USER_PROFILE: Successfully updated user {email}")
+        logger.debug(f"UPDATE_USER_ADMIN: Successfully updated user {email}")
         return user
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"UPDATE_USER_PROFILE ERROR: Error updating user {email}: {e}")
+        logger.error(f"UPDATE_USER_ADMIN ERROR: Error updating user {email}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.put(
+    "/{email}/me",
+    response_model=UserResponse,
+    summary="Update User Config",
+    description=dedent_and_convert_to_html(
+        """
+    Update user configuration (config field only).
+    
+    **Authorization Rules:**
+    - Public endpoint (accessible to all users)
+    - Can only update the config field
+    - All other fields are ignored
+    
+    **Updatable Fields:**
+    - config: User configuration as JSON string
+    
+    **Access Control:** Public endpoint
+    """
+    ),
+    responses={
+        200: {
+            "description": "User config successfully updated",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": "firebase-uid-123",
+                        "email": "user@example.com",
+                        "name": "User Name",
+                        "picture": "https://example.com/avatar.jpg",
+                        "roles": "public,protected",
+                        "created_at": "2024-01-01T00:00:00Z",
+                        "last_login": "2024-01-15T10:30:00Z",
+                        "config": '{"slideshow": {"duration": 5}, "dark_mode": true}',
+                    }
+                }
+            },
+        },
+        404: {
+            "description": "User not found",
+            "content": {"application/json": {"example": {"detail": "User not found"}}},
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {"example": {"detail": "Internal server error"}}
+            },
+        },
+    },
+)
+async def update_user_config(
+    email: str,
+    user_update: UserUpdate,
+    request: Request,
+    db: DatabaseManager = Depends(get_db),
+):
+    """
+    Update user configuration.
+
+    This endpoint allows any user to update their config field.
+    All other fields in the request are ignored.
+
+    Args:
+        email: Email address of the user to update
+        user_update: User update data (only config field will be used)
+        request: FastAPI request object
+        db: Database manager dependency
+
+    Returns:
+        UserResponse: Updated user information
+
+    Raises:
+        HTTPException: 404 if user not found, 500 if database error
+    """
+    try:
+        # Extract only the config field from the update data
+        update_data = user_update.model_dump(exclude_unset=True)
+        config_data = {}
+
+        if "config" in update_data:
+            config_data["config"] = update_data["config"]
+            logger.debug(f"UPDATE_USER_CONFIG: Updating config for user {email}")
+        else:
+            logger.debug("UPDATE_USER_CONFIG: No config field provided")
+            # Still need to return the current user data
+            user = db.get_user_by_email(email)
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+            return user
+
+        user_update_config = UserUpdate(**config_data)
+
+        # Perform the update
+        user = db.update_user(email, user_update_config)
+        if not user:
+            logger.debug(f"UPDATE_USER_CONFIG: User {email} not found in database")
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Clear cache for this user after successful database update
+        session_token = request.cookies.get("session")
+        if session_token and hasattr(request, "session"):
+            cache_key = (
+                f"user_info_{hashlib.sha256(session_token.encode()).hexdigest()[:16]}"
+            )
+            if cache_key in request.session:
+                del request.session[cache_key]
+                logger.debug(f"UPDATE_USER_CONFIG: Cleared cache for user {email}")
+
+        logger.debug(
+            f"UPDATE_USER_CONFIG: Successfully updated config for user {email}"
+        )
+        return user
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"UPDATE_USER_CONFIG ERROR: Error updating user config {email}: {e}"
+        )
         raise HTTPException(status_code=500, detail="Internal server error")
 
 

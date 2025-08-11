@@ -69,7 +69,7 @@ export class PwUsers extends LitElement {
   private async saveEdit() {
     if (!this.editingUser) return;
 
-    const url = `/auth/users/${this.editingUser.email}/put`;
+    const url = `/auth/users/${this.editingUser.email}`;
     
     const result = await put_json(url, this.editForm);
     if (result) {

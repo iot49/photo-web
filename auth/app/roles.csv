@@ -18,10 +18,10 @@ allow, /files/api/file/*, !files:8000, Delegate file access to files service
 allow, /auth/firebase-config, public
 allow, /auth/login*, public, Login page
 allow, /auth/logout*, public, Logout endpoint
-allow, /auth/me, public, User info endpoint
 allow, /auth/term-accepted, public, Terms acceptance endpoint
-allow, /auth/users/*/put, public, User profile updates
-allow, /auth/users*, admin, User management
+allow, /auth/me, public, User info endpoint
+allow, /auth/users/*/me, public, User config updates
+allow, /auth/users*, admin, User management (includes /{email} PUT endpoint)
 allow, /auth/roles-csv, admin, Testing
 
 allow, /auth/api/analytics*, admin, Statistics

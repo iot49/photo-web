@@ -110,7 +110,7 @@ export class MeImple implements Me {
     
     // Schedule delayed database update
     this._updateTimeout = setTimeout(async () => {
-      const result = await put_json(`/auth/users/${this.email}/put`, {
+      const result = await put_json(`/auth/users/${this.email}/me`, {
         config: JSON.stringify(this.config)
       });
       if (result) {
@@ -122,22 +122,6 @@ export class MeImple implements Me {
     }, 3000);
   }
 
-  // Method to update profile information
-  async updateProfile(profileUpdates: Partial<Omit<Me, 'config'>>): Promise<void> {
-    // Update local data immediately
-    Object.assign(this, profileUpdates);
-    
-    // Notify context consumers of the change
-    this._onUpdate();
-
-    // Update database immediately for profile changes
-    const result = await put_json(`/auth/users/${this.email}/put`, profileUpdates);
-    if (result) {
-      console.log('Profile updated in database');
-    } else {
-      console.warn('Failed to update profile in database');
-    }
-  }
 
   // Method to update the internal data (used by context when refreshing from server)
   updateData(newData: Me): void {
