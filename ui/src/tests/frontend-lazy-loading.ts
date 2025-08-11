@@ -1,3 +1,4 @@
+import { get_json } from '../app/api';
 import { PwTests } from '../pw-tests';
 
 export async function test_frontend_lazy_loading(msg: PwTests) {
@@ -12,24 +13,14 @@ export async function test_frontend_lazy_loading(msg: PwTests) {
       const uri = `/files/api/folder/${path}/${name}`;
       msg.out(`Simulating lazy load call: ${uri}`);
       
-      const response = await fetch(uri, { 
-        method: 'GET', 
-        credentials: 'include', 
-        mode: 'cors' 
-      });
+      const data = await get_json(uri);
       
       const endTime = performance.now();
       const duration = endTime - startTime;
       
-      if (response.ok) {
-        const data = await response.json();
-        msg.out(`✓ Lazy load successful: ${duration.toFixed(2)}ms`);
-        msg.out(`  - Response: ${data.folders?.length || 0} folders, ${data.files?.length || 0} files`);
-        return { duration, success: true };
-      } else {
-        msg.err(`✗ Lazy load failed: ${duration.toFixed(2)}ms (Status: ${response.status})`);
-        return { duration, success: false, error: `HTTP ${response.status}` };
-      }
+      msg.out(`✓ Lazy load successful: ${duration.toFixed(2)}ms`);
+      msg.out(`  - Response: ${data.folders?.length || 0} folders, ${data.files?.length || 0} files`);
+      return { duration, success: true };
     } catch (error) {
       const endTime = performance.now();
       const duration = endTime - startTime;
@@ -174,12 +165,7 @@ export async function test_frontend_lazy_loading(msg: PwTests) {
   try {
     // Step 1: Get root data (like connectedCallback)
     const rootStart = performance.now();
-    const rootResponse = await fetch('/files/api/root', { 
-      method: 'GET', 
-      credentials: 'include', 
-      mode: 'cors' 
-    });
-    const rootData = await rootResponse.json();
+    const rootData = await get_json('/files/api/root');
     const rootDuration = performance.now() - rootStart;
     msg.out(`Step 1 - Get root: ${rootDuration.toFixed(2)}ms`);
     
@@ -190,12 +176,7 @@ export async function test_frontend_lazy_loading(msg: PwTests) {
       
       // This is the exact call pattern from the frontend
       const lazyUri = `/files/api/folder/${rootData.path}/${firstFolder}`;
-      const lazyResponse = await fetch(lazyUri, { 
-        method: 'GET', 
-        credentials: 'include', 
-        mode: 'cors' 
-      });
-      const lazyData = await lazyResponse.json();
+      const lazyData = await get_json(lazyUri);
       const lazyDuration = performance.now() - lazyStart;
       
       msg.out(`Step 2 - Lazy load ${firstFolder}: ${lazyDuration.toFixed(2)}ms`);

@@ -4,7 +4,8 @@ import { customElement, property, query, state } from 'lit/decorators.js';
 import { get_json } from './app/api';
 import { Albums, PhotoModel, SrcsetInfo } from './app/interfaces';
 import { consume } from '@lit/context';
-import { albumsContext, srcsetInfoContext } from './app/context';
+import { albumsContext, srcsetInfoContext, meContext } from './app/context';
+import { MeImple } from './app/me';
 import { SwipeHandler } from './app/swipe';
 
 /* Lazy loading
@@ -32,10 +33,6 @@ to achieve alternate behaviors.
     Uses dissolve to transition between images.
 */
 
-const TRANSITION_MS = 1100; // duration of slide transition in [ms]
-const SLIDE_MS = 3100; // time each slide is shown in [ms]; note: extra wide or tall slides take more time
-const PANORAMA_TIME = 2.4; // increase parnorama image animation time by up to this factor
-const SCALE_FACTOR = 1.2; // factor by which the image is scaled during translation
 
 @customElement('pw-slideshow')
 export class PwSlideshow extends LitElement {
@@ -44,6 +41,9 @@ export class PwSlideshow extends LitElement {
 
   @consume({ context: srcsetInfoContext, subscribe: true })
   private srcsetInfo!: SrcsetInfo;
+
+  @consume({ context: meContext, subscribe: true })
+  private me?: MeImple;
 
   @query('#slideshow') slideshow!: HTMLDivElement;
   @query('#overlays') overlays!: HTMLDivElement;
@@ -55,7 +55,7 @@ export class PwSlideshow extends LitElement {
   @property({ type: String, reflect: true }) theme: 'carousel' | 'ken-burns' = 'ken-burns';
 
   // autoplay status
-  @property({ type: Boolean }) autoplay = true;
+  @property({ type: Boolean }) autoplay = false;
 
   // List of arrays of PhotoModels for each album
   @state() private photos!: PhotoModel[][];
@@ -86,6 +86,7 @@ export class PwSlideshow extends LitElement {
     return this.playlist.split(':');
   }
 
+
   // load descriptions of all photos in all albums in the playlist
   private async loadPhotos(): Promise<void> {
     if (this.playlist === '') {
@@ -94,10 +95,11 @@ export class PwSlideshow extends LitElement {
     }
     const photos: PhotoModel[][] = [];
     for (const uid of this.uids) {
-      try {
-        photos.push(await get_json(`/photos/api/albums/${uid}`));
-      } catch (error) {
-        console.error(`Failed to load photos for album: ${uid}, trying again`, error);
+      const albumPhotos = await get_json(`/photos/api/albums/${uid}`);
+      if (albumPhotos) {
+        photos.push(albumPhotos);
+      } else {
+        console.error(`Failed to load photos for album: ${uid}, trying again`);
         // Clear any existing loadPhotos timeout before setting a new one
         if (this.loadPhotosTimeoutId !== null) {
           clearTimeout(this.loadPhotosTimeoutId);
@@ -118,9 +120,26 @@ export class PwSlideshow extends LitElement {
 
   protected firstUpdated(_changedProperties: PropertyValues): void {
     super.firstUpdated(_changedProperties);
+    this.updateCSSProperties();
     this.goto(0);
     this.setupSwipeHandlers();
     this.setupOverlayHandlers();
+  }
+
+  protected updated(_changedProperties: PropertyValues): void {
+    super.updated(_changedProperties);
+    // Update CSS properties when me context changes
+    if (_changedProperties.has('me')) {
+      this.updateCSSProperties();
+    }
+  }
+
+  private updateCSSProperties(): void {
+    const scaleFactor = this.me?.config.slideshow.scale_factor || 1.2;
+    const transitionMs = (this.me?.config.slideshow.transition || 1.1) * 1000;
+    
+    this.style.setProperty('--scale-factor', scaleFactor.toString());
+    this.style.setProperty('--transition-ms', `${transitionMs}ms`);
   }
 
   private goto = (nextIndex: number) => {
@@ -225,9 +244,9 @@ export class PwSlideshow extends LitElement {
             // Dispatch a popstate event to trigger the router's navigation handling
             window.dispatchEvent(new PopStateEvent('popstate'));
           }
-        }, SLIDE_MS);
+        }, (this.me?.config.slideshow.duration || 3.1) * 1000);
       } else {
-        const timeoutMs = dynamicSlideMs - TRANSITION_MS;
+        const timeoutMs = dynamicSlideMs - ((this.me?.config.slideshow.transition || 1.1) * 1000);
 
         this.autoplayTimeoutId = window.setTimeout(() => this.goto(nextIndex + 1), timeoutMs);
       }
@@ -243,12 +262,13 @@ export class PwSlideshow extends LitElement {
 
     if (videoElement) {
       // For videos: use max of SLIDE_MS, video duration, or HTML data attribute (no dynamic factor)
-      const videoDurationMs = videoElement.duration ? videoElement.duration * 1000 : SLIDE_MS;
+      const slideMs = (this.me?.config.slideshow.duration || 3.1) * 1000;
+      const videoDurationMs = videoElement.duration ? videoElement.duration * 1000 : slideMs;
       const htmlDuration = videoElement.dataset.duration ? parseInt(videoElement.dataset.duration) : 0;
-      const baseDuration = Math.max(SLIDE_MS, videoDurationMs, htmlDuration);
+      const baseDuration = Math.max(slideMs, videoDurationMs, htmlDuration);
 
       // Set up video looping for short videos
-      const shouldLoop = videoDurationMs < SLIDE_MS;
+      const shouldLoop = videoDurationMs < slideMs;
       videoElement.loop = shouldLoop;
 
       return baseDuration;
@@ -258,11 +278,11 @@ export class PwSlideshow extends LitElement {
       const customProperty = getComputedStyle(imgElement).getPropertyValue('--data-dynamic-time-factor');
       if (customProperty) dynamicTimeFactor = parseFloat(customProperty) || 1.0;
 
-      return SLIDE_MS * dynamicTimeFactor;
+      return ((this.me?.config.slideshow.duration || 3.1) * 1000) * dynamicTimeFactor;
     }
 
     // Fallback for other content types
-    return SLIDE_MS;
+    return (this.me?.config.slideshow.duration || 3.1) * 1000;
   }
 
   private toggleAutoplay() {
@@ -298,7 +318,7 @@ export class PwSlideshow extends LitElement {
         const dynamicSlideMs = this.calculateSlideDuration(currentSlide);
 
         // Schedule next slide transition
-        this.autoplayTimeoutId = window.setTimeout(() => this.goto(this.currentIndex + 1), dynamicSlideMs - TRANSITION_MS);
+        this.autoplayTimeoutId = window.setTimeout(() => this.goto(this.currentIndex + 1), dynamicSlideMs - ((this.me?.config.slideshow.transition || 1.1) * 1000));
       }
     } else {
       // Pause ken-burns animation and videos when autoplay is stopped
@@ -320,9 +340,134 @@ export class PwSlideshow extends LitElement {
     // Note: Theme is now only controlled by the dedicated theme toggle button
   }
 
-  private toggleTheme() {
-    this.theme = this.theme === 'ken-burns' ? 'carousel' : 'ken-burns';
+
+  private renderSlideshowControls() {
+    // Show controls for all users - the PUT endpoint handles credential validation
+    if (!this.me) {
+      return html`<p>Loading settings...</p>`;
+    }
+
+    const config = this.me.config.slideshow;
+    
+    return html`
+      <div class="slideshow-controls">
+        <div class="control-group">
+          <label>Theme</label>
+          <sl-switch
+            ?checked=${this.theme === 'ken-burns'}
+            @sl-change=${this.handleThemeChange}
+          >
+            Ken Burns
+          </sl-switch>
+        </div>
+        
+        <div class="control-group">
+          <label>Duration: ${config.duration.toFixed(1)}s</label>
+          <sl-range
+            min="1"
+            max="10"
+            step="0.1"
+            .value=${config.duration}
+            @sl-input=${this.handleDurationChange}
+            @sl-change=${this.handleDurationChange}
+            tooltip="top"
+          ></sl-range>
+        </div>
+        
+        <div class="control-group">
+          <label>Transition: ${config.transition.toFixed(1)}s</label>
+          <sl-range
+            min="0"
+            max="3"
+            step="0.1"
+            .value=${config.transition}
+            @sl-input=${this.handleTransitionChange}
+            @sl-change=${this.handleTransitionChange}
+            tooltip="top"
+          ></sl-range>
+        </div>
+        
+        <div class="control-group">
+          <label>Panorama: ${config.panorama.toFixed(1)}</label>
+          <sl-range
+            min="1"
+            max="6"
+            step="0.1"
+            .value=${config.panorama}
+            @sl-input=${this.handlePanoramaChange}
+            @sl-change=${this.handlePanoramaChange}
+            tooltip="top"
+          ></sl-range>
+        </div>
+        
+        <div class="control-group">
+          <label>Scale: ${config.scale_factor.toFixed(1)}</label>
+          <sl-range
+            min="0.5"
+            max="2"
+            step="0.1"
+            .value=${config.scale_factor}
+            @sl-input=${this.handleScaleFactorChange}
+            @sl-change=${this.handleScaleFactorChange}
+            tooltip="top"
+          ></sl-range>
+        </div>
+      </div>
+    `;
   }
+
+  private handleThemeChange = (e: CustomEvent) => {
+    const isKenBurns = (e.target as any).checked;
+    this.theme = isKenBurns ? 'ken-burns' : 'carousel';
+  };
+
+  private handleDurationChange = (e: CustomEvent) => {
+    const value = parseFloat((e.target as any).value);
+    if (this.me) {
+      this.me.updateConfig({
+        slideshow: {
+          ...this.me.config.slideshow,
+          duration: value
+        }
+      });
+    }
+  };
+
+  private handleTransitionChange = (e: CustomEvent) => {
+    const value = parseFloat((e.target as any).value);
+    if (this.me) {
+      this.me.updateConfig({
+        slideshow: {
+          ...this.me.config.slideshow,
+          transition: value
+        }
+      });
+    }
+  };
+
+  private handlePanoramaChange = (e: CustomEvent) => {
+    const value = parseFloat((e.target as any).value);
+    if (this.me) {
+      this.me.updateConfig({
+        slideshow: {
+          ...this.me.config.slideshow,
+          panorama: value
+        }
+      });
+    }
+  };
+
+  private handleScaleFactorChange = (e: CustomEvent) => {
+    const value = parseFloat((e.target as any).value);
+    if (this.me) {
+      this.me.updateConfig({
+        slideshow: {
+          ...this.me.config.slideshow,
+          scale_factor: value
+        }
+      });
+    }
+  };
 
   private handlePrevClick(event?: Event) {
     // Prevent event bubbling to avoid triggering handleOverlayActivity
@@ -604,8 +749,8 @@ export class PwSlideshow extends LitElement {
         <div class="overlay top-overlay" @click=${() => this.endSlideshow()}>
           <sl-icon name="x-lg"></sl-icon>
         </div>
-        <div class="overlay bottom-overlay" @click=${() => this.toggleTheme()}>
-          <p>${this.theme === 'carousel' ? 'ken burns' : 'carousel'}</p>
+        <div class="overlay bottom-overlay">
+          ${this.renderSlideshowControls()}
         </div>
       </div>
     `;
@@ -673,7 +818,8 @@ export class PwSlideshow extends LitElement {
     const heightToWidth = photo.height / photo.width;
     const maxAspectRatio = Math.max(widthToHeight, heightToWidth);
 
-    return Math.tanh(maxAspectRatio / PANORAMA_TIME) / Math.tanh(1 / PANORAMA_TIME);
+    const panoramaTime = this.me?.config.slideshow.panorama || 2.4;
+    return Math.tanh(maxAspectRatio / panoramaTime) / Math.tanh(1 / panoramaTime);
   }
 
   static styles = [
@@ -787,7 +933,7 @@ export class PwSlideshow extends LitElement {
           transform: scale(1);
         }
         to {
-          transform: scale(${SCALE_FACTOR});
+          transform: scale(var(--scale-factor, 1.2));
         }
       }
 
@@ -801,7 +947,7 @@ export class PwSlideshow extends LitElement {
         opacity: 0;
         z-index: 2;
         animation-name: ken-burns-fade;
-        animation-duration: ${TRANSITION_MS}ms;
+        animation-duration: var(--transition-ms, 1100ms);
         animation-fill-mode: forwards;
         animation-timing-function: linear;
       }
@@ -989,6 +1135,91 @@ export class PwSlideshow extends LitElement {
       video.load-failed::after {
         content: "Failed to load video";
       }
+
+      /* Slideshow controls styling */
+      .slideshow-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        padding: 1rem;
+        background: transparent;
+        border-radius: 8px;
+        min-width: 280px;
+        max-width: 320px;
+      }
+
+      .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+      }
+
+      .control-group label {
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin: 0;
+        text-align: left;
+      }
+
+      .slideshow-controls sl-switch {
+        --width: 3rem;
+        --height: 1.5rem;
+        --thumb-size: 1.25rem;
+        --sl-color-primary-600: rgba(255, 255, 255, 0.4);
+        --sl-color-neutral-400: rgba(255, 255, 255, 0.2);
+      }
+
+      .slideshow-controls sl-switch::part(label) {
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 0.875rem;
+      }
+
+      .slideshow-controls sl-range {
+        --sl-color-primary-600: rgba(255, 255, 255, 0.4);
+        --sl-color-neutral-300: rgba(255, 255, 255, 0.2);
+        --track-height: 4px;
+        --thumb-size: 16px;
+        --tooltip-background-color: rgba(0, 0, 0, 0.7);
+        --tooltip-color: white;
+      }
+
+      .slideshow-controls sl-range::part(base) {
+        padding: 0.5rem 0;
+      }
+
+      /* Adjust bottom overlay positioning for controls */
+      .bottom-overlay {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        cursor: default;
+      }
+
+      /* Hide controls content by default, show when overlay is visible */
+      .slideshow-controls {
+        opacity: 0;
+        transition: opacity 0.5s ease;
+        pointer-events: none;
+      }
+
+      #overlays.visible .slideshow-controls {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      /* Override the general p styling for controls */
+      .slideshow-controls p {
+        position: static;
+        transform: none;
+        opacity: 1;
+        font-size: 0.875rem;
+        color: rgba(255, 255, 255, 0.9);
+        text-align: center;
+        margin: 0;
+      }
+
     `,
   ];
 }

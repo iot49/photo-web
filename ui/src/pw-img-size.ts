@@ -3,6 +3,7 @@ import { css, html, LitElement } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { albumsContext, srcsetInfoContext } from './app/context';
 import { Albums, SrcsetInfo, AlbumModel } from './app/interfaces';
+import { get_blob } from './app/api';
 
 // BUG: after the speedtest finished, view switches to https://dev49.org/ui/album instead of staying.
 @customElement('pw-img-size')
@@ -305,13 +306,8 @@ export class PwImgSize extends LitElement {
     const startTime = performance.now();
 
     try {
-      const response = await fetch(imageUrl + '&cache-bust=' + Math.random());
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
       // Read the entire response to ensure complete download
-      await response.blob();
+      await get_blob(imageUrl + '&cache-bust=' + Math.random());
       const endTime = performance.now();
 
       return endTime - startTime;

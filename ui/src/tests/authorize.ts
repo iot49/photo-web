@@ -31,7 +31,9 @@ export async function test_authorize(msg: PwTests) {
       for (const path in spec.paths) {
         const pathObj = spec.paths[path];
         // Convert OpenAPI path parameters to actual paths for testing
-        const testPath = path.replace(/{[^}]+}/g, import.meta.env.VITE_SUPER_USER_EMAIL || 'test-param');
+        // Extract first email from colon-separated SUPER_USER_EMAIL
+        const firstSuperUserEmail = (import.meta.env.VITE_SUPER_USER_EMAIL || 'test-param').split(':')[0];
+        const testPath = path.replace(/{[^}]+}/g, firstSuperUserEmail);
         
         // Only extract GET methods
         if (pathObj.get) {
@@ -111,14 +113,19 @@ export async function test_authorize(msg: PwTests) {
         const expectedStatus = getExpectedStatus(fullUri, currentUserRoles, rolesData || '');
         
         try {
-          // Test the GET endpoint
-          const response = await fetch(fullUri, {
-            method: 'GET',
-            credentials: 'include'
-          });
+          // Test the GET endpoint - we need to handle both success and error responses
+          let actualStatus: number;
+          try {
+            await get_json(fullUri);
+            actualStatus = 200; // If get_json succeeds, it's a 200
+          } catch (error) {
+            // Extract status from error message if possible
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            const statusMatch = errorMessage.match(/HTTP error! status: (\d+)/);
+            actualStatus = statusMatch ? parseInt(statusMatch[1]) : 500;
+          }
           
-          console.log(`Testing GET ${fullUri} returns ${response.status} expected ${expectedStatus} `);
-          const actualStatus = response.status;
+          console.log(`Testing GET ${fullUri} returns ${actualStatus} expected ${expectedStatus} `);
           totalTests++;
           
           if (actualStatus === expectedStatus) {

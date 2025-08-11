@@ -148,6 +148,11 @@ class AnalyticsCollector:
             try:
                 with open(album_file, "r") as f:
                     album_data = json.load(f)
+                    # DEBUG: Log the type of unique_users after loading from JSON
+                    if "unique_users" in album_data:
+                        logger.warning(
+                            f"DEBUG: unique_users type after JSON load: {type(album_data['unique_users'])}, value: {album_data['unique_users']}"
+                        )
             except:
                 album_data = {}
 
@@ -165,6 +170,10 @@ class AnalyticsCollector:
 
         # Update album statistics
         album_data["total_accesses"] += 1
+        # DEBUG: Log type before calling .add()
+        logger.warning(
+            f"DEBUG: About to call .add() on unique_users, type: {type(album_data['unique_users'])}"
+        )
         album_data["unique_users"].add(record["user_id"])
         album_data["last_accessed"] = record["timestamp"]
         album_data["access_history"].append(
@@ -201,6 +210,11 @@ class AnalyticsCollector:
             try:
                 with open(file_analytics, "r") as f:
                     file_data = json.load(f)
+                    # DEBUG: Log the type of unique_users after loading from JSON
+                    if "unique_users" in file_data:
+                        logger.warning(
+                            f"DEBUG: file unique_users type after JSON load: {type(file_data['unique_users'])}"
+                        )
             except:
                 file_data = {}
 
@@ -247,6 +261,10 @@ class AnalyticsCollector:
             try:
                 with open(user_file, "r") as f:
                     user_data = json.load(f)
+                    # Convert set fields back to sets if they exist (JSON loads them as lists)
+                    for field in ["services_used", "albums_accessed", "files_accessed"]:
+                        if field in user_data and isinstance(user_data[field], list):
+                            user_data[field] = set(user_data[field])
             except:
                 user_data = {}
 

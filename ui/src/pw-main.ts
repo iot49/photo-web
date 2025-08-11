@@ -1,7 +1,8 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
-import { Albums, Me, SrcsetInfo } from './app/interfaces';
+import { Albums, SrcsetInfo } from './app/interfaces';
+import { Me, MeImple } from './app/me';
 import { provide } from '@lit/context';
 import { albumsContext, meContext, srcsetInfoContext } from './app/context';
 import { get_json, post_json } from './app/api';
@@ -76,7 +77,7 @@ export class PwMain extends LitElement {
 
   @provide({ context: meContext })
   @state()
-  me!: Me;
+  me!: MeImple;
 
   @provide({ context: srcsetInfoContext })
   @state()
@@ -93,7 +94,11 @@ export class PwMain extends LitElement {
 
     // Load contexts
     this.albums = await get_json('/photos/api/albums');
-    this.me = await get_json('/auth/me');
+    const meData: Me = await get_json('/auth/me');
+    this.me = new MeImple(meData, () => {
+      // Trigger re-render when MeImple updates
+      this.requestUpdate();
+    });
     this.srcsetInfo = new SrcsetInfo(await get_json('/photos/api/photos/srcset'));
 
     // Add event listeners for login/logout events
@@ -112,7 +117,17 @@ export class PwMain extends LitElement {
     const refreshData = async () => {
       if (DEBUG) console.log('Auth state changed, refreshing albums and me');
       this.albums = await get_json('/photos/api/albums');
-      this.me = await get_json('/auth/me');
+      const meData: Me = await get_json('/auth/me');
+      
+      if (this.me) {
+        // Update existing MeImple instance
+        (this.me as MeImple).updateData(meData);
+      } else {
+        // Create new MeImple instance
+        this.me = new MeImple(meData, () => {
+          this.requestUpdate();
+        });
+      }
 
       // Check terms acceptance after login
       this.checkTermsAcceptance();
@@ -142,14 +157,17 @@ export class PwMain extends LitElement {
   }
 
   private async handleAcceptTerms() {
-    try {
-      await post_json('/auth/term-accepted');
+    const result = await post_json('/auth/term-accepted');
+    if (result) {
       // Re-download the me object to ensure fresh data from server
-      this.me = await get_json('/auth/me');
-      this.hideTermsDialog();
-    } catch (error) {
-      console.error('Failed to accept terms:', error);
-      // Show error to user - could use a toast notification here
+      const meData: Me = await get_json('/auth/me');
+      if (meData) {
+        (this.me as MeImple).updateData(meData);
+        this.hideTermsDialog();
+      } else {
+        alert('Failed to refresh user data. Please try again.');
+      }
+    } else {
       alert('Failed to accept terms. Please try again.');
     }
   }
@@ -347,21 +365,26 @@ export class PwMain extends LitElement {
     route: { isActive: boolean; display: string; selectedFilePath?: string },
     componentFactory: () => any
   ) {
+    console.log("renderLazyComponent", routeId, route)
     // For components that depend on dynamic properties (playlist), always re-render
     // to ensure they get the latest values, and only show when active
     const routeDefinitions = this.getRouteDefinitions();
     const routeDefinition = routeDefinitions.find((r) => r.routeId === routeId);
     if (routeDefinition?.isDynamic) {
       if (!route.isActive) {
+        console.log("dynamic route", this.id, "deactivated")
         // For dynamic components that are becoming inactive, ensure proper cleanup
         const existingComponent = this.activeDynamicComponents.get(routeId);
+        console.log("1 cleanup", existingComponent)
         if (existingComponent) {
           // Force disconnectedCallback by removing from DOM
           if (existingComponent.parentNode) {
+            console.log("2 cleanup", existingComponent.parentNode)
             existingComponent.parentNode.removeChild(existingComponent);
           }
           // Call disconnectedCallback manually if it exists
           if (typeof (existingComponent as any).disconnectedCallback === 'function') {
+            console.log("3 cleanup");
             (existingComponent as any).disconnectedCallback();
           }
           this.activeDynamicComponents.delete(routeId);

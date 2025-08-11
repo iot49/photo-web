@@ -1,17 +1,27 @@
+import hashlib
 import logging
 from typing import List
 
 from database import DatabaseManager, get_database_manager
 from doc_utils import dedent_and_convert_to_html
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from models import UserCreate, UserResponse, UserUpdate
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 def get_db() -> DatabaseManager:
     """Dependency to get database manager."""
     return get_database_manager()
+
+
+def get_user_roles_from_request(request: Request) -> List[str]:
+    """Extract user roles from request headers (set by auth middleware)."""
+    roles_header = request.headers.get("X-Forwarded-Roles", "")
+    if not roles_header:
+        return ["public"]  # Default role if no roles found
+    return [role.strip() for role in roles_header.split(",") if role.strip()]
 
 
 # Create router for user endpoints
@@ -272,27 +282,23 @@ async def create_user(user_data: UserCreate, db: DatabaseManager = Depends(get_d
 
 
 @router.put(
-    "/{email}",
+    "/{email}/put",
     response_model=UserResponse,
-    summary="Update User",
+    summary="Update User Profile",
     description=dedent_and_convert_to_html(
         """
-    Update user information by email address.
+    Update user profile information with authorization controls.
     
-    Updates user profile information including name, picture, and roles.
-    Only provided fields are updated; omitted fields remain unchanged.
-    
-    **Access Control:** Requires admin role or self-access
+    **Authorization Rules:**
+    - Requires "protected" or "admin" role to make any changes
+    - Only "admin" role can change fields other than config
+    - Non-admin users can only update their config field
     
     **Updatable Fields:**
-    - Name (display name)
-    - Picture (profile image URL)
-    - Roles (comma-separated list)
+    - Config (JSON string) - requires protected/admin role
+    - Other fields (name, roles, etc.) - requires admin role
     
-    **Restrictions:**
-    - Email cannot be changed (use as identifier)
-    - Role changes require admin privileges
-    - Self-updates limited to name and picture
+    **Access Control:** Public endpoint with field-level authorization
     """
     ),
     responses={
@@ -308,17 +314,18 @@ async def create_user(user_data: UserCreate, db: DatabaseManager = Depends(get_d
                         "roles": "public,protected",
                         "created_at": "2024-01-01T00:00:00Z",
                         "last_login": "2024-01-15T10:30:00Z",
+                        "config": '{"slideshow": {"duration": 5}}',
                     }
                 }
             },
         },
-        404: {
-            "description": "User not found",
-            "content": {"application/json": {"example": {"detail": "User not found"}}},
-        },
         403: {
             "description": "Access denied - insufficient permissions",
             "content": {"application/json": {"example": {"detail": "Access denied"}}},
+        },
+        404: {
+            "description": "User not found",
+            "content": {"application/json": {"example": {"detail": "User not found"}}},
         },
         500: {
             "description": "Internal server error",
@@ -328,42 +335,96 @@ async def create_user(user_data: UserCreate, db: DatabaseManager = Depends(get_d
         },
     },
 )
-async def update_user(
-    email: str, user_update: UserUpdate, db: DatabaseManager = Depends(get_db)
+async def update_user_profile(
+    email: str,
+    user_update: UserUpdate,
+    request: Request,
+    db: DatabaseManager = Depends(get_db),
 ):
     """
-    Update user information by email.
+    Update user profile with authorization controls.
 
-    Updates the specified user's information with the provided data.
-    Only fields included in the update request are modified.
+    Simple authorization logic:
+    - If user has neither "admin" nor "protected" role, do nothing (return 403)
+    - If user doesn't have "admin" role, remove all fields except config
+    - Admin users can update any field
 
     Args:
         email: Email address of the user to update
         user_update: User update data with optional fields
+        request: FastAPI request object to extract user roles
         db: Database manager dependency
 
     Returns:
         UserResponse: Updated user information
 
     Raises:
-        HTTPException: 404 if user not found, 500 if database error
+        HTTPException: 403 if insufficient permissions, 404 if user not found, 500 if database error
     """
     try:
-        logger.warning(
-            f"UPDATE_USER: Received request to update user {email} with data: {user_update.model_dump(exclude_unset=True)}"
-        )
+        # Get user roles from request headers
+        user_roles = get_user_roles_from_request(request)
+
+        # Check if user has protected or admin role
+        has_protected_or_admin = "protected" in user_roles or "admin" in user_roles
+        if not has_protected_or_admin:
+            logger.debug(
+                f"UPDATE_USER_PROFILE: Access denied for user with roles {user_roles}"
+            )
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied - requires protected or admin role",
+            )
+
+        # If user is not admin, filter out all fields except config
+        is_admin = "admin" in user_roles
+        if not is_admin:
+            update_data = user_update.model_dump(exclude_unset=True)
+            filtered_data = {}
+            logger.debug(f"PUT user {update_data}")
+
+            # Only allow config field for non-admin users
+            if "config" in update_data:
+                filtered_data["config"] = update_data["config"]
+                logger.debug(
+                    f"UPDATE_USER_PROFILE: Non-admin user updating config only {filtered_data}"
+                )
+
+            if len(filtered_data) == 0:
+                logger.debug(
+                    "UPDATE_USER_PROFILE: No valid fields to update for non-admin user"
+                )
+                # Still need to return the current user data
+                user = db.get_user_by_email(email)
+                if not user:
+                    raise HTTPException(status_code=404, detail="User not found")
+                return user
+
+            user_update = UserUpdate(**filtered_data)
+
+        # Perform the update
         user = db.update_user(email, user_update)
         if not user:
-            logger.warning(f"UPDATE_USER: User {email} not found in database")
+            logger.debug(f"UPDATE_USER_PROFILE: User {email} not found in database")
             raise HTTPException(status_code=404, detail="User not found")
-        logger.warning(
-            f"UPDATE_USER: Successfully updated user {email}, new roles: {user.roles}"
-        )
+
+        # Clear cache for this user after successful database update
+        session_token = request.cookies.get("session")
+        if session_token and hasattr(request, "session"):
+            cache_key = (
+                f"user_info_{hashlib.sha256(session_token.encode()).hexdigest()[:16]}"
+            )
+            if cache_key in request.session:
+                del request.session[cache_key]
+                logger.debug(f"UPDATE_USER_PROFILE: Cleared cache for user {email}")
+
+        logger.debug(f"UPDATE_USER_PROFILE: Successfully updated user {email}")
         return user
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"UPDATE_USER ERROR: Error updating user {email}: {e}")
+        logger.error(f"UPDATE_USER_PROFILE ERROR: Error updating user {email}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 

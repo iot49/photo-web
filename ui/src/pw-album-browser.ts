@@ -1,6 +1,7 @@
 import { LitElement, PropertyValues, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { Albums, Me, SrcsetInfo } from './app/interfaces.js';
+import { Albums, SrcsetInfo } from './app/interfaces.js';
+import { Me } from './app/me.js';
 import { consume } from '@lit/context';
 import { albumsContext, meContext, srcsetInfoContext } from './app/context.js';
 import { album_tree, TreeNode } from './app/album_tree.js';

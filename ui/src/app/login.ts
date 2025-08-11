@@ -2,6 +2,7 @@
 
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { get_json, post_with_redirect } from './api';
 
 // Firebase configuration fetched from server
 let firebaseConfig: any = null;
@@ -16,17 +17,7 @@ async function initializeFirebase() {
 
   try {
     // Fetch Firebase config from server
-    const response = await fetch(`/auth/firebase-config`, {
-      method: 'GET',
-      credentials: 'include',
-      mode: 'cors',
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch Firebase config: ${response.status} ${response.statusText}`);
-    }
-
-    firebaseConfig = await response.json();
+    firebaseConfig = await get_json('/auth/firebase-config');
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
 
@@ -49,31 +40,25 @@ export async function login(redirect: string) {
   signInWithPopup(auth, provider)
     .then((result) => {
       result.user.getIdToken().then(async function (idToken) {
-        fetch(`/auth/login?id_token=${idToken}&redirect_uri=${redirect}`, {
-          method: 'POST',
-          redirect: 'follow',
-          credentials: 'include',
-          mode: 'cors',
-        })
-          .then(async (response) => {
-            if (response.redirected) {
-              console.log('Login redirect', response.url);
-              // Emit pw-login event before redirect
-              window.dispatchEvent(new CustomEvent('pw-me-changed'));
-              window.location.href = response.url;
-            } else if (!response.ok) {
-              // Handle error responses
-              console.error(`Login failed with status ${response.status}: ${response.text()}`);
-            } else {
-              console.log('Logout successful but no redirect');
-            }
-          })
-          .catch(function (_err) {
-            // console.error(`Login fetch error "${err}"`, err);
-          })
-          .finally(function () {
+        try {
+          const response = await post_with_redirect(`/auth/login?id_token=${idToken}&redirect_uri=${redirect}`);
+          
+          if (response.redirected) {
+            console.log('Login redirect', response.url);
+            // Emit pw-login event before redirect
             window.dispatchEvent(new CustomEvent('pw-me-changed'));
-          });
+            window.location.href = response.url;
+          } else if (!response.ok) {
+            // Handle error responses
+            console.error(`Login failed with status ${response.status}: ${response.text()}`);
+          } else {
+            console.log('Logout successful but no redirect');
+          }
+        } catch (_err) {
+          // console.error(`Login fetch error "${err}"`, err);
+        } finally {
+          window.dispatchEvent(new CustomEvent('pw-me-changed'));
+        }
       });
     })
     .catch((error) => {
@@ -83,12 +68,7 @@ export async function login(redirect: string) {
 
 export async function logout(redirect: string) {
   try {
-    const response = await fetch(`/auth/logout?redirect_uri=${redirect}`, {
-      method: 'POST',
-      redirect: 'follow',
-      credentials: 'include',
-      mode: 'cors',
-    });
+    const response = await post_with_redirect(`/auth/logout?redirect_uri=${redirect}`);
 
     if (response.redirected) {
       console.log('LOGOUT redirect', response.url);

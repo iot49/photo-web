@@ -1,6 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
-import { get_json } from './app/api.js';
+import { get_json, put_json, delete_json } from './app/api';
 
 /**
  * User interface matching the auth service User model
@@ -69,24 +69,10 @@ export class PwUsers extends LitElement {
   private async saveEdit() {
     if (!this.editingUser) return;
 
-    try {
-      const url = `/auth/users/${this.editingUser.email}`;
-      const body = JSON.stringify(this.editForm);
-      
-      const response = await fetch(url, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        mode: 'cors',
-        body: body,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update user: ${response.status} ${response.statusText}`);
-      }
-
+    const url = `/auth/users/${this.editingUser.email}/put`;
+    
+    const result = await put_json(url, this.editForm);
+    if (result) {
       // Refresh the users list
       this.users = await get_json('/auth/users');
       this.cancelEdit();
@@ -96,9 +82,8 @@ export class PwUsers extends LitElement {
       if (this.editForm.roles !== undefined) {
         alert('User roles updated successfully! Please refresh the page or re-login to see the updated permissions.');
       }
-    } catch (error) {
-      console.error('Error updating user:', error);
-      this.error = error instanceof Error ? error.message : 'Failed to update user';
+    } else {
+      this.error = 'Failed to update user';
     }
   }
 
@@ -107,22 +92,12 @@ export class PwUsers extends LitElement {
       return;
     }
 
-    try {
-      const response = await fetch(`/auth/users/${user.email}`, {
-        method: 'DELETE',
-        credentials: 'include',
-        mode: 'cors',
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to delete user: ${response.status} ${response.statusText}`);
-      }
-
+    const result = await delete_json(`/auth/users/${user.email}`);
+    if (result) {
       // Refresh the users list
       this.users = await get_json('/auth/users');
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      this.error = error instanceof Error ? error.message : 'Failed to delete user';
+    } else {
+      this.error = 'Failed to delete user';
     }
   }
 

@@ -1,4 +1,4 @@
-import { get_json } from '../app/api';
+import { get_json, get_text, get_blob } from '../app/api';
 import { PwTests } from '../pw-tests';
 
 // cmd to force-load -thumb image
@@ -9,16 +9,14 @@ const LOADING = false; // Enable/disable "Loading photos to populate cache..." s
 
 async function testNginxHealth(msg: PwTests): Promise<void> {
   // First, let's check if we can access nginx health endpoint
-  const healthResponse = await fetch('/nginx/health', {
-    method: 'GET',
-    credentials: 'include',
-  });
-
-  if (healthResponse.ok) {
-    const healthText = await healthResponse.text();
-    msg.out(`✓ Nginx health check: ${healthText.trim()}`);
-  } else {
-    msg.err(`✗ Nginx health check failed: ${healthResponse.status}`);
+  try {
+    const healthText = await get_text('/nginx/health');
+    msg.out(`✓ Nginx health check: ${healthText?.trim() || 'OK'}`);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const statusMatch = errorMessage.match(/HTTP error! status: (\d+)/);
+    const status = statusMatch ? statusMatch[1] : 'unknown';
+    msg.err(`✗ Nginx health check failed: ${status}`);
   }
 }
 
@@ -56,27 +54,17 @@ async function loadPhotosToPopulateCache(msg: PwTests): Promise<number> {
             const imageUrl = `/photos/api/photos/${photoId}/img${suffix}`;
 
             try {
-              const imageResponse = await fetch(imageUrl, {
-                method: 'GET',
-                credentials: 'include',
-              });
+              // For image requests, we need to use get_blob to download the image
+              await get_blob(imageUrl);
+              const suffixDisplay = suffix === '' ? '(original)' : suffix;
 
-              if (imageResponse.ok) {
-                const cacheStatus = imageResponse.headers.get('X-Cache-Status');
-                const contentLength = imageResponse.headers.get('Content-Length');
-                const suffixDisplay = suffix === '' ? '(original)' : suffix;
-
-                msg.out(
-                  `✓ Photo ${photoId}${suffixDisplay}: ${imageResponse.status} (Cache: ${cacheStatus || 'unknown'}, Size: ${
-                    contentLength || 'unknown'
-                  } bytes)`
-                );
-                msg.out(`Debug: Requested URL: ${imageUrl}`);
-              } else {
-                msg.err(`✗ Photo ${photoId}${suffix}: ${imageResponse.status}`);
-              }
+              msg.out(`✓ Photo ${photoId}${suffixDisplay}: 200 (downloaded successfully)`);
+              msg.out(`Debug: Requested URL: ${imageUrl}`);
             } catch (error) {
-              msg.err(`Error accessing photo ${photoId}${suffix}: ${error instanceof Error ? error.message : String(error)}`);
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              const statusMatch = errorMessage.match(/HTTP error! status: (\d+)/);
+              const status = statusMatch ? statusMatch[1] : 'error';
+              msg.err(`✗ Photo ${photoId}${suffix}: ${status}`);
             }
           }
 

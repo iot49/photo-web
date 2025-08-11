@@ -1,6 +1,6 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
-import { get_json } from './app/api.js';
+import { get_json } from './app/api';
 import { consume } from '@lit/context';
 import { Albums } from './app/interfaces.js';
 import { albumsContext } from './app/context.js';

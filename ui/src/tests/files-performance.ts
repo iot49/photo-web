@@ -25,34 +25,27 @@ export async function test_files_performance(msg: PwTests) {
   async function measureFetchCall(uri: string, description: string): Promise<{duration: number, status: number, size?: number}> {
     const startTime = performance.now();
     try {
-      const response = await fetch(uri, { 
-        method: 'GET', 
-        credentials: 'include', 
-        mode: 'cors' 
-      });
+      const data = await get_json(uri);
       const endTime = performance.now();
       const duration = endTime - startTime;
       
-      // Get response size if possible
-      const contentLength = response.headers.get('content-length');
-      const size = contentLength ? parseInt(contentLength) : undefined;
-      
-      if (response.ok) {
-        const data = await response.json();
-        msg.out(`✓ ${description}: ${duration.toFixed(2)}ms (Status: ${response.status}${size ? `, Size: ${size} bytes` : ''})`);
-        if (data.folders) {
-          msg.out(`  - Folders: ${data.folders.length}, Files: ${data.files ? data.files.length : 0}`);
-        }
-      } else {
-        msg.err(`✗ ${description}: ${duration.toFixed(2)}ms (Status: ${response.status})`);
+      msg.out(`✓ ${description}: ${duration.toFixed(2)}ms (Status: 200)`);
+      if (data.folders) {
+        msg.out(`  - Folders: ${data.folders.length}, Files: ${data.files ? data.files.length : 0}`);
       }
       
-      return { duration, status: response.status, size };
+      return { duration, status: 200 };
     } catch (error) {
       const endTime = performance.now();
       const duration = endTime - startTime;
-      msg.err(`✗ ${description}: ${duration.toFixed(2)}ms - Error: ${error instanceof Error ? error.message : String(error)}`);
-      return { duration, status: 0 };
+      
+      // Extract status from error message if possible
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const statusMatch = errorMessage.match(/HTTP error! status: (\d+)/);
+      const status = statusMatch ? parseInt(statusMatch[1]) : 500;
+      
+      msg.err(`✗ ${description}: ${duration.toFixed(2)}ms (Status: ${status})`);
+      return { duration, status };
     }
   }
 

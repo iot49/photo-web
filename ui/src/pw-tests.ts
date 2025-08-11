@@ -5,6 +5,7 @@ import { test_photos_files } from './tests/auth-photos-files.js';
 import { nginx_cache } from './tests/nginx-cache.js';
 import { test_files_performance } from './tests/files-performance.js';
 import { test_frontend_lazy_loading } from './tests/frontend-lazy-loading.js';
+import { test_me_config } from './tests/me-config.js';
 
 @customElement('pw-tests')
 export class PwTests extends LitElement {
@@ -139,6 +140,14 @@ export class PwTests extends LitElement {
     }
   }
 
+  private async runMeConfigTest() {
+    try {
+      await test_me_config(this);
+    } catch (error) {
+      this.err(`Error running me config test: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   private navTemplate() {
     return html`
       <div class="nav-controls-container" slot="nav-controls">
@@ -156,6 +165,9 @@ export class PwTests extends LitElement {
         </sl-tooltip>
         <sl-tooltip content="Run Frontend Lazy Loading Test">
           <div class="nav-control-item" @click=${this.runFrontendLazyLoadingTest}>Lazy Load</div>
+        </sl-tooltip>
+        <sl-tooltip content="Run Me Configuration Test">
+          <div class="nav-control-item" @click=${this.runMeConfigTest}>Me Config</div>
         </sl-tooltip>
       </div>
     `;

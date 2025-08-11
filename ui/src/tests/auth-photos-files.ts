@@ -124,12 +124,8 @@ export async function test_photos_files(msg: PwTests) {
     const expectedStatus = userRoles.includes(realm) ? 200 : 403;
     
     try {
-      const response = await fetch(uri, {
-        method: 'GET',
-        credentials: 'include'
-      });
-      
-      const actualStatus = response.status;
+      await get_json(uri);
+      const actualStatus = 200; // If get_json succeeds, it's a 200
       
       if (actualStatus === expectedStatus) {
         loggedInPassed++;
@@ -140,7 +136,17 @@ export async function test_photos_files(msg: PwTests) {
       }
     } catch (error) {
       loggedInFailed++;
-      msg.err(`✗ ${uri}: Error - ${error instanceof Error ? error.message : String(error)} - realm: ${realm}`);
+      // Extract status from error message if possible
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const statusMatch = errorMessage.match(/HTTP error! status: (\d+)/);
+      const actualStatus = statusMatch ? parseInt(statusMatch[1]) : 500;
+      
+      if (actualStatus === expectedStatus) {
+        loggedInPassed++;
+        msg.out(`✓ ${uri}: ${actualStatus} (expected ${expectedStatus}) - realm: ${realm}`);
+      } else {
+        msg.err(`✗ ${uri}: ${actualStatus} (expected ${expectedStatus}) - realm: ${realm}`);
+      }
     }
   }
 
@@ -169,12 +175,8 @@ export async function test_photos_files(msg: PwTests) {
     const expectedStatus = userRoles.includes(realm) ? 200 : 403;
     
     try {
-      const response = await fetch(uri, {
-        method: 'GET',
-        credentials: 'include'
-      });
-      
-      const actualStatus = response.status;
+      await get_json(uri);
+      const actualStatus = 200; // If get_json succeeds, it's a 200
       
       if (actualStatus === expectedStatus) {
         loggedOutPassed++;
@@ -185,7 +187,17 @@ export async function test_photos_files(msg: PwTests) {
       }
     } catch (error) {
       loggedOutFailed++;
-      msg.err(`✗ ${uri}: Error - ${error instanceof Error ? error.message : String(error)} - realm: ${realm}`);
+      // Extract status from error message if possible
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const statusMatch = errorMessage.match(/HTTP error! status: (\d+)/);
+      const actualStatus = statusMatch ? parseInt(statusMatch[1]) : 500;
+      
+      if (actualStatus === expectedStatus) {
+        loggedOutPassed++;
+        msg.out(`✓ ${uri}: ${actualStatus} (expected ${expectedStatus}) - realm: ${realm}`);
+      } else {
+        msg.err(`✗ ${uri}: ${actualStatus} (expected ${expectedStatus}) - realm: ${realm}`);
+      }
     }
   }
 

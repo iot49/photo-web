@@ -1,12 +1,12 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
-import { Me } from './app/interfaces.js';
+import { Me } from './app/me.js';
 import { consume } from '@lit/context';
 import { meContext } from './app/context.js';
 import { login, logout } from './app/login.js';
 import { ThemeManager } from './shoelace-config.js';
 import { SlDialog } from '@shoelace-style/shoelace';
-import { get_json } from './app/api.js';
+import { get_json } from './app/api';
 
 /**
  * Album browser component that shows available photo albums.

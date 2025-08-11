@@ -1,7 +1,10 @@
 /*
-    These interfaces match the models 
+    These interfaces match the models
     in `photos/models.py`.
 */
+
+export type { Me, Config, SlideshowConfig } from './me';
+export { MeImple } from './me';
 
 export interface PhotoModel {
   uuid: string;
@@ -47,15 +50,6 @@ export interface AlbumModel {
 
 export type Albums = Record<string, AlbumModel>;
 
-
-export interface Me {
-  roles: string;
-  name?: string;
-  email?: string;
-  picture?: string;
-  terms_accepted: string;
-  created_at: string;
-}
 
 export class SrcsetInfo {
   private sizes!: ImageSizes;
