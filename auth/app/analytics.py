@@ -14,6 +14,7 @@ from typing import Any, Dict
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 
 class AnalyticsCollector:
@@ -29,11 +30,10 @@ class AnalyticsCollector:
         (self.data_dir / "albums").mkdir(exist_ok=True)
         (self.data_dir / "files").mkdir(exist_ok=True)
 
-        self.analytics_logger = logging.getLogger("analytics")
-        handler = logging.FileHandler(self.data_dir / "analytics.log")
-        handler.setFormatter(logging.Formatter("%(message)s"))
-        self.analytics_logger.addHandler(handler)
-        self.analytics_logger.setLevel(logging.INFO)
+        # Set up file handler for analytics logging
+        self.analytics_handler = logging.FileHandler(self.data_dir / "analytics.log")
+        self.analytics_handler.setFormatter(logging.Formatter("%(message)s"))
+        logger.addHandler(self.analytics_handler)
 
     def extract_resource_info(self, uri: str) -> Dict[str, Any]:
         """Extract resource information from URI for analytics"""
@@ -119,7 +119,7 @@ class AnalyticsCollector:
             }
 
             # Log to analytics file
-            self.analytics_logger.info(json.dumps(analytics_record))
+            logger.debug(json.dumps(analytics_record))
 
             # Store specific analytics based on resource type
             if (

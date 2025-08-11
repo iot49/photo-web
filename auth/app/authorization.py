@@ -147,12 +147,12 @@ class AuthorizationManager:
             logger.error("Request object required for delegation but not provided")
             return False
 
-        logger.warning(
+        logger.debug(
             f"DELEGATION: Starting delegation to {rule.delegation_url} for URI {uri}"
         )
         try:
             delegation_url = rule.delegation_url
-            logger.warning(f"DELEGATION: Attempting connection to {delegation_url}")
+            logger.debug(f"DELEGATION: Attempting connection to {delegation_url}")
             # Prepare headers to forward to delegation service
             headers = {
                 "X-Forwarded-Uri": uri,

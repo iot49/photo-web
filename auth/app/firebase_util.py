@@ -105,24 +105,13 @@ def verify_user(request: Request) -> UserBase:
     # get user info from session_cookie
     user_info = verify_cookie(session_cookie)
 
-    # DEBUG: Log original roles from database
-    logger.warning(
-        f"DEBUG: Original roles from database for {user_info.email}: '{user_info.roles}'"
-    )
-
     # ensure default roles are set
     roles = set([role.strip() for role in user_info.roles.split(",")])
     roles.add("public")  # ensure 'public' role is always present
     if user_info.email == os.getenv("ADMIN_EMAIL", ""):
         roles.add("admin")
 
-    # DEBUG: Log processed roles
-    logger.warning(f"DEBUG: Processed roles after filtering: '{sorted(roles)}'")
-
     user_info.roles = ",".join(sorted(roles))
-
-    # DEBUG: Log final roles
-    logger.warning(f"DEBUG: Final roles returned to API: '{user_info.roles}'")
 
     # update cache
     cached_result = user_info.model_dump()

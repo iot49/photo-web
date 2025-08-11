@@ -10,9 +10,9 @@ from models import DB
 # Import the shared DB manager
 from shared_db import shared_db_manager
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARNING)
 
 # ImageMagick will handle all image formats including HEIC natively
 logger.info("Using ImageMagick for image processing with native HEIC support")

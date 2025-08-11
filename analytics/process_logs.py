@@ -14,12 +14,14 @@ from pathlib import Path
 from typing import Any, Dict
 
 import pandas as pd
+import pytz
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 
 class LogProcessor:
@@ -82,6 +84,14 @@ class LogProcessor:
 
             # Filter recent data (last 30 days)
             cutoff_date = datetime.now() - timedelta(days=30)
+
+            # Handle timezone-aware timestamps by converting both to UTC
+            if not df.empty and df["timestamp"].dt.tz is not None:
+                # Convert cutoff_date to UTC timezone-aware datetime
+                cutoff_date = cutoff_date.replace(tzinfo=pytz.UTC)
+                # Ensure timestamps are also in UTC for consistent comparison
+                df["timestamp"] = df["timestamp"].dt.tz_convert(pytz.UTC)
+
             recent_df = df[df["timestamp"] >= cutoff_date]
 
             # Generate analytics
@@ -93,9 +103,13 @@ class LogProcessor:
                 "hourly_distribution": recent_df.groupby(recent_df["timestamp"].dt.hour)
                 .size()
                 .to_dict(),
-                "daily_requests": recent_df.groupby(recent_df["timestamp"].dt.date)
-                .size()
-                .to_dict(),
+                "daily_requests": {
+                    str(date): count
+                    for date, count in recent_df.groupby(recent_df["timestamp"].dt.date)
+                    .size()
+                    .to_dict()
+                    .items()
+                },
                 "avg_response_time": recent_df["duration"].mean()
                 if "duration" in recent_df.columns
                 else 0,

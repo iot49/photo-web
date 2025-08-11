@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from models import UserCreate, UserResponse, UserUpdate
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARNING)
 
 
 def get_db() -> DatabaseManager:

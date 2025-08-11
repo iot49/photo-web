@@ -39,10 +39,10 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from analytics import analytics_collector
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.WARNING)
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARNING)
 
 # Add middleware to log all incoming requests for debugging
 

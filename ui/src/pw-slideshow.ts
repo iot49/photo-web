@@ -686,7 +686,7 @@ export class PwSlideshow extends LitElement {
     this.overlayTimeoutId = window.setTimeout(() => {
       this.overlaysVisible = false;
       this.overlayTimeoutId = null;
-    }, 2000);
+    }, 1200);
   };
 
   disconnectedCallback() {

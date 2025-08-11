@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from models import DB
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 router = APIRouter()
 
