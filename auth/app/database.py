@@ -52,39 +52,118 @@ class DatabaseManager:
                 )
                 migration_exists = result.scalar() > 0
 
-                if migration_exists:
-                    logger.warning(
-                        "MIGRATION: ✓ 'config' column migration already applied"
-                    )
-                    return
+                if not migration_exists:
+                    logger.warning("MIGRATION: Starting config column migration...")
 
-                logger.warning("MIGRATION: Starting config column migration...")
+                    # Check if config column exists
+                    result = session.execute(text("PRAGMA table_info(user)"))
+                    columns = result.fetchall()
+                    column_names = [col[1] for col in columns]
 
-                # Check if config column exists
-                result = session.execute(text("PRAGMA table_info(user)"))
-                columns = result.fetchall()
-                column_names = [col[1] for col in columns]
+                    if "config" not in column_names:
+                        logger.warning(
+                            "MIGRATION: Adding missing 'config' column to user table..."
+                        )
+                        # Add the config column with default value
+                        session.execute(
+                            text("ALTER TABLE user ADD COLUMN config TEXT DEFAULT '{}'")
+                        )
+                        logger.warning(
+                            "MIGRATION: ✓ Successfully added 'config' column to user table"
+                        )
 
-                if "config" not in column_names:
-                    logger.warning(
-                        "MIGRATION: Adding missing 'config' column to user table..."
-                    )
-                    # Add the config column with default value
+                    # Record that this migration has been applied
                     session.execute(
-                        text("ALTER TABLE user ADD COLUMN config TEXT DEFAULT '{}'")
+                        text(
+                            "INSERT INTO migrations (name) VALUES ('add_config_column')"
+                        )
                     )
+                    session.commit()
                     logger.warning(
-                        "MIGRATION: ✓ Successfully added 'config' column to user table"
+                        "MIGRATION: ✓ Config column migration completed and recorded"
                     )
 
-                # Record that this migration has been applied
-                session.execute(
-                    text("INSERT INTO migrations (name) VALUES ('add_config_column')")
+                # Check if config escape cleanup migration has already been applied
+                result = session.execute(
+                    text(
+                        "SELECT COUNT(*) FROM migrations WHERE name = 'fix_config_escapes'"
+                    )
                 )
-                session.commit()
-                logger.warning(
-                    "MIGRATION: ✓ Config column migration completed and recorded"
-                )
+                escape_migration_exists = result.scalar() > 0
+
+                if not escape_migration_exists:
+                    logger.warning(
+                        "MIGRATION: Starting config escape cleanup migration..."
+                    )
+
+                    # Get all users with config values that might have escape issues
+                    result = session.execute(
+                        text(
+                            "SELECT email, config FROM user WHERE config IS NOT NULL AND config != '{}' AND config != ''"
+                        )
+                    )
+                    users_with_config = result.fetchall()
+
+                    import json
+
+                    fixed_count = 0
+
+                    for email, config_value in users_with_config:
+                        if config_value and isinstance(config_value, str):
+                            try:
+                                # Try to detect and fix multiple layers of JSON escaping
+                                current_value = config_value
+                                parsed_value = None
+
+                                # Keep parsing until we get a dict object or can't parse anymore
+                                while isinstance(current_value, str):
+                                    try:
+                                        parsed = json.loads(current_value)
+                                        if isinstance(parsed, dict):
+                                            # We found the actual config object
+                                            parsed_value = parsed
+                                            break
+                                        elif isinstance(parsed, str):
+                                            # Still a string, continue parsing
+                                            current_value = parsed
+                                        else:
+                                            # Not a dict or string, stop
+                                            break
+                                    except json.JSONDecodeError:
+                                        break
+
+                                if parsed_value is not None:
+                                    # Convert back to a clean JSON string
+                                    clean_config = json.dumps(parsed_value)
+
+                                    # Only update if the value actually changed
+                                    if clean_config != config_value:
+                                        session.execute(
+                                            text(
+                                                "UPDATE user SET config = :config WHERE email = :email"
+                                            ),
+                                            {"config": clean_config, "email": email},
+                                        )
+                                        fixed_count += 1
+                                        logger.warning(
+                                            f"MIGRATION: Fixed config escapes for user {email}"
+                                        )
+
+                            except Exception as e:
+                                logger.warning(
+                                    f"MIGRATION: Could not fix config for user {email}: {e}"
+                                )
+
+                    # Record that this migration has been applied
+                    session.execute(
+                        text(
+                            "INSERT INTO migrations (name) VALUES ('fix_config_escapes')"
+                        )
+                    )
+                    session.commit()
+                    logger.warning(
+                        f"MIGRATION: ✓ Config escape cleanup migration completed. Fixed {fixed_count} users."
+                    )
 
         except Exception as e:
             logger.error(f"MIGRATION ERROR: Error during config column migration: {e}")
@@ -109,6 +188,9 @@ class DatabaseManager:
             # Create new user
             user_dict = user_data.model_dump()
 
+            # Always set created_at to current date (ignore any input value)
+            user_dict["created_at"] = datetime.now().strftime("%Y-%m-%d")
+
             # Set roles to "public,admin" if email is in SUPER_USER_EMAIL list
             super_user_emails = os.getenv("SUPER_USER_EMAIL", "")
             super_user_list = [
@@ -116,10 +198,6 @@ class DatabaseManager:
             ]
             if user_data.email in super_user_list:
                 user_dict["roles"] = "public,admin"
-
-            # Set created_at to current date if not provided
-            if not user_dict.get("created_at"):
-                user_dict["created_at"] = datetime.now().strftime("%Y-%m-%d")
 
             user = User(**user_dict)
             session.add(user)
@@ -214,24 +292,19 @@ class DatabaseManager:
         existing_user = self.get_user_by_email(email)
 
         if existing_user:
-            # Update existing user with Firebase data
-            update_data = UserUpdate(
-                name=firebase_user_data.get("name", existing_user.name),
-                picture=firebase_user_data.get("picture", existing_user.picture),
-            )
-            user = self.update_user(email, update_data)
-            # Update last login
+            # Update last login for existing user (name and picture are immutable)
             user = self.update_last_login(email)
             return user
         else:
             # Create new user
             user_data = UserCreate(
-                name=firebase_user_data.get("name", ""),
+                name=firebase_user_data.get("name") or email,
                 email=email,
                 picture=firebase_user_data.get("picture", ""),
                 roles="public",  # Default role
                 enabled=True,
-                created_at=datetime.now().strftime("%Y-%m-%d"),
+                # set in self.create_user
+                # created_at=datetime.now().strftime("%Y-%m-%d"),
             )
             user = self.create_user(user_data)
             # Set initial login time

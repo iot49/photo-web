@@ -110,7 +110,7 @@ export class MeImple implements Me {
     
     // Schedule delayed database update
     this._updateTimeout = setTimeout(async () => {
-      const result = await put_json(`/auth/users/${this.email}/me`, {
+      const result = await put_json(`/auth/users/${this.email}/config`, {
         config: JSON.stringify(this.config)
       });
       if (result) {

@@ -5,7 +5,13 @@ from typing import List
 from database import DatabaseManager, get_database_manager
 from doc_utils import dedent_and_convert_to_html
 from fastapi import APIRouter, Depends, HTTPException, Request
-from models import UserCreate, UserResponse, UserUpdate
+from models import (
+    UserCreate,
+    UserResponse,
+    UserUpdate,
+    UserUpdateConfig,
+    UserUpdateProfile,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -105,7 +111,8 @@ async def get_all_users(db: DatabaseManager = Depends(get_db)):
     """
     try:
         users = db.get_all_users()
-        return users
+        # Return users with None fields excluded
+        return [user.model_dump(exclude_none=True) for user in users]
     except Exception as e:
         logger.error(f"Error getting users: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -186,7 +193,8 @@ async def get_user(email: str, db: DatabaseManager = Depends(get_db)):
         user = db.get_user_by_email(email)
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
-        return user
+        # Return user with None fields excluded
+        return user.model_dump(exclude_none=True)
     except HTTPException:
         raise
     except Exception as e:
@@ -348,9 +356,9 @@ async def create_user(user_data: UserCreate, db: DatabaseManager = Depends(get_d
         },
     },
 )
-async def update_user_admin(
+async def update_user_profile(
     email: str,
-    user_update: UserUpdate,
+    user_update: UserUpdateProfile,
     request: Request,
     db: DatabaseManager = Depends(get_db),
 ):
@@ -386,11 +394,8 @@ async def update_user_admin(
                 detail="Access denied - admin role required",
             )
 
-        # Filter out config field - admins should use /{email}/me for config updates
+        # Convert UserUpdateProfile to UserUpdate for database operation
         update_data = user_update.model_dump(exclude_unset=True)
-        if "config" in update_data:
-            del update_data["config"]
-            logger.debug("UPDATE_USER_ADMIN: Removed config field from admin update")
 
         if len(update_data) == 0:
             logger.debug("UPDATE_USER_ADMIN: No valid fields to update")
@@ -400,10 +405,10 @@ async def update_user_admin(
                 raise HTTPException(status_code=404, detail="User not found")
             return user
 
-        user_update_filtered = UserUpdate(**update_data)
+        user_update_internal = UserUpdate(**update_data)
 
         # Perform the update
-        user = db.update_user(email, user_update_filtered)
+        user = db.update_user(email, user_update_internal)
         if not user:
             logger.debug(f"UPDATE_USER_ADMIN: User {email} not found in database")
             raise HTTPException(status_code=404, detail="User not found")
@@ -429,7 +434,7 @@ async def update_user_admin(
 
 
 @router.put(
-    "/{email}/me",
+    "/{email}/config",
     response_model=UserResponse,
     summary="Update User Config",
     description=dedent_and_convert_to_html(
@@ -479,7 +484,7 @@ async def update_user_admin(
 )
 async def update_user_config(
     email: str,
-    user_update: UserUpdate,
+    user_update: UserUpdateConfig,
     request: Request,
     db: DatabaseManager = Depends(get_db),
 ):
@@ -507,8 +512,24 @@ async def update_user_config(
         config_data = {}
 
         if "config" in update_data:
-            config_data["config"] = update_data["config"]
-            logger.debug(f"UPDATE_USER_CONFIG: Updating config for user {email}")
+            # The frontend sends JSON.stringify(config), so we receive a JSON string
+            # We should store this directly without additional JSON encoding
+            config_value = update_data["config"]
+
+            # Validate that it's valid JSON by trying to parse it
+            try:
+                import json
+
+                json.loads(
+                    config_value
+                )  # Just validate, don't store the parsed version
+                config_data["config"] = config_value  # Store the JSON string as-is
+                logger.debug(f"UPDATE_USER_CONFIG: Updating config for user {email}")
+            except json.JSONDecodeError as e:
+                logger.error(f"UPDATE_USER_CONFIG: Invalid JSON in config field: {e}")
+                raise HTTPException(
+                    status_code=400, detail="Invalid JSON in config field"
+                )
         else:
             logger.debug("UPDATE_USER_CONFIG: No config field provided")
             # Still need to return the current user data
@@ -517,10 +538,10 @@ async def update_user_config(
                 raise HTTPException(status_code=404, detail="User not found")
             return user
 
-        user_update_config = UserUpdate(**config_data)
+        user_update_internal = UserUpdate(**config_data)
 
         # Perform the update
-        user = db.update_user(email, user_update_config)
+        user = db.update_user(email, user_update_internal)
         if not user:
             logger.debug(f"UPDATE_USER_CONFIG: User {email} not found in database")
             raise HTTPException(status_code=404, detail="User not found")

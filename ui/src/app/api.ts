@@ -134,6 +134,16 @@ export async function post_with_redirect(uri: string, data?: any) {
   try {
     let response: Response;
     try {
+      console.log(`DEBUG: Starting POST request to ${uri}`);
+      console.log(`DEBUG: Request options:`, {
+        method: 'POST',
+        credentials: 'include',
+        mode: 'cors',
+        redirect: 'follow',
+        headers: data ? { 'Content-Type': 'application/json' } : undefined,
+        body: data ? JSON.stringify(data) : undefined
+      });
+      
       response = await fetch(uri, {
         method: 'POST',
         credentials: 'include',
@@ -144,7 +154,18 @@ export async function post_with_redirect(uri: string, data?: any) {
         } : undefined,
         body: data ? JSON.stringify(data) : undefined
       });
+      
+      console.log(`DEBUG: Fetch completed successfully for ${uri}`);
+      console.log(`DEBUG: Response status: ${response.status}, ok: ${response.ok}, redirected: ${response.redirected}`);
+      console.log(`DEBUG: Response headers:`, Object.fromEntries(response.headers.entries()));
+      console.log(`DEBUG: Response URL: ${response.url}`);
+      
     } catch (error) {
+      console.error(`DEBUG: Fetch failed for ${uri}`);
+      console.error(`DEBUG: Error type: ${(error as any)?.constructor?.name}`);
+      console.error(`DEBUG: Error message: ${(error as any)?.message}`);
+      console.error(`DEBUG: Error stack:`, (error as any)?.stack);
+      console.error(`DEBUG: Full error object:`, error);
       console.error(`Failed posting to ${uri}`, { cause: error });
       throw new Error(`Failed posting to ${uri}`, { cause: error });
     }

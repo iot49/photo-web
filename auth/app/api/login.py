@@ -147,7 +147,7 @@ async def session_login(
                 new_user_data = UserCreate(
                     email=user_email,
                     name=user_info.name or user_email,
-                    picture=user_info.picture,
+                    picture=user_info.picture or "",
                 )
                 db.create_user(new_user_data)
             # Update last login time for both new and existing users
@@ -353,4 +353,4 @@ async def get_current_user(request: Request):
     except Exception as e:
         logger.error(f"Error getting current user: {e}", e)
         # Return public role instead of raising error to prevent auth failures
-        return UserResponse({"roles": "public"})
+        return {"roles": "public"}

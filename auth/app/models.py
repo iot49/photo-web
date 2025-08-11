@@ -79,16 +79,24 @@ class UserCreate(UserBase):
     pass
 
 
-class UserUpdate(SQLModel):
-    """Model for updating user data."""
+class UserUpdateProfile(SQLModel):
+    """Model for updating user profile (admin)."""
 
-    name: Optional[str] = None
     roles: Optional[str] = None
     enabled: Optional[bool] = None
-    picture: Optional[str] = None
     terms_accepted: Optional[str] = None
-    created_at: Optional[str] = None
+
+
+class UserUpdateConfig(SQLModel):
+    """Model for updating user configuration"""
+
     config: Optional[str] = None
+
+
+class UserUpdate(UserUpdateProfile, UserUpdateConfig):
+    """Model for updating user (internal use) - combines profile and config updates."""
+
+    last_login: Optional[str] = None
 
 
 class UserResponse(UserBase):

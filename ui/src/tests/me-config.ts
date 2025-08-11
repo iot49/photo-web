@@ -28,7 +28,7 @@ export async function test_me_config(msg: PwTests) {
   if (!canUpdateConfig) {
     msg.err('❌ User must have "protected" or "admin" role to update configuration');
     msg.out('## Authorization Requirements');
-    msg.out('The `/auth/users/{email}/me` endpoint requires:');
+    msg.out('The `/auth/users/{email}/config` endpoint requires:');
     msg.out('- **"public"** role (minimum) - allows config updates only');
     msg.out('- **"admin"** role - allows config and other field updates');
     msg.out('');
@@ -92,7 +92,7 @@ export async function test_me_config(msg: PwTests) {
     };
 
     try {
-      const updateResponse = await put_json(`/auth/users/${me.email}/me`, newSlideshowConfig);
+      const updateResponse = await put_json(`/auth/users/${me.email}/config`, newSlideshowConfig);
       
       if (updateResponse && updateResponse.config) {
         const parsedConfig = JSON.parse(updateResponse.config);
@@ -132,7 +132,7 @@ export async function test_me_config(msg: PwTests) {
     };
 
     try {
-      const updateResponse = await put_json(`/auth/users/${me.email}/me`, darkModeConfig);
+      const updateResponse = await put_json(`/auth/users/${me.email}/config`, darkModeConfig);
       
       if (updateResponse && updateResponse.config) {
         const parsedConfig = JSON.parse(updateResponse.config);
@@ -195,7 +195,7 @@ export async function test_me_config(msg: PwTests) {
           }
         }
 
-        // Now separately update config using the /me endpoint
+        // Now separately update config using the /config endpoint
         const configUpdateData = {
           config: JSON.stringify({
             dark_mode: true,
@@ -208,20 +208,20 @@ export async function test_me_config(msg: PwTests) {
           })
         };
 
-        const configUpdateResponse = await put_json(`/auth/users/${me.email}/me`, configUpdateData);
+        const configUpdateResponse = await put_json(`/auth/users/${me.email}/config`, configUpdateData);
         
         if (configUpdateResponse && configUpdateResponse.config) {
           const parsedConfig = JSON.parse(configUpdateResponse.config);
           if (parsedConfig.slideshow && parsedConfig.slideshow.duration === 7000) {
             configTestsPassed++;
-            msg.out('✓ Config updated successfully via /me endpoint');
+            msg.out('✓ Config updated successfully via /config endpoint');
           } else {
             configTestsFailed++;
-            msg.err('✗ Config not updated via /me endpoint');
+            msg.err('✗ Config not updated via /config endpoint');
           }
         } else {
           configTestsFailed++;
-          msg.err('✗ No config response from /me endpoint');
+          msg.err('✗ No config response from /config endpoint');
         }
       } else {
         roleTestsFailed++;
@@ -268,7 +268,7 @@ export async function test_me_config(msg: PwTests) {
     try {
       if (originalConfig) {
         const restoreData = { config: originalConfig };
-        await put_json(`/auth/users/${me.email}/me`, restoreData);
+        await put_json(`/auth/users/${me.email}/config`, restoreData);
         msg.out('✓ Original configuration restored');
       } else {
         msg.out('ℹ No original configuration to restore');
