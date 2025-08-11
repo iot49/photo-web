@@ -33,11 +33,8 @@ interface NavigateEvent extends Event {
  */
 @customElement('pw-main')
 export class PwMain extends LitElement {
-  // Cache for lazily loaded components
-  private componentCache = new Map<string, HTMLElement>();
-  
-  // Track active dynamic components to ensure proper cleanup
-  private activeDynamicComponents = new Map<string, HTMLElement>();
+  // Cache for static components (reused across route changes)
+  private staticComponentCache = new Map<string, any>();
   static styles = css`
     .loading {
       display: flex;
@@ -354,77 +351,47 @@ export class PwMain extends LitElement {
   }
 
   /**
-   * Renders a component lazily - only creates it when first needed, then reuses the instance.
-   * @param routeId - Unique identifier for the route/component in the cache
-   * @param route - Route information including isActive and display properties
-   * @param componentFactory - Function that returns the component template when called
-   * @returns The component template with proper display styling, or empty template if not active
+   * Renders a component with proper lifecycle management.
+   * Dynamic components are completely removed from DOM when inactive.
+   * Static components are cached and hidden/shown with CSS.
    */
   private renderLazyComponent(
     routeId: string,
     route: { isActive: boolean; display: string; selectedFilePath?: string },
     componentFactory: () => any
   ) {
-    console.log("renderLazyComponent", routeId, route)
-    // For components that depend on dynamic properties (playlist), always re-render
-    // to ensure they get the latest values, and only show when active
+    if (DEBUG) console.log("renderLazyComponent", routeId, route);
+    
     const routeDefinitions = this.getRouteDefinitions();
     const routeDefinition = routeDefinitions.find((r) => r.routeId === routeId);
+    
     if (routeDefinition?.isDynamic) {
+      // For dynamic components: only render when active, completely remove when inactive
       if (!route.isActive) {
-        console.log("dynamic route", this.id, "deactivated")
-        // For dynamic components that are becoming inactive, ensure proper cleanup
-        const existingComponent = this.activeDynamicComponents.get(routeId);
-        console.log("1 cleanup", existingComponent)
-        if (existingComponent) {
-          // Force disconnectedCallback by removing from DOM
-          if (existingComponent.parentNode) {
-            console.log("2 cleanup", existingComponent.parentNode)
-            existingComponent.parentNode.removeChild(existingComponent);
-          }
-          // Call disconnectedCallback manually if it exists
-          if (typeof (existingComponent as any).disconnectedCallback === 'function') {
-            console.log("3 cleanup");
-            (existingComponent as any).disconnectedCallback();
-          }
-          this.activeDynamicComponents.delete(routeId);
-          if (DEBUG) console.log(`Cleaned up dynamic component: ${routeId}`);
-        }
         return html``;
       }
       
-      // Clean up any existing component before creating new one
-      const existingComponent = this.activeDynamicComponents.get(routeId);
-      if (existingComponent) {
-        if (existingComponent.parentNode) {
-          existingComponent.parentNode.removeChild(existingComponent);
-        }
-        if (typeof (existingComponent as any).disconnectedCallback === 'function') {
-          (existingComponent as any).disconnectedCallback();
+      // Always create fresh dynamic components to ensure proper lifecycle
+      if (DEBUG) console.log(`Creating fresh dynamic component for route: ${routeId}`);
+      const component = componentFactory();
+      return html`<div style="display: ${route.display}">${component}</div>`;
+    } else {
+      // For static components: cache and reuse, but only create on first use when active
+      if (!this.staticComponentCache.has(routeId)) {
+        if (route.isActive) {
+          if (DEBUG) console.log(`Creating static component for route: ${routeId} on first use`);
+          const component = componentFactory();
+          this.staticComponentCache.set(routeId, component);
+        } else {
+          // Don't create component if route is not active
+          return html``;
         }
       }
-      
-      if (DEBUG) console.log(`Re-rendering dynamic component for route: ${routeId}`);
-      const component = componentFactory();
-      
-      // Store reference to the new component for cleanup
-      this.activeDynamicComponents.set(routeId, component as HTMLElement);
-      
-      return html`<div style="display: ${route.display}">${component}</div>`;
-    }
 
-    // For non-dynamic components, keep them in the DOM to preserve state
-    // If component hasn't been created yet, create it and cache it
-    if (!this.componentCache.has(routeId)) {
-      if (DEBUG) console.log(`Creating component for route: ${routeId}`);
-      const component = componentFactory();
-      this.componentCache.set(routeId, component);
+      if (DEBUG && route.isActive) console.log(`Showing cached static component for route: ${routeId}`);
+      const cachedComponent = this.staticComponentCache.get(routeId);
+      return html`<div style="display: ${route.display}">${cachedComponent}</div>`;
     }
-
-    // Always render non-dynamic components, but control visibility with display style
-    if (DEBUG && route.isActive) console.log(`Showing cached component for route: ${routeId}`);
-    const cachedComponent = this.componentCache.get(routeId);
-    return html`<div style="display: ${route.display}">${cachedComponent}</div>`;
   }
 
   private getRouteDefinitions() {
@@ -446,7 +413,7 @@ export class PwMain extends LitElement {
         matchUris: ['/ui/splash', '/ui', '/ui/'],
         isActive: this.matchesAnyUri(['/ui/splash', '/ui', '/ui/']),
         componentFactory: () => html`<pw-slideshow playlist=${recentAlbums(this.albums, 3).join(':')} theme="ken-burns" autoplay></pw-slideshow>`,
-        isDynamic: false,
+        isDynamic: true,
       },
       {
         routeId: 'album',
@@ -577,13 +544,29 @@ export class PwMain extends LitElement {
    */
   public clearComponentCache(routeId?: string) {
     if (routeId) {
-      if (this.componentCache.has(routeId)) {
-        if (DEBUG) console.log(`Clearing cached component: ${routeId}`);
-        this.componentCache.delete(routeId);
+      // Clear static component cache
+      if (this.staticComponentCache.has(routeId)) {
+        if (DEBUG) console.log(`Clearing cached static component: ${routeId}`);
+        this.staticComponentCache.delete(routeId);
       }
     } else {
-      if (DEBUG) console.log('Clearing all cached components');
-      this.componentCache.clear();
+      if (DEBUG) console.log('Clearing all cached static components');
+      this.staticComponentCache.clear();
     }
+    
+    // Force a re-render to apply changes
+    this.requestUpdate();
+  }
+
+  /**
+   * Cleanup method called when the main component is disconnected
+   */
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    
+    // Clean up all cached components
+    this.clearComponentCache();
+    
+    if (DEBUG) console.log('PwMain disconnected - all components cleaned up');
   }
 }

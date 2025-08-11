@@ -162,7 +162,7 @@ export class PwSlideshow extends LitElement {
     }
 
     nextIndex = ((nextIndex % N) + N) % N;
-    // console.log(`N = ${N} curr = ${this.currentIndex} next = ${nextIndex}`, slides[nextIndex]);
+    console.log(`GOTO from ${this.currentIndex} -> ${nextIndex} of ${N} slides`, slides[nextIndex]);
 
     // Load photos for current and adjacent slides (index, index+1, index+2, index-1)
     this.loadPhoto(nextIndex);
