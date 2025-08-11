@@ -5,7 +5,7 @@ import { get_json } from './app/api';
 import { Albums, PhotoModel, SrcsetInfo } from './app/interfaces';
 import { consume } from '@lit/context';
 import { albumsContext, srcsetInfoContext, meContext } from './app/context';
-import { MeImple } from './app/me';
+import { Me } from './app/me';
 import { SwipeHandler } from './app/swipe';
 
 /* Lazy loading
@@ -43,7 +43,7 @@ export class PwSlideshow extends LitElement {
   private srcsetInfo!: SrcsetInfo;
 
   @consume({ context: meContext, subscribe: true })
-  private me?: MeImple;
+  private me?: Me;
 
   @query('#slideshow') slideshow!: HTMLDivElement;
   @query('#overlays') overlays!: HTMLDivElement;
@@ -428,64 +428,58 @@ export class PwSlideshow extends LitElement {
     const isKenBurns = (e.target as any).checked;
     this.theme = isKenBurns ? 'ken-burns' : 'carousel';
     
-    // Persist theme to database
-    if (this.me) {
-      this.me.updateConfig({
-        slideshow: {
-          ...this.me.config.slideshow,
-          theme: this.theme
-        }
-      });
-    }
+    // Emit config change event
+    this.dispatchConfigChange({
+      slideshow: {
+        theme: this.theme
+      }
+    });
   };
 
   private handleDurationChange = (e: CustomEvent) => {
     const value = parseFloat((e.target as any).value);
-    if (this.me) {
-      this.me.updateConfig({
-        slideshow: {
-          ...this.me.config.slideshow,
-          duration: value
-        }
-      });
-    }
+    this.dispatchConfigChange({
+      slideshow: {
+        duration: value
+      }
+    });
   };
 
   private handleTransitionChange = (e: CustomEvent) => {
     const value = parseFloat((e.target as any).value);
-    if (this.me) {
-      this.me.updateConfig({
-        slideshow: {
-          ...this.me.config.slideshow,
-          transition: value
-        }
-      });
-    }
+    this.dispatchConfigChange({
+      slideshow: {
+        transition: value
+      }
+    });
   };
 
   private handlePanoramaChange = (e: CustomEvent) => {
     const value = parseFloat((e.target as any).value);
-    if (this.me) {
-      this.me.updateConfig({
-        slideshow: {
-          ...this.me.config.slideshow,
-          panorama: value
-        }
-      });
-    }
+    this.dispatchConfigChange({
+      slideshow: {
+        panorama: value
+      }
+    });
   };
 
   private handleScaleFactorChange = (e: CustomEvent) => {
     const value = parseFloat((e.target as any).value);
-    if (this.me) {
-      this.me.updateConfig({
-        slideshow: {
-          ...this.me.config.slideshow,
-          scale_factor: value
-        }
-      });
-    }
+    this.dispatchConfigChange({
+      slideshow: {
+        scale_factor: value
+      }
+    });
   };
+
+  private dispatchConfigChange(changes: any) {
+    const event = new CustomEvent('pw-config-changed', {
+      detail: changes,
+      bubbles: true,
+      composed: true
+    });
+    window.dispatchEvent(event);
+  }
 
   private handlePrevClick(event?: Event) {
     // Prevent event bubbling to avoid triggering handleOverlayActivity
@@ -670,6 +664,7 @@ export class PwSlideshow extends LitElement {
     // Add event listeners for mouse movement and clicks
     this.overlays.addEventListener('mousemove', this.handleOverlayActivity);
     this.overlays.addEventListener('click', this.handleOverlayActivity);
+    this.overlays.addEventListener('mouseleave', this.handleOverlayMouseLeave);
     console.log('Overlay handlers set up successfully');
   }
 
@@ -687,6 +682,17 @@ export class PwSlideshow extends LitElement {
       this.overlaysVisible = false;
       this.overlayTimeoutId = null;
     }, 1200);
+  };
+
+  private handleOverlayMouseLeave = () => {
+    // Hide overlays immediately when mouse leaves the overlay area
+    this.overlaysVisible = false;
+    
+    // Clear existing timeout
+    if (this.overlayTimeoutId !== null) {
+      clearTimeout(this.overlayTimeoutId);
+      this.overlayTimeoutId = null;
+    }
   };
 
   disconnectedCallback() {

@@ -2,7 +2,6 @@
 
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { get_json, post_with_redirect } from './api';
 
 // Firebase configuration fetched from server
 let firebaseConfig: any = null;
@@ -17,7 +16,17 @@ async function initializeFirebase() {
 
   try {
     // Fetch Firebase config from server
-    firebaseConfig = await get_json('/auth/firebase-config');
+    const response = await fetch(`/auth/firebase-config`, {
+      method: 'GET',
+      credentials: 'include',
+      mode: 'cors',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch Firebase config: ${response.status} ${response.statusText}`);
+    }
+
+    firebaseConfig = await response.json();
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
 
@@ -28,8 +37,12 @@ async function initializeFirebase() {
   }
 }
 
-// TODO: the redirect: 'follow' in login and logout result in "Mixed Content: The page at 'https://dev49.org/ui/' was loaded over HTTPS, but requested an insecure resource 'http://dev49.org/ui'. This request has been blocked; the content must be served over HTTPS."
-// remove the follow for testing and examine the redirect url received. Does it redirect to http?
+// TODO: the redirect: 'follow' in login and logout result in "Mixed Content: 
+//    The page at 'https://dev49.org/ui/' was loaded over HTTPS, but requested an insecure resource 'http://dev49.org/ui'. 
+//    This request has been blocked; the content must be served over HTTPS."
+// Remove the follow for testing and examine the redirect url received: No change.
+// Apparently redirects go to http, starlink issue.
+
 export async function login(redirect: string) {
   // logs user in & redirects to uri
 
@@ -40,25 +53,32 @@ export async function login(redirect: string) {
   signInWithPopup(auth, provider)
     .then((result) => {
       result.user.getIdToken().then(async function (idToken) {
-        try {
-          const response = await post_with_redirect(`/auth/login?id_token=${idToken}&redirect_uri=${redirect}`);
-          
-          if (response.redirected) {
-            console.log('Login redirect', response.url);
-            // Emit pw-login event before redirect
+        fetch(`/auth/login?id_token=${idToken}&redirect_uri=${redirect}`, {
+          method: 'POST',
+          redirect: 'follow',
+          credentials: 'include',
+          mode: 'cors',
+        })
+          .then(async (response) => {
+            if (response.redirected) {
+              console.log('Login redirect', response.url);
+              // Emit pw-login event before redirect
+              window.dispatchEvent(new CustomEvent('pw-me-changed'));
+              window.location.href = response.url;
+            } else if (!response.ok) {
+              // Handle error responses
+              console.error(`Login failed with status ${response.status}: ${response.text()}`);
+            } else {
+              console.log('Logout successful but no redirect');
+            }
+          })
+          .catch(function (_err) {
+            console.error(`Login fetch error "${_err}"`, _err);
+          })
+          .finally(function () {
             window.dispatchEvent(new CustomEvent('pw-me-changed'));
-            window.location.href = response.url;
-          } else if (!response.ok) {
-            // Handle error responses
-            console.error(`Login failed with status ${response.status}: ${response.text()}`);
-          } else {
-            console.log('Logout successful but no redirect');
-          }
-        } catch (_err) {
-          // console.error(`Login fetch error "${err}"`, err);
-        } finally {
-          window.dispatchEvent(new CustomEvent('pw-me-changed'));
-        }
+            window.location.href = '/ui/album';
+          });
       });
     })
     .catch((error) => {
@@ -66,25 +86,31 @@ export async function login(redirect: string) {
     });
 }
 
-export async function logout(redirect: string) {
-  try {
-    const response = await post_with_redirect(`/auth/logout?redirect_uri=${redirect}`);
-
-    if (response.redirected) {
-      console.log('LOGOUT redirect', response.url);
-      // Emit pw-logout event before redirect
+export function logout(redirect: string) {
+  fetch(`/auth/logout?redirect_uri=${redirect}`, {
+    method: 'POST',
+    redirect: 'follow',
+    credentials: 'include',
+    mode: 'cors',
+  })
+    .then(async (response) => {
+      if (response.redirected) {
+        console.log('Logout redirect', response.url);
+        // Emit pw-logout event before redirect
+        window.dispatchEvent(new CustomEvent('pw-me-changed'));
+        window.location.href = response.url;
+      } else if (!response.ok) {
+        // Handle error responses
+        console.error(`Logout failed with status ${response.status}: ${response.text()}`);
+      } else {
+        console.log('Logout successful but no redirect');
+      }
+    })
+    .catch(function (_err) {
+      console.error(`Logout fetch error "${_err}"`, _err);
+    })
+    .finally(function () {
       window.dispatchEvent(new CustomEvent('pw-me-changed'));
-      window.location.href = response.url;
-    } else if (!response.ok) {
-      // Handle error responses
-      console.error(`Logout failed with status ${response.status}: ${response.text()}`);
-    } else {
-      console.log('Logout successful but no redirect');
-    }
-  } catch (_err) {
-    // Logout fetch ERROR "TypeError: Failed to fetch"
-    // console.error(`Logout fetch error "${err}"`, err);
-  } finally {
-    window.dispatchEvent(new CustomEvent('pw-me-changed'));
-  }
+      window.location.href = '/ui/album';
+    });
 }

@@ -3,8 +3,6 @@
     Extracted from interfaces.ts to keep files focused and under 120 lines.
 */
 
-import { put_json } from './api';
-
 export interface SlideshowConfig {
   // 1 ... 10 seconds
   duration: number;
@@ -31,102 +29,10 @@ export interface Me {
   terms_accepted: string;
   created_at: string;
   last_login: string;
-  config: Config | string; // Can be either parsed object or JSON string from server
+  config: Config; // Always parsed object now
 }
 
-export class MeImple implements Me {
-  private _updateTimeout: ReturnType<typeof setTimeout> | null = null;
-  private _onUpdate: () => void = () => {};
-
-  // Implement Me interface properties
-  roles!: string;
-  name?: string;
-  email?: string;
-  picture?: string;
-  terms_accepted!: string;
-  created_at!: string;
-  last_login!: string;
-  config!: Config;
-
-  constructor(data: Me, onUpdate?: () => void) {
-    this._setData(data);
-    this._onUpdate = onUpdate || (() => {});
-  }
-
-  // Private method to set data properties with defaults
-  private _setData(data: Me): void {
-    // Copy all properties from data to this instance
-    this.roles = data.roles;
-    this.name = data.name;
-    this.email = data.email;
-    this.picture = data.picture;
-    this.terms_accepted = data.terms_accepted;
-    this.created_at = data.created_at;
-    this.last_login = data.last_login;
-    
-    // Parse config if it's a string, otherwise use as-is
-    let parsedConfig: Config | undefined;
-    if (typeof data.config === 'string') {
-      try {
-        parsedConfig = JSON.parse(data.config);
-      } catch (error) {
-        console.warn('Failed to parse user config JSON:', error);
-        parsedConfig = undefined;
-      }
-    } else {
-      parsedConfig = data.config;
-    }
-    
-    // Ensure config has valid defaults
-    this.config = {
-      dark_mode: parsedConfig?.dark_mode ?? false,
-      slideshow: {
-        duration: parsedConfig?.slideshow?.duration ?? 3.1,
-        transition: parsedConfig?.slideshow?.transition ?? 1.1,
-        panorama: parsedConfig?.slideshow?.panorama ?? 2.4,
-        scale_factor: parsedConfig?.slideshow?.scale_factor ?? 1.2,
-        theme: parsedConfig?.slideshow?.theme ?? 'ken-burns'
-      }
-    };
-  }
-
-  // Method to check if user has a specific role
-  hasRole(role: string): boolean {
-    return this.roles.split(',').map(r => r.trim()).includes(role);
-  }
-
-  // Method to update config with debounced database persistence
-  async updateConfig(configUpdates: Partial<Config>): Promise<void> {
-    // Update local config immediately for reactive UI
-    this.config = { ...this.config, ...configUpdates };
-    
-    // Notify context consumers of the change
-    this._onUpdate();
-
-    // Clear any existing timeout
-    if (this._updateTimeout !== null) {
-      clearTimeout(this._updateTimeout);
-    }
-    
-    // Schedule delayed database update
-    this._updateTimeout = setTimeout(async () => {
-      const result = await put_json(`/auth/users/${this.email}/config`, {
-        config: JSON.stringify(this.config)
-      });
-      if (result) {
-        console.log('Config updated in database');
-      } else {
-        console.warn('Failed to update config in database');
-      }
-      this._updateTimeout = null;
-    }, 3000);
-  }
-
-
-  // Method to update the internal data (used by context when refreshing from server)
-  updateData(newData: Me): void {
-    this._setData(newData);
-    
-    this._onUpdate();
-  }
+// Helper function to check if user has a specific role
+export function hasRole(me: Me, role: string): boolean {
+  return me.roles.split(',').map(r => r.trim()).includes(role);
 }

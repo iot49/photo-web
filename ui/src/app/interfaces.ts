@@ -4,7 +4,7 @@
 */
 
 export type { Me, Config, SlideshowConfig } from './me';
-export { MeImple } from './me';
+export { hasRole } from './me';
 
 export interface PhotoModel {
   uuid: string;

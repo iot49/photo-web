@@ -1,4 +1,5 @@
 import hashlib
+import json
 import logging
 from typing import List
 
@@ -518,8 +519,6 @@ async def update_user_config(
 
             # Validate that it's valid JSON by trying to parse it
             try:
-                import json
-
                 json.loads(
                     config_value
                 )  # Just validate, don't store the parsed version

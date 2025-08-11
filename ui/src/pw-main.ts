@@ -1,11 +1,12 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
+import { produce } from 'immer';
 
 import { Albums, SrcsetInfo } from './app/interfaces';
-import { Me, MeImple } from './app/me';
+import { Me, Config } from './app/me';
 import { provide } from '@lit/context';
 import { albumsContext, meContext, srcsetInfoContext } from './app/context';
-import { get_json, post_json } from './app/api';
+import { get_json, post_json, put_json } from './app/api';
 import { recentAlbums } from './pw-album-browser';
 import { logout } from './app/login';
 
@@ -74,7 +75,7 @@ export class PwMain extends LitElement {
 
   @provide({ context: meContext })
   @state()
-  me!: MeImple;
+  me!: Me;
 
   @provide({ context: srcsetInfoContext })
   @state()
@@ -85,6 +86,7 @@ export class PwMain extends LitElement {
   private uri = '';
   private queryParams = new URLSearchParams();
   private termsDate = '2025-08-03'; // TERMS_DATE from environment
+  private configUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
 
   async connectedCallback() {
     super.connectedCallback();
@@ -92,14 +94,12 @@ export class PwMain extends LitElement {
     // Load contexts
     this.albums = await get_json('/photos/api/albums');
     const meData: Me = await get_json('/auth/me');
-    this.me = new MeImple(meData, () => {
-      // Trigger re-render when MeImple updates
-      this.requestUpdate();
-    });
+    this.me = this.sanitizeMe(meData);
     this.srcsetInfo = new SrcsetInfo(await get_json('/photos/api/photos/srcset'));
 
-    // Add event listeners for login/logout events
+    // Add event listeners for login/logout and config change events
     this.handleLoginLogoutEvents();
+    this.handleConfigChangeEvents();
 
     // Intercept navigation events using the modern Navigation API
     this.setupNavigationInterception();
@@ -112,33 +112,97 @@ export class PwMain extends LitElement {
 
   private handleLoginLogoutEvents() {
     const refreshData = async () => {
-      if (DEBUG) console.log('Auth state changed, refreshing albums and me');
       this.albums = await get_json('/photos/api/albums');
       const meData: Me = await get_json('/auth/me');
-      
-      if (this.me) {
-        // Update existing MeImple instance
-        (this.me as MeImple).updateData(meData);
-      } else {
-        // Create new MeImple instance
-        this.me = new MeImple(meData, () => {
-          this.requestUpdate();
-        });
-      }
+      this.me = this.sanitizeMe(meData);
 
       // Check terms acceptance after login
       this.checkTermsAcceptance();
-
-      // NOTE: this is probably not required. Components check out state.
-      // Clear component cache on auth state change to ensure components
-      // are recreated with the new authentication context
-      // this.clearComponentCache();
-
-      this.requestUpdate(); // Force a re-render to ensure context consumers update
     };
 
     // Listen for both login and logout events with the same handler
     window.addEventListener('pw-me-changed', refreshData);
+  }
+
+  private handleConfigChangeEvents() {
+    window.addEventListener('pw-config-changed', (event: Event) => {
+      const customEvent = event as CustomEvent;
+      
+      // Update me using immer
+      this.me = produce(this.me, (draft) => {
+        // Merge changes from event details into draft
+        if (customEvent.detail.darkMode !== undefined) {
+          draft.config.dark_mode = customEvent.detail.darkMode;
+        }
+        if (customEvent.detail.slideshow) {
+          Object.assign(draft.config.slideshow, customEvent.detail.slideshow);
+        }
+      });
+
+      // Schedule database update with debouncing
+      this.scheduleConfigUpdate();
+    });
+  }
+
+  private scheduleConfigUpdate() {
+    // Clear any existing timeout
+    if (this.configUpdateTimeout !== null) {
+      clearTimeout(this.configUpdateTimeout);
+    }
+    
+    // Schedule delayed database update
+    this.configUpdateTimeout = setTimeout(async () => {
+      // Return immediately if user is not logged in
+      if (!this.me || !this.me.email) {
+        this.configUpdateTimeout = null;
+        return;
+      }
+      const result = await put_json(`/auth/users/${this.me.email}/config`, {
+        config: JSON.stringify(this.me.config)
+      });
+      if (!result) {
+        console.warn('Failed to update config in database', result);
+      }
+      this.configUpdateTimeout = null;
+    }, 3000);
+  }
+
+  private sanitizeMe(meData: Me): Me {
+    // Helper function to clamp values with default
+    const clamp = (value: number | undefined, lower: number, upper: number, defaultValue: number): number => {
+      const num = value ?? defaultValue;
+      return Math.max(Math.min(num, upper), lower);
+    };
+
+    // Parse config if it's a string, otherwise use as-is
+    let parsedConfig: Config | undefined;
+    if (typeof meData.config === 'string') {
+      try {
+        parsedConfig = JSON.parse(meData.config);
+      } catch (error) {
+        console.warn('Failed to parse user config JSON:', error);
+        parsedConfig = undefined;
+      }
+    } else {
+      parsedConfig = meData.config as Config;
+    }
+    
+    // Ensure config has valid defaults and clip out of range values
+    const sanitizedConfig: Config = {
+      dark_mode: parsedConfig?.dark_mode ?? false,
+      slideshow: {
+        duration: clamp(parsedConfig?.slideshow?.duration, 1, 10, 3.1),
+        transition: clamp(parsedConfig?.slideshow?.transition, 0, 3, 1.1),
+        panorama: clamp(parsedConfig?.slideshow?.panorama, 1, 6, 2.4),
+        scale_factor: clamp(parsedConfig?.slideshow?.scale_factor, 0.5, 2, 1.2),
+        theme: parsedConfig?.slideshow?.theme ?? 'ken-burns'
+      }
+    };
+
+    return {
+      ...meData,
+      config: sanitizedConfig
+    };
   }
 
   private checkTermsAcceptance() {
@@ -159,7 +223,7 @@ export class PwMain extends LitElement {
       // Re-download the me object to ensure fresh data from server
       const meData: Me = await get_json('/auth/me');
       if (meData) {
-        (this.me as MeImple).updateData(meData);
+        this.me = this.sanitizeMe(meData);
         this.hideTermsDialog();
       } else {
         alert('Failed to refresh user data. Please try again.');
@@ -228,7 +292,7 @@ export class PwMain extends LitElement {
 
         // Only intercept navigations that can be intercepted and are within our app
         if (event.canIntercept && this.shouldInterceptNavigation(event.destination.url)) {
-          // console.log('Intercepting navigation to:', event.destination.url);
+          if (DEBUG) console.log('Intercepting navigation to:', event.destination.url);
 
           // Let the router handle the navigation
           event.intercept({

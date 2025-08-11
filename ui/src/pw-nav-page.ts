@@ -1,10 +1,10 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
-import { MeImple } from './app/me.js';
+import { Me } from './app/me';
 import { consume } from '@lit/context';
-import { meContext } from './app/context.js';
-import { login, logout } from './app/login.js';
-import { ThemeManager } from './shoelace-config.js';
+import { meContext } from './app/context';
+import { login, logout } from './app/login';
+import { ThemeManager } from './shoelace-config';
 import { SlDialog } from '@shoelace-style/shoelace';
 import { get_json } from './app/api';
 
@@ -139,7 +139,7 @@ export class PwNavPage extends LitElement {
 
   @consume({ context: meContext, subscribe: true })
   @property({ attribute: false })
-  private me!: MeImple;
+  private me!: Me;
 
   override updated(changedProperties: Map<string | number | symbol, unknown>) {
     super.updated(changedProperties);
@@ -193,7 +193,7 @@ export class PwNavPage extends LitElement {
               </sl-tooltip>
               <sl-tooltip content="Toggle between dark and light mode">
                 <sl-button variant="text" size="medium" @click="${this.toggleTheme}" class="theme-toggle">
-                  <sl-icon name="${this.themeManager.getCurrentTheme() === 'dark' ? 'sun' : 'moon'}"></sl-icon>
+                  <sl-icon name="${this.me?.config?.dark_mode ? 'sun' : 'moon'}"></sl-icon>
                 </sl-button>
               </sl-tooltip>
               ${this.isAdmin() ? this.renderPulldown() : ''} ${this.me?.email ? this.renderUserAvatar() : this.renderLoginButton()}
@@ -295,11 +295,14 @@ export class PwNavPage extends LitElement {
     // Persist theme preference to user config if user is logged in
     if (this.me?.email) {
       const isDarkMode = this.themeManager.getCurrentTheme() === 'dark';
-      await this.me.updateConfig({ dark_mode: isDarkMode });
+      // Emit config change event for dark mode
+      const event = new CustomEvent('pw-config-changed', {
+        detail: { darkMode: isDarkMode },
+        bubbles: true,
+        composed: true
+      });
+      window.dispatchEvent(event);
     }
-    
-    // Force a re-render to update the theme display in the menu
-    this.requestUpdate();
   }
 
   private async reloadDialog() {
