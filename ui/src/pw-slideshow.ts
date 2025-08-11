@@ -121,6 +121,10 @@ export class PwSlideshow extends LitElement {
   protected firstUpdated(_changedProperties: PropertyValues): void {
     super.firstUpdated(_changedProperties);
     this.updateCSSProperties();
+    // Initialize theme from database if available
+    if (this.me?.config.slideshow.theme !== undefined) {
+      this.theme = this.me.config.slideshow.theme;
+    }
     this.goto(0);
     this.setupSwipeHandlers();
     this.setupOverlayHandlers();
@@ -131,6 +135,10 @@ export class PwSlideshow extends LitElement {
     // Update CSS properties when me context changes
     if (_changedProperties.has('me')) {
       this.updateCSSProperties();
+      // Initialize theme from database when me context is available
+      if (this.me?.config.slideshow.theme !== undefined) {
+        this.theme = this.me.config.slideshow.theme;
+      }
     }
   }
 
@@ -352,12 +360,12 @@ export class PwSlideshow extends LitElement {
     return html`
       <div class="slideshow-controls">
         <div class="control-group">
-          <label>Theme</label>
+          <label>Theme: ${this.theme === 'ken-burns' ? 'Ken Burns' : 'Carousel'}</label>
           <sl-switch
             ?checked=${this.theme === 'ken-burns'}
             @sl-change=${this.handleThemeChange}
           >
-            Ken Burns
+            ${this.theme === 'ken-burns' ? 'Ken Burns' : 'Carousel'}
           </sl-switch>
         </div>
         
@@ -419,6 +427,16 @@ export class PwSlideshow extends LitElement {
   private handleThemeChange = (e: CustomEvent) => {
     const isKenBurns = (e.target as any).checked;
     this.theme = isKenBurns ? 'ken-burns' : 'carousel';
+    
+    // Persist theme to database
+    if (this.me) {
+      this.me.updateConfig({
+        slideshow: {
+          ...this.me.config.slideshow,
+          theme: this.theme
+        }
+      });
+    }
   };
 
   private handleDurationChange = (e: CustomEvent) => {

@@ -7,13 +7,15 @@ import { put_json } from './api';
 
 export interface SlideshowConfig {
   // 1 ... 10 seconds
-  duration: number;      
+  duration: number;
   // 0 ... 3 seconds
-  transition: number;   
-  // 1 ... 6 
-  panorama: number;    
-  // 0.5 ... 2  
-  scale_factor: number;  
+  transition: number;
+  // 1 ... 6
+  panorama: number;
+  // 0.5 ... 2
+  scale_factor: number;
+  // carousel or ken-burns
+  theme: 'carousel' | 'ken-burns';
 }
 
 export interface Config {
@@ -82,7 +84,8 @@ export class MeImple implements Me {
         duration: parsedConfig?.slideshow?.duration ?? 3.1,
         transition: parsedConfig?.slideshow?.transition ?? 1.1,
         panorama: parsedConfig?.slideshow?.panorama ?? 2.4,
-        scale_factor: parsedConfig?.slideshow?.scale_factor ?? 1.2
+        scale_factor: parsedConfig?.slideshow?.scale_factor ?? 1.2,
+        theme: parsedConfig?.slideshow?.theme ?? 'ken-burns'
       }
     };
   }
