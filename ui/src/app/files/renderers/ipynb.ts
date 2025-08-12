@@ -1,6 +1,6 @@
 import { get_text } from '../../api';
 import { createRenderer } from 'ipynb2html';
-import { createFileLink, setFileContent } from './utils';
+import { emitFilePathEvent, setFileContent } from './utils';
 
 export async function renderJupyterNotebook(filePane: HTMLDivElement, path: string): Promise<void> {
   try {
@@ -51,12 +51,10 @@ export async function renderJupyterNotebook(filePane: HTMLDivElement, path: stri
     container.appendChild(header);
     container.appendChild(notebookElement);
     
-    // Create the file link element
-    const fileLinkDiv = document.createElement('div');
-    fileLinkDiv.innerHTML = createFileLink(path);
+    // Emit the file path event for the bottom bar
+    emitFilePathEvent(path);
     
     filePane.appendChild(container);
-    filePane.appendChild(fileLinkDiv);
     
   } catch (error) {
     console.error('Error rendering Jupyter notebook:', error);

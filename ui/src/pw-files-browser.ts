@@ -53,7 +53,28 @@ export class PwFilesBrowser extends LitElement {
     }
 
     #filePane {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    #fileContent {
+      flex: 1;
       overflow: auto;
+      min-height: 0;
+    }
+
+    #fileBottomBar {
+      height: 1.5em;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--sl-color-neutral-100);
+      border-top: 1px solid var(--sl-color-neutral-300);
+      font-size: 0.875rem;
+      color: var(--sl-color-neutral-700);
     }
 
     sl-tree-item {
@@ -65,20 +86,34 @@ export class PwFilesBrowser extends LitElement {
 
   @state() root!: FolderModel;
   @property() selectedFilePath?: string;
+  @state() private currentFilePath?: string;
   private fileRenderer!: FileRenderer;
 
   @query('#treePane') treePane!: HTMLDivElement;
-  @query('#filePane') filePane!: HTMLDivElement;
+  @query('#fileContent') fileContent!: HTMLDivElement;
 
   async connectedCallback() {
     await super.connectedCallback();
     const rj = await get_json('/files/api/root');
     this.root = new FolderModel(rj.path, rj.folders, rj.files);
+    
+    // Listen for pw-file-path events
+    window.addEventListener('pw-file-path', this.handleFilePathEvent as EventListener);
   }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    window.removeEventListener('pw-file-path', this.handleFilePathEvent as EventListener);
+  }
+
+  private handleFilePathEvent = (event: Event) => {
+    const customEvent = event as CustomEvent;
+    this.currentFilePath = customEvent.detail.path;
+  };
 
   protected firstUpdated(_changedProperties: PropertyValues): void {
     super.firstUpdated(_changedProperties);
-    this.fileRenderer = new FileRenderer(this.filePane);
+    this.fileRenderer = new FileRenderer(this.fileContent);
 
     // If a file path was provided via routing, show it immediately
     if (this.selectedFilePath) {
@@ -151,7 +186,14 @@ export class PwFilesBrowser extends LitElement {
           <div id="treePane" slot="start">
             ${this.root == null ? html`Loading ... <sl-spinner></sl-spinner>` : html` ${this.treeTemplate(this.root)}`}
           </div>
-          <div id="filePane" slot="end">Choose file to display ...</div>
+          <div id="filePane" slot="end">
+            <div id="fileContent">Choose file to display ...</div>
+            <div id="fileBottomBar">
+              ${this.currentFilePath
+                ? html`<a href="${this.currentFilePath}" target="_blank" style="color: var(--sl-color-primary-600); text-decoration: none;">Click here to open the file in a new tab</a>`
+                : 'Select a file to view'}
+            </div>
+          </div>
         </sl-split-panel>
       </pw-nav-page>
     `;

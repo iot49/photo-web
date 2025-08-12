@@ -6,7 +6,7 @@ export interface CodeRenderer {
   setupLinkClickHandler: () => void;
 }
 
-export async function renderCode(filePane: HTMLDivElement, path: string, extension: string, renderer: CodeRenderer): Promise<void> {
+export async function renderCode(filePane: HTMLDivElement, path: string, extension: string, _renderer: CodeRenderer): Promise<void> {
   const content = await get_text(path);
   if (!content) {
     setFileContent(filePane, '<p>File not found or empty</p>');

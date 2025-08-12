@@ -48,12 +48,14 @@ export function escapeHtml(text: string): string {
   return div.innerHTML;
 }
 
-export function createFileLink(path: string): string {
-  return `
-    <p style="flex-shrink: 0; margin: 0; padding: 8px 0; text-align: center; font-size: 0.9em; background-color: var(--sl-color-neutral-100); color: var(--sl-color-neutral-700);">
-      <a href="${path}" target="_blank" style="color: var(--sl-color-primary-600);">Click here to open the file in a new tab</a>
-    </p>
-  `;
+export function emitFilePathEvent(path: string): void {
+  // Emit custom event with file path information
+  const event = new CustomEvent('pw-file-path', {
+    detail: { path },
+    bubbles: true,
+    composed: true
+  });
+  window.dispatchEvent(event);
 }
 
 export function createFileWrapper(contentHtml: string, path: string, additionalStyles?: string): string {
@@ -61,10 +63,12 @@ export function createFileWrapper(contentHtml: string, path: string, additionalS
     ? `display: flex; flex-direction: column; height: 100%; ${additionalStyles}`
     : 'display: flex; flex-direction: column; height: 100%;';
     
+  // Emit the file path event instead of including the link in the content
+  emitFilePathEvent(path);
+    
   return `
     <div style="${containerStyle}">
       ${contentHtml}
-      ${createFileLink(path)}
     </div>
   `;
 }
