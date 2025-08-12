@@ -322,13 +322,15 @@ ${escapedContent}
         // Prevent default navigation
         event.preventDefault();
         
+        // Extract the file path from the API path (remove /files/api/file prefix)
+        const filePath = url.pathname.replace('/files/api/file', '');
+        // Update the browser URL to use the UI route format with query parameter
+        const newUrl = `/ui/files?path=${encodeURIComponent(filePath)}`;
+        window.history.pushState(null, '', newUrl);
+        
         // Show the linked file in the current file pane
         console.log("SHOW", url.pathname);
         this.showFile(url.pathname);
-        
-        // Update the browser URL to reflect the navigation
-        // Keep the /files/api/file/ format as that's what the router expects
-        window.history.pushState(null, '', url.pathname);
       }
     }
   };

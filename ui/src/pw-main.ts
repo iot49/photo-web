@@ -335,7 +335,7 @@ export class PwMain extends LitElement {
   private shouldInterceptNavigation(url: string): boolean {
     const urlObj = new URL(url);
     // Only intercept navigations within our app's UI routes
-    return urlObj.pathname.startsWith('/ui/') || urlObj.pathname.startsWith('/files/api/file/');
+    return urlObj.pathname.startsWith('/ui/');
   }
 
   /**
@@ -347,15 +347,6 @@ export class PwMain extends LitElement {
     return uris.some((uri) => this.uri === uri);
   }
 
-  private getFilePathFromUri(): string | null {
-    // Check if URI matches the pattern /files/api/file/*
-    const filePathPrefix = '/files/api/file/';
-    if (this.uri.startsWith(filePathPrefix)) {
-      // Extract the file path portion after /files/api/file/
-      return this.uri.substring(filePathPrefix.length);
-    }
-    return null;
-  }
 
   public render() {
     if (this.isLoading) {
@@ -459,8 +450,9 @@ export class PwMain extends LitElement {
   }
 
   private getRouteDefinitions() {
-    const filePath = this.getFilePathFromUri();
-    const selectedFilePath = filePath ? `/files/api/file/${filePath}` : undefined;
+    // Get file path from query parameter instead of URI path
+    const filePathParam = this.queryParams.get('path');
+    const selectedFilePath = filePathParam ? `/files/api/file${filePathParam}` : undefined;
 
     /**
      * Route definition structure:
@@ -491,7 +483,7 @@ export class PwMain extends LitElement {
         routeId: 'files',
         description: 'Files browser with file viewer',
         matchUris: ['/ui/files'],
-        isActive: this.uri === '/ui/files' || this.getFilePathFromUri() !== null,
+        isActive: this.uri === '/ui/files',
         componentFactory: () => html`<pw-files-browser .selectedFilePath=${selectedFilePath}></pw-files-browser>`,
         isDynamic: false,
         selectedFilePath,

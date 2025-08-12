@@ -115,7 +115,14 @@ export class PwFilesBrowser extends LitElement {
         treeItem.addEventListener('click', (event) => {
           const target = event.target as HTMLElement;
           const path = target?.getAttribute('data-path');
-          this.fileRenderer.showFile(path);
+          if (path) {
+            // Extract the file path from the API path (remove /files/api/file prefix)
+            const filePath = path.replace('/files/api/file', '');
+            // Update the URL to use the UI route format with query parameter
+            const newUrl = `/ui/files?path=${encodeURIComponent(filePath)}`;
+            window.history.pushState(null, '', newUrl);
+            this.fileRenderer.showFile(path);
+          }
         });
         target.append(treeItem);
         if (fileName === 'index.md') {
