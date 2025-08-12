@@ -1,7 +1,7 @@
 {
   "name": "photo-web-ui",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.9.0",
   "type": "module",
   "scripts": {
     "build": "tsc && vite build",
@@ -17,7 +17,9 @@
     "urlpattern-polyfill": "^10.1.0"
   },
   "devDependencies": {
+    "@types/highlight.js": "^10.1.0",
     "@types/jest": "^30.0.0",
+    "rollup-plugin-visualizer": "^6.0.3",
     "ts-jest": "^29.4.0",
     "typescript": "~5.7.2",
     "vite": "^6.2.0"
