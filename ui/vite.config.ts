@@ -27,8 +27,10 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    /*
     plugins: [
       visualizer({ open: true }), // Automatically opens the visualizer in your browser
     ],
+    */
   };
 });
