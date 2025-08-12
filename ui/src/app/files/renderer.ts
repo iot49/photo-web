@@ -1,5 +1,11 @@
-import { get_text } from '../api';
-import { createRenderer } from 'ipynb2html';
+import { renderMarkdown } from './renderers/markdown';
+import { renderImage } from './renderers/image';
+import { renderPdf } from './renderers/pdf';
+import { renderAudio } from './renderers/audio';
+import { renderCode } from './renderers/code';
+import { renderJupyterNotebook } from './renderers/ipynb';
+import { renderHtml } from './renderers/html';
+import { renderFallback } from './renderers/fallback';
 
 export class FileRenderer {
   private filePane: HTMLDivElement;
@@ -27,22 +33,11 @@ export class FileRenderer {
       // Show loading indicator
       this.filePane.innerHTML = '<sl-spinner></sl-spinner> Loading...';
 
-      // Render file content
+      // Render file content based on extension
       switch (extension) {
         case 'md':
         case 'qmd':
-          this.filePane.innerHTML = `
-            <div style="display: flex; flex-direction: column; height: 100%;">
-              <div style="flex: 1; min-height: 0; overflow: auto;">
-                <zero-md src=${path}>
-
-                </zero-md>
-              </div>
-              ${this.createFileLink(path)}
-            </div>
-          `;
-          // Add link click handler after zero-md is rendered
-          this.setupLinkClickHandler();
+          renderMarkdown(this.filePane, path, this);
           return;
 
         // Image file cases
@@ -54,40 +49,20 @@ export class FileRenderer {
         case 'svg':
         case 'webp':
         case 'ico':
-          this.filePane.innerHTML = `
-            <div style="display: flex; flex-direction: column; height: 100%;">
-              <div style="flex: 1; display: flex; align-items: center; justify-content: center;">
-                <img src="${path}" alt="${fileName}" style="max-width: 100%; height: auto;">
-              </div>
-              ${this.createFileLink(path)}
-            </div>
-          `;
+          renderImage(this.filePane, path, fileName);
           return;
 
         case 'pdf':
-          // Render PDF using iframe instead of embed to avoid fullscreen permissions policy violations
-          this.filePane.innerHTML = `
-            <div style="display: flex; flex-direction: column; height: 100%; background-color: var(--sl-color-neutral-0);">
-              <iframe src="${path}" type="application/pdf" width="100%" style="flex: 1; min-height: 0; border: none; background-color: var(--sl-color-neutral-0);"></iframe>
-              ${this.createFileLink(path)}
-            </div>
-          `;
+          renderPdf(this.filePane, path);
           return;
 
         case 'ipynb':
-          // Render Jupyter notebook
-          await this.renderJupyterNotebook(path);
+          await renderJupyterNotebook(this.filePane, path);
           return;
 
         case 'html':
         case 'htm':
-          // Render HTML in iframe for security
-          this.filePane.innerHTML = `
-            <div style="display: flex; flex-direction: column; height: 100%;">
-              <iframe src="${path}" width="100%" style="flex: 1; min-height: 0;" frameborder="0"></iframe>
-              ${this.createFileLink(path)}
-            </div>
-          `;
+          renderHtml(this.filePane, path);
           return;
 
         // Audio file cases
@@ -99,18 +74,7 @@ export class FileRenderer {
         case 'flac':
         case 'wma':
         case 'opus':
-          this.filePane.innerHTML = `
-            <div style="display: flex; flex-direction: column; height: 100%;">
-              <div style="flex: 1; padding: 20px; text-align: center; display: flex; flex-direction: column; justify-content: center;">
-                <h3>${fileName}</h3>
-                <audio controls style="width: 100%; max-width: 500px;">
-                  <source src="${path}" type="audio/${extension === 'm4a' ? 'mp4' : extension}">
-                  Your browser does not support the audio element.
-                </audio>
-              </div>
-              ${this.createFileLink(path)}
-            </div>
-          `;
+          renderAudio(this.filePane, path, fileName, extension);
           return;
 
         // Code file cases
@@ -152,106 +116,16 @@ export class FileRenderer {
         case 'dockerfile':
         case 'makefile':
         case 'cmake':
-          // Download content first for code files
-          const content = await get_text(path);
-          if (!content) {
-            this.filePane.innerHTML = '<p>File not found or empty</p>';
-            return;
-          }
-          // Render code files with syntax highlighting using zero-md
-          const language = this.getLanguageForExtension(extension);
-          const escapedContent = this.escapeHtml(content);
-          this.filePane.innerHTML = `
-            <div style="display: flex; flex-direction: column; height: 100%;">
-              <div style="flex: 1; min-height: 0; overflow: auto;">
-                <zero-md>
-
-                  <script type="text/markdown">
-\`\`\`${language}
-${escapedContent}
-\`\`\`
-                  </script>
-                </zero-md>
-              </div>
-              ${this.createFileLink(path)}
-            </div>
-          `;
-          // Add link click handler after zero-md is rendered
-          this.setupLinkClickHandler();
+          await renderCode(this.filePane, path, extension, this);
           return;
       }
 
-      // Fallback for unhandled file types - render as plain text
-      const content = await get_text(path);
-
-      if (!content) {
-        this.filePane.innerHTML = '<p>File not found or empty</p>';
-        return;
-      }
-
-      // Render as plain text for any unhandled file types
-      this.filePane.innerHTML = `
-        <div style="display: flex; flex-direction: column; height: 100%;">
-          <div style="flex: 1; min-height: 0; overflow: auto;">
-            <pre style="white-space: pre-wrap; font-family: monospace;">${this.escapeHtml(content)}</pre>
-          </div>
-          ${this.createFileLink(path)}
-        </div>
-      `;
+      // Fallback for unhandled file types
+      await renderFallback(this.filePane, path);
     } catch (error) {
       console.error('Error loading file:', error);
       this.filePane.innerHTML = `<p>Error loading file: ${error}</p>`;
     }
-  }
-
-  private getLanguageForExtension(extension: string): string {
-    const languageMap: { [key: string]: string } = {
-      js: 'javascript',
-      ts: 'typescript',
-      jsx: 'jsx',
-      tsx: 'tsx',
-      py: 'python',
-      cpp: 'cpp',
-      c: 'c',
-      h: 'c',
-      hpp: 'cpp',
-      java: 'java',
-      cs: 'csharp',
-      php: 'php',
-      rb: 'ruby',
-      go: 'go',
-      rs: 'rust',
-      swift: 'swift',
-      kt: 'kotlin',
-      scala: 'scala',
-      sh: 'bash',
-      bash: 'bash',
-      zsh: 'bash',
-      fish: 'bash',
-      sql: 'sql',
-      css: 'css',
-      scss: 'scss',
-      sass: 'sass',
-      less: 'less',
-      json: 'json',
-      xml: 'xml',
-      yaml: 'yaml',
-      yml: 'yaml',
-      toml: 'toml',
-      ini: 'ini',
-      cfg: 'ini',
-      conf: 'ini',
-      dockerfile: 'dockerfile',
-      makefile: 'makefile',
-      cmake: 'cmake',
-    };
-    return languageMap[extension] || extension;
-  }
-
-  private escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
   }
 
   private updateMarkdownTheme(): void {
@@ -266,7 +140,7 @@ ${escapedContent}
     });
   }
 
-  private setupLinkClickHandler(): void {
+  setupLinkClickHandler(): void {
     const zeroMdElements = this.filePane.querySelectorAll('zero-md');
     zeroMdElements.forEach((zeroMd) => {
       // Listen for the zero-md-rendered event to ensure content is loaded
@@ -364,68 +238,4 @@ ${escapedContent}
       }
     }
   };
-
-  private async renderJupyterNotebook(path: string): Promise<void> {
-    try {
-      const content = await get_text(path);
-      if (!content) {
-        this.filePane.innerHTML = '<p>Notebook file not found or empty</p>';
-        return;
-      }
-
-      const notebook = JSON.parse(content);
-      
-      // Create the renderer using the browser's document
-      const renderer = createRenderer(document);
-      
-      // Render the notebook to a DOM element
-      const notebookElement = renderer.render(notebook);
-      
-      // Clear the file pane
-      this.filePane.innerHTML = '';
-      
-      // Create wrapper container
-      const container = document.createElement('div');
-      container.className = 'jupyter-notebook-container';
-      container.style.cssText = `
-        max-width: 100%;
-        background: var(--sl-color-neutral-0);
-        color: var(--sl-color-neutral-900);
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-        line-height: 1.6;
-        padding: 20px;
-      `;
-      
-      // Create header
-      const header = document.createElement('div');
-      header.className = 'notebook-header';
-      header.style.cssText = `
-        border-bottom: 1px solid var(--sl-color-neutral-200);
-        padding-bottom: 10px;
-        margin-bottom: 20px;
-      `;
-      
-      const title = document.createElement('h2');
-      title.style.cssText = 'margin: 0; color: var(--sl-color-primary-600);';
-      title.textContent = '📓 Jupyter Notebook';
-      header.appendChild(title);
-      
-      // Assemble the final structure
-      container.appendChild(header);
-      container.appendChild(notebookElement);
-      this.filePane.appendChild(container);
-      
-    } catch (error) {
-      console.error('Error rendering Jupyter notebook:', error);
-      this.filePane.innerHTML = `<p>Error rendering notebook: ${error instanceof Error ? error.message : String(error)}</p>`;
-    }
-  }
-
-  private createFileLink(path: string): string {
-    return `
-      <p style="flex-shrink: 0; margin: 0; padding: 8px 0; text-align: center; font-size: 0.9em; background-color: var(--sl-color-neutral-100); color: var(--sl-color-neutral-700);">
-        <a href="${path}" target="_blank" style="color: var(--sl-color-primary-600);">Click here to open the file in a new tab</a>
-      </p>
-    `;
-  }
 }
