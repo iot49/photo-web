@@ -450,9 +450,15 @@ export class PwMain extends LitElement {
   }
 
   private getRouteDefinitions() {
-    // Get file path from query parameter instead of URI path
-    const filePathParam = this.queryParams.get('path');
-    const selectedFilePath = filePathParam ? `/files/api/file${filePathParam}` : undefined;
+    // Get file path from URI path parameter instead of query parameter
+    let selectedFilePath: string | undefined;
+    if (this.uri.startsWith('/ui/files/')) {
+      // Extract path from URI (everything after /ui/files/)
+      const filePath = this.uri.substring('/ui/files'.length);
+      if (filePath && filePath !== '/') {
+        selectedFilePath = `/files/api/file${filePath}`;
+      }
+    }
 
     /**
      * Route definition structure:
@@ -483,7 +489,7 @@ export class PwMain extends LitElement {
         routeId: 'files',
         description: 'Files browser with file viewer',
         matchUris: ['/ui/files'],
-        isActive: this.uri === '/ui/files',
+        isActive: this.uri === '/ui/files' || this.uri.startsWith('/ui/files/'),
         componentFactory: () => html`<pw-files-browser .selectedFilePath=${selectedFilePath}></pw-files-browser>`,
         isDynamic: false,
         selectedFilePath,

@@ -118,8 +118,8 @@ export class PwFilesBrowser extends LitElement {
           if (path) {
             // Extract the file path from the API path (remove /files/api/file prefix)
             const filePath = path.replace('/files/api/file', '');
-            // Update the URL to use the UI route format with query parameter
-            const newUrl = `/ui/files?path=${encodeURIComponent(filePath)}`;
+            // Update the URL to use the UI route format with path parameter
+            const newUrl = `/ui/files${filePath}`;
             window.history.pushState(null, '', newUrl);
             this.fileRenderer.showFile(path);
           }

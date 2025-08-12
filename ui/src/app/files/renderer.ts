@@ -354,8 +354,8 @@ ${escapedContent}
         
         // Extract the file path from the API path (remove /files/api/file prefix)
         const filePath = url.pathname.replace('/files/api/file', '');
-        // Update the browser URL to use the UI route format with query parameter
-        const newUrl = `/ui/files?path=${encodeURIComponent(filePath)}`;
+        // Update the browser URL to use the UI route format with path parameter
+        const newUrl = `/ui/files${filePath}`;
         window.history.pushState(null, '', newUrl);
         
         // Show the linked file in the current file pane
