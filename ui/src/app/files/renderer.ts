@@ -32,9 +32,14 @@ export class FileRenderer {
         case 'md':
         case 'qmd':
           this.filePane.innerHTML = `
-            <zero-md src=${path}>
+            <div style="display: flex; flex-direction: column; height: 100%;">
+              <div style="flex: 1; min-height: 0; overflow: auto;">
+                <zero-md src=${path}>
 
-            </zero-md>
+                </zero-md>
+              </div>
+              ${this.createFileLink(path)}
+            </div>
           `;
           // Add link click handler after zero-md is rendered
           this.setupLinkClickHandler();
@@ -49,7 +54,14 @@ export class FileRenderer {
         case 'svg':
         case 'webp':
         case 'ico':
-          this.filePane.innerHTML = `<img src="${path}" alt="${fileName}" style="max-width: 100%; height: auto;">`;
+          this.filePane.innerHTML = `
+            <div style="display: flex; flex-direction: column; height: 100%;">
+              <div style="flex: 1; display: flex; align-items: center; justify-content: center;">
+                <img src="${path}" alt="${fileName}" style="max-width: 100%; height: auto;">
+              </div>
+              ${this.createFileLink(path)}
+            </div>
+          `;
           return;
 
         case 'pdf':
@@ -57,9 +69,7 @@ export class FileRenderer {
           this.filePane.innerHTML = `
             <div style="display: flex; flex-direction: column; height: 100%; background-color: var(--sl-color-neutral-0);">
               <iframe src="${path}" type="application/pdf" width="100%" style="flex: 1; min-height: 0; border: none; background-color: var(--sl-color-neutral-0);"></iframe>
-              <p style="flex-shrink: 0; margin: 0; padding: 8px 0; text-align: center; font-size: 0.9em; background-color: var(--sl-color-neutral-100); color: var(--sl-color-neutral-700);">
-                If PDF doesn't display, <a href="${path}" target="_blank" style="color: var(--sl-color-primary-600);">click here to open in new tab</a>
-              </p>
+              ${this.createFileLink(path)}
             </div>
           `;
           return;
@@ -72,7 +82,12 @@ export class FileRenderer {
         case 'html':
         case 'htm':
           // Render HTML in iframe for security
-          this.filePane.innerHTML = `<iframe src="${path}" width="100%" height="100%" frameborder="0"></iframe>`;
+          this.filePane.innerHTML = `
+            <div style="display: flex; flex-direction: column; height: 100%;">
+              <iframe src="${path}" width="100%" style="flex: 1; min-height: 0;" frameborder="0"></iframe>
+              ${this.createFileLink(path)}
+            </div>
+          `;
           return;
 
         // Audio file cases
@@ -85,12 +100,15 @@ export class FileRenderer {
         case 'wma':
         case 'opus':
           this.filePane.innerHTML = `
-            <div style="padding: 20px; text-align: center;">
-              <h3>${fileName}</h3>
-              <audio controls style="width: 100%; max-width: 500px;">
-                <source src="${path}" type="audio/${extension === 'm4a' ? 'mp4' : extension}">
-                Your browser does not support the audio element.
-              </audio>
+            <div style="display: flex; flex-direction: column; height: 100%;">
+              <div style="flex: 1; padding: 20px; text-align: center; display: flex; flex-direction: column; justify-content: center;">
+                <h3>${fileName}</h3>
+                <audio controls style="width: 100%; max-width: 500px;">
+                  <source src="${path}" type="audio/${extension === 'm4a' ? 'mp4' : extension}">
+                  Your browser does not support the audio element.
+                </audio>
+              </div>
+              ${this.createFileLink(path)}
             </div>
           `;
           return;
@@ -144,14 +162,19 @@ export class FileRenderer {
           const language = this.getLanguageForExtension(extension);
           const escapedContent = this.escapeHtml(content);
           this.filePane.innerHTML = `
-            <zero-md>
+            <div style="display: flex; flex-direction: column; height: 100%;">
+              <div style="flex: 1; min-height: 0; overflow: auto;">
+                <zero-md>
 
-              <script type="text/markdown">
+                  <script type="text/markdown">
 \`\`\`${language}
 ${escapedContent}
 \`\`\`
-              </script>
-            </zero-md>
+                  </script>
+                </zero-md>
+              </div>
+              ${this.createFileLink(path)}
+            </div>
           `;
           // Add link click handler after zero-md is rendered
           this.setupLinkClickHandler();
@@ -167,7 +190,14 @@ ${escapedContent}
       }
 
       // Render as plain text for any unhandled file types
-      this.filePane.innerHTML = `<pre style="white-space: pre-wrap; font-family: monospace;">${this.escapeHtml(content)}</pre>`;
+      this.filePane.innerHTML = `
+        <div style="display: flex; flex-direction: column; height: 100%;">
+          <div style="flex: 1; min-height: 0; overflow: auto;">
+            <pre style="white-space: pre-wrap; font-family: monospace;">${this.escapeHtml(content)}</pre>
+          </div>
+          ${this.createFileLink(path)}
+        </div>
+      `;
     } catch (error) {
       console.error('Error loading file:', error);
       this.filePane.innerHTML = `<p>Error loading file: ${error}</p>`;
@@ -389,5 +419,13 @@ ${escapedContent}
       console.error('Error rendering Jupyter notebook:', error);
       this.filePane.innerHTML = `<p>Error rendering notebook: ${error instanceof Error ? error.message : String(error)}</p>`;
     }
+  }
+
+  private createFileLink(path: string): string {
+    return `
+      <p style="flex-shrink: 0; margin: 0; padding: 8px 0; text-align: center; font-size: 0.9em; background-color: var(--sl-color-neutral-100); color: var(--sl-color-neutral-700);">
+        <a href="${path}" target="_blank" style="color: var(--sl-color-primary-600);">Click here to open the file in a new tab</a>
+      </p>
+    `;
   }
 }
