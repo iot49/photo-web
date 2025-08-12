@@ -182,6 +182,7 @@ export class PwNavPage extends LitElement {
           <div class="navbar-right">
             <slot name="nav-controls"></slot>
             <div class="nav-user">
+              ${this.isEditor() ? this.renderEditIcon() : ''}
               <sl-tooltip content="Toggle between Photo Albums and Documents">
                 ${this.parentIsDoc
                   ? html`<sl-button variant="text" size="medium" @click="${this.handleAlbumClick}" class="theme-toggle">
@@ -289,6 +290,10 @@ export class PwNavPage extends LitElement {
     return this.me?.roles?.includes('admin') || false;
   }
 
+  private isEditor(): boolean {
+    return this.me?.roles?.includes('editor') || false;
+  }
+
   private async toggleTheme() {
     this.themeManager.toggleTheme();
     
@@ -356,6 +361,21 @@ export class PwNavPage extends LitElement {
 
   private handleFilesClick() {
     window.location.href = '/ui/files';
+  }
+
+  private renderEditIcon() {
+    return html`
+      <sl-tooltip content="Edit this page">
+        <sl-button variant="text" size="medium" @click="${this.handleEditClick}" class="theme-toggle">
+          <sl-icon name="pencil-square"></sl-icon>
+        </sl-button>
+      </sl-tooltip>
+    `;
+  }
+
+  private handleEditClick() {
+    const currentFile = 'ui/src/pw-nav-page.ts';
+    window.location.href = `/ui/editor?file=${encodeURIComponent(currentFile)}`;
   }
 
   private handleNavigation(url: string) {

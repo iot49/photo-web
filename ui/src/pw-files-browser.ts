@@ -2,8 +2,8 @@ import { LitElement, PropertyValues, css, html } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 import { get_json } from './app/api';
 import { SlTreeItem } from './shoelace-config';
-import { FileRenderer } from './file-renderer';
-import { iconForFilename } from './file-icons';
+import { FileRenderer } from './app/files/renderer';
+import { iconForFilename } from './app/files/icons';
 
 interface FolderModelInterface {
   path: string;

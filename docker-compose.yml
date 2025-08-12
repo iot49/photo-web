@@ -46,6 +46,12 @@ services:
       - traefik.http.routers.traefik-dashboard.service=dashboard@internal
       - traefik.http.routers.traefik-dashboard.middlewares=authorize@file
       - traefik.http.routers.traefik-dashboard.priority=1
+      # Internal dashboard router for cloudflared (port 81)
+      - traefik.http.routers.traefik-dashboard-internal.rule=Host(`traefik.${ROOT_DOMAIN}`) && PathPrefix(`/`)
+      - traefik.http.routers.traefik-dashboard-internal.entrypoints=webinternal
+      - traefik.http.routers.traefik-dashboard-internal.service=dashboard@internal
+      - traefik.http.routers.traefik-dashboard-internal.middlewares=authorize@file
+      - traefik.http.routers.traefik-dashboard-internal.priority=1
       # API router (for data endpoints)
       - traefik.http.routers.traefik-api.rule=Host(`traefik.${ROOT_DOMAIN}`) && PathPrefix(`/api`)
       - traefik.http.routers.traefik-api.tls=true
@@ -54,6 +60,12 @@ services:
       - traefik.http.routers.traefik-api.service=api@internal
       - traefik.http.routers.traefik-api.middlewares=authorize@file
       - traefik.http.routers.traefik-api.priority=2
+      # Internal API router for cloudflared (port 81)
+      - traefik.http.routers.traefik-api-internal.rule=Host(`traefik.${ROOT_DOMAIN}`) && PathPrefix(`/api`)
+      - traefik.http.routers.traefik-api-internal.entrypoints=webinternal
+      - traefik.http.routers.traefik-api-internal.service=api@internal
+      - traefik.http.routers.traefik-api-internal.middlewares=authorize@file
+      - traefik.http.routers.traefik-api-internal.priority=2
     networks:
       - ingress
       - tunnel
@@ -201,3 +213,32 @@ services:
       - auth
     labels:
       - "traefik.enable=false"  # Internal service only
+
+  editor:
+    build: ./editor
+    image: editor-service:latest
+    container_name: editor
+    hostname: ${ROOT_DOMAIN}
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ${FILES}:/home:rw  # Mount for editing
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # Docker access for development
+    labels:
+      - "traefik.enable=true"
+      # Route editor subdomain through traefik (HTTPS - port 443)
+      - "traefik.http.routers.editor.rule=Host(`editor.${ROOT_DOMAIN}`)"
+      - "traefik.http.routers.editor.entrypoints=websecure"
+      - "traefik.http.routers.editor.tls=true"
+      - "traefik.http.routers.editor.tls.certresolver=cloudflare"
+      - "traefik.http.routers.editor.priority=50"
+      - "traefik.http.routers.editor.middlewares=authorize@file"
+      # Internal unencrypted router for cloudflared
+      - "traefik.http.routers.editor-internal.rule=Host(`editor.${ROOT_DOMAIN}`)"
+      - "traefik.http.routers.editor-internal.entrypoints=webinternal"
+      - "traefik.http.routers.editor-internal.priority=50"
+      - "traefik.http.routers.editor-internal.middlewares=authorize@file"
+      - "traefik.http.services.editor.loadbalancer.server.port=8080"
+    networks:
+      - ingress

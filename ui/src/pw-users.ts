@@ -184,15 +184,17 @@ export class PwUsers extends LitElement {
                       this.handleSelectInput('roles', e);
                     }}
                   >
-                    <sl-option value="public">public</sl-option>
-                    <sl-option value="protected">protected</sl-option>
-                    <sl-option value="private">private</sl-option>
-                    <sl-option value="admin">admin</sl-option>
-                    ${this.folderOptions.map(option => {
-                      // Replace spaces with underscores for the value, but keep original for display
-                      const sanitizedValue = option.replace(/\s+/g, '_');
-                      return html`<sl-option value=${sanitizedValue}>${option}</sl-option>`;
-                    })}
+                    ${(() => {
+                      // Combine hardcoded roles with folder options, using Set to remove duplicates
+                      const hardcodedRoles = ['public', 'protected', 'private', 'admin', 'editor'];
+                      const allOptions = [...new Set([...hardcodedRoles, ...this.folderOptions])];
+                      
+                      return allOptions.map(option => {
+                        // Replace spaces with underscores for the value, but keep original for display
+                        const sanitizedValue = option.replace(/\s+/g, '_');
+                        return html`<sl-option value=${sanitizedValue}>${option}</sl-option>`;
+                      });
+                    })()}
                   </sl-select>
                 `
               : html` <span class="roles-list">${user.roles.replace(/,/g, ' ')}</span> `}

@@ -561,6 +561,19 @@ export class PwMain extends LitElement {
         isDynamic: true,
       },
       {
+        routeId: 'editor',
+        description: 'Code editor for editing source files',
+        matchUris: ['/ui/editor'],
+        isActive: this.matchesAnyUri(['/ui/editor']),
+        componentFactory: () => {
+          const urlParams = this.queryParams;
+          const file = urlParams.get('file') || 'ui/src/pw-nav-page.ts';
+          const editorUrl = `https://editor.${location.hostname}/?file=${encodeURIComponent(file)}`;
+          return html`<pw-nav-page><iframe src="${editorUrl}"></iframe></pw-nav-page>`;
+        },
+        isDynamic: true,
+      },
+      {
         routeId: 'slideshow',
         description: 'Photo slideshow with themes and playlists',
         matchUris: ['/ui/slideshow'],

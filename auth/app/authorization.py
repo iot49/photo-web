@@ -19,11 +19,30 @@ class AuthorizationRule:
 
     def __init__(self, action: str, uri_pattern: str, role: Optional[str] = None):
         self.action = action.strip().lower()
-        self.uri_pattern = uri_pattern.strip()
+        self.raw_pattern = uri_pattern.strip()
         self.role = role.strip() if role and role.strip() else None
 
-    def matches_uri(self, uri: str) -> bool:
-        """Check if the URI matches this rule's pattern using fnmatch"""
+        # Parse subdomain and path from pattern
+        self.subdomain, self.uri_pattern = self._parse_pattern(self.raw_pattern)
+
+    def _parse_pattern(self, pattern: str) -> tuple[str, str]:
+        """Parse pattern into subdomain and URI components"""
+        if ":" in pattern:
+            subdomain, path = pattern.split(":", 1)
+            return subdomain.strip(), path.strip()
+        else:
+            return "", pattern.strip()
+
+    def matches_uri(self, uri: str, subdomain: str = "") -> bool:
+        """Check if the URI and subdomain match this rule's pattern using fnmatch"""
+        # Check subdomain match
+        if self.subdomain and self.subdomain != subdomain:
+            return False
+        elif not self.subdomain and subdomain:
+            # Rule has no subdomain but request has one - no match
+            return False
+
+        # Check URI pattern match
         return fnmatch.fnmatch(uri, self.uri_pattern)
 
     def applies_to_role(self, user_roles: List[str]) -> bool:
@@ -98,19 +117,22 @@ class AuthorizationManager:
         Args:
             uri: The URI to check authorization for
             user_roles: List of user roles
-            request: FastAPI Request object (required for delegation)
+            request: FastAPI Request object (required for delegation and subdomain extraction)
         """
+        # Extract subdomain from request
+        subdomain = self._extract_subdomain(request) if request else ""
+
         for rule in self.rules:
-            if rule.matches_uri(uri) and rule.applies_to_role(user_roles):
+            if rule.matches_uri(uri, subdomain) and rule.applies_to_role(user_roles):
                 logger.debug(
-                    f"RULE matched: {rule.action} {rule.uri_pattern} {rule.role} for URI {uri} with roles {user_roles}"
+                    f"RULE matched: {rule.action} {rule.raw_pattern} {rule.role} for URI {uri} subdomain '{subdomain}' with roles {user_roles}"
                 )
 
                 if rule.action == "allow":
                     if rule.is_delegated:
                         # Delegate authorization to another service
                         logger.debug(
-                            f"DELEGATE: {rule.action} {rule.uri_pattern} {rule.role} for URI {uri} with roles {user_roles}"
+                            f"DELEGATE: {rule.action} {rule.raw_pattern} {rule.role} for URI {uri} subdomain '{subdomain}' with roles {user_roles}"
                         )
                         return self._delegate_authorization(
                             rule, uri, user_roles, request
@@ -122,9 +144,33 @@ class AuthorizationManager:
 
         # No matching rule found, deny by default
         logger.debug(
-            f"No matching rule found for URI {uri} with roles {user_roles}, denying access"
+            f"No matching rule found for URI {uri} subdomain '{subdomain}' with roles {user_roles}, denying access"
         )
         return False
+
+    def _extract_subdomain(self, request: Request) -> str:
+        """Extract subdomain from the request host header"""
+        if not request:
+            return ""
+
+        # Get host from X-Forwarded-Host (from Traefik) or Host header
+        host = request.headers.get("X-Forwarded-Host") or request.headers.get(
+            "Host", ""
+        )
+
+        if not host:
+            return ""
+
+        # Remove port if present
+        host = host.split(":")[0]
+
+        # Split by dots and check if we have a subdomain
+        parts = host.split(".")
+        if len(parts) > 2:
+            # Assume the first part is the subdomain
+            return parts[0]
+
+        return ""
 
     def _delegate_authorization(
         self,

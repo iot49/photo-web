@@ -101,6 +101,9 @@ export function iconForFilename(fileName: string): string {
     rst: 'file-earmark-text',
     adoc: 'file-earmark-text',
 
+    // Jupyter notebooks
+    ipynb: 'journal-code',
+
     // Font files
     ttf: 'fonts',
     otf: 'fonts',

@@ -1,0 +1,10 @@
+ipykernel
+ipywidgets
+nbformat
+nbclient
+
+matplotlib
+pandas
+pyyaml
+
+openai
