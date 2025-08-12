@@ -2,8 +2,8 @@ export function getLanguageForExtension(extension: string): string {
   const languageMap: { [key: string]: string } = {
     js: 'javascript',
     ts: 'typescript',
-    jsx: 'jsx',
-    tsx: 'tsx',
+    jsx: 'javascript', // highlight.js doesn't have jsx, use javascript
+    tsx: 'typescript', // highlight.js doesn't have tsx, use typescript
     py: 'python',
     cpp: 'cpp',
     c: 'c',
