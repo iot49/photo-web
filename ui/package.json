@@ -13,7 +13,6 @@
     "firebase": "^11.10.0",
     "highlight.js": "^11.11.1",
     "immer": "^10.1.1",
-    "ipynb2html": "^0.4.0-rc.1",
     "lit": "^3.2.1",
     "urlpattern-polyfill": "^10.1.0"
   },

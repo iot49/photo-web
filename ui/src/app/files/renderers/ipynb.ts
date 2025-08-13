@@ -1,6 +1,22 @@
 import { get_text } from '../../api';
-import { createRenderer } from 'ipynb2html';
 import { emitFilePathEvent, setFileContent } from './utils';
+
+// Import our local browser-compatible notebookjs
+// @ts-ignore - local JS file without TypeScript declarations
+import nb from './notebookjs.js';
+
+
+/*
+COMPLETED:
+✓ render markdown with zero-md
+✓ remove unneeded markdown css from notebook.css
+
+BUG: the code cells are not formatted. 
+Is notebook.css ignored?
+
+Part of rendered output:
+<div class="nb-cell nb-code-cell"><div class="nb-input" data-prompt-number="3"><pre class=""><code class="lang-python" data-language="python">5-9</code></pre></div><div class="nb-output" data-prompt-number="3"><pre class="nb-text-output">-4</pre></div></div>
+*/
 
 export async function renderJupyterNotebook(filePane: HTMLDivElement, path: string): Promise<void> {
   try {
@@ -10,13 +26,11 @@ export async function renderJupyterNotebook(filePane: HTMLDivElement, path: stri
       return;
     }
 
-    const notebook = JSON.parse(content);
+    const ipynb = JSON.parse(content);
     
-    // Create the renderer using the browser's document
-    const renderer = createRenderer(document);
-    
-    // Render the notebook to a DOM element
-    const notebookElement = renderer.render(notebook);
+    // Parse and render the notebook using notebookjs
+    const notebook = nb.parse(ipynb);
+    const notebookElement = notebook.render();
     
     // Clear the file pane
     filePane.innerHTML = '';
@@ -47,9 +61,100 @@ export async function renderJupyterNotebook(filePane: HTMLDivElement, path: stri
     title.textContent = '📓 Jupyter Notebook';
     header.appendChild(title);
     
+    // Create notebook content container with notebookjs styling
+    const notebookContent = document.createElement('div');
+    notebookContent.className = 'notebook-content nb-notebook';
+    notebookContent.style.cssText = `
+      font-family: Helvetica Neue, Helvetica, sans-serif;
+      font-size: 14px;
+      width: 99%;
+      max-width: 750px;
+      margin: 0 auto;
+    `;
+    
+    // Add the rendered notebook HTML
+    notebookContent.appendChild(notebookElement);
+    
+    // Ensure CSS styles are applied by adding critical styles inline as fallback
+    const style = document.createElement('style');
+    style.textContent = `
+      .nb-cell {
+        margin-bottom: 1em;
+        border: 1px solid var(--sl-color-neutral-200);
+        border-radius: 6px;
+        overflow: hidden;
+        background: var(--sl-color-neutral-0);
+      }
+      
+      .nb-code-cell {
+        border: 1px solid var(--sl-color-neutral-300);
+      }
+      
+      .nb-code-cell .nb-input {
+        background: var(--sl-color-neutral-50);
+        border-bottom: 1px solid var(--sl-color-neutral-200);
+      }
+      
+      .nb-code-cell .nb-input pre {
+        margin: 0;
+        padding: 12px 16px;
+        background: transparent;
+        border: none;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 13px;
+        line-height: 1.4;
+        overflow-x: auto;
+      }
+      
+      .nb-code-cell .nb-input code {
+        background: transparent;
+        padding: 0;
+        border: none;
+        font-family: inherit;
+      }
+      
+      .nb-output {
+        padding: 12px 16px;
+        background: var(--sl-color-neutral-0);
+      }
+      
+      .nb-text-output {
+        background: var(--sl-color-neutral-50);
+        padding: 12px 16px;
+        border-radius: 4px;
+        margin: 8px 0;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 13px;
+        line-height: 1.4;
+        white-space: pre-wrap;
+        overflow-x: auto;
+      }
+      
+      .nb-input[data-prompt-number]::before {
+        content: "In [" attr(data-prompt-number) "]:";
+        display: block;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 11px;
+        color: var(--sl-color-neutral-500);
+        margin-bottom: 4px;
+        font-weight: bold;
+      }
+      
+      .nb-output[data-prompt-number]::before {
+        content: "Out[" attr(data-prompt-number) "]:";
+        display: block;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 11px;
+        color: var(--sl-color-neutral-500);
+        margin-bottom: 4px;
+        font-weight: bold;
+      }
+    `;
+    container.appendChild(style);
+    
     // Assemble the final structure
     container.appendChild(header);
-    container.appendChild(notebookElement);
+    container.appendChild(notebookContent);
     
     // Emit the file path event for the bottom bar
     emitFilePathEvent(path);
