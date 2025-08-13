@@ -164,7 +164,7 @@ export class FileRenderer {
 
     // Find all links in the shadow DOM
     const links = shadowRoot.querySelectorAll('a[href]');
-    console.log(`Found ${links.length} links in zero-md shadow DOM`);
+    // console.log(`Found ${links.length} links in zero-md shadow DOM`);
     
     links.forEach((link) => {
       const anchorLink = link as HTMLAnchorElement;
@@ -213,13 +213,6 @@ export class FileRenderer {
   private handleLinkClick = (event: Event): void => {
     const link = event.target as HTMLAnchorElement;
     if (link && link.href) {
-      console.log('Link clicked:', {
-        href: link.href,
-        text: link.textContent?.trim(),
-        target: link.target,
-        element: link
-      });
-      
       // Check if this is a link to a document file that we should handle internally
       const url = new URL(link.href);
       if (url.pathname.startsWith('/files/api/file/')) {
@@ -233,7 +226,6 @@ export class FileRenderer {
         window.history.pushState(null, '', newUrl);
         
         // Show the linked file in the current file pane
-        console.log("SHOW", url.pathname);
         this.showFile(url.pathname);
       }
     }
