@@ -172,7 +172,7 @@ export class FileRenderer {
       anchorLink.removeEventListener('click', this.handleLinkClick);
       // Add click listener
       anchorLink.addEventListener('click', this.handleLinkClick);
-      console.log('Attached click listener to link:', anchorLink.href);
+      // console.log('Attached click listener to link:', anchorLink.href);
     });
   }
 
@@ -223,7 +223,13 @@ export class FileRenderer {
         const filePath = url.pathname.replace('/files/api/file', '');
         // Update the browser URL to use the UI route format with path parameter
         const newUrl = `/ui/files${filePath}`;
-        window.history.pushState(null, '', newUrl);
+        
+        // Push state with proper history entry
+        const state = {
+          filePath: url.pathname,
+          uiPath: newUrl
+        };
+        window.history.pushState(state, '', newUrl);
         
         // Show the linked file in the current file pane
         this.showFile(url.pathname);

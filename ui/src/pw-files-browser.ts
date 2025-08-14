@@ -99,16 +99,63 @@ export class PwFilesBrowser extends LitElement {
     
     // Listen for pw-file-path events
     window.addEventListener('pw-file-path', this.handleFilePathEvent as EventListener);
+    
+    // Listen for pageshow event to handle back/forward cache restoration
+    window.addEventListener('pageshow', this.handlePageShow as EventListener);
+    
+    // Listen for popstate events to handle back/forward navigation
+    window.addEventListener('popstate', this.handlePopState as EventListener);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     window.removeEventListener('pw-file-path', this.handleFilePathEvent as EventListener);
+    window.removeEventListener('pageshow', this.handlePageShow as EventListener);
+    window.removeEventListener('popstate', this.handlePopState as EventListener);
   }
 
   private handleFilePathEvent = (event: Event) => {
     const customEvent = event as CustomEvent;
     this.currentFilePath = customEvent.detail.path;
+  };
+
+  private handlePageShow = (event: PageTransitionEvent) => {
+    console.log('PageShow event in files browser:', {
+      persisted: event.persisted,
+      currentPath: window.location.pathname,
+      selectedFilePath: this.selectedFilePath,
+      hasFileRenderer: !!this.fileRenderer
+    });
+    
+    // Handle back/forward cache restoration OR any pageshow event
+    // Extract file path from current URL and update display
+    const currentPath = window.location.pathname;
+    if (currentPath.startsWith('/ui/files/') && this.fileRenderer) {
+      const filePath = currentPath.substring('/ui/files'.length);
+      if (filePath && filePath !== '/') {
+        const selectedFilePath = `/files/api/file${filePath}`;
+        console.log('Syncing file display after pageshow:', selectedFilePath);
+        this.fileRenderer.showFile(selectedFilePath);
+      }
+    }
+  };
+
+  private handlePopState = (event: PopStateEvent) => {
+    // Directly handle URL changes from back/forward navigation
+    const currentPath = window.location.pathname;
+    if (currentPath.startsWith('/ui/files/') && this.fileRenderer) {
+      const filePath = currentPath.substring('/ui/files'.length);
+      if (filePath && filePath !== '/') {
+        // Use state information if available, otherwise construct from URL
+        const selectedFilePath = event.state?.filePath || `/files/api/file${filePath}`;
+        console.log('Showing file after popstate:', selectedFilePath);
+        this.fileRenderer.showFile(selectedFilePath);
+      } else {
+        // Back to files root - show default index.md if available
+        console.log('Back to files root, showing default index.md');
+        this.fileRenderer.showFile(`/files/api/file/public/index.md`);
+      }
+    }
   };
 
   protected firstUpdated(_changedProperties: PropertyValues): void {
@@ -155,7 +202,13 @@ export class PwFilesBrowser extends LitElement {
             const filePath = path.replace('/files/api/file', '');
             // Update the URL to use the UI route format with path parameter
             const newUrl = `/ui/files${filePath}`;
-            window.history.pushState(null, '', newUrl);
+            
+            // Push state with proper history entry
+            const state = {
+              filePath: path,
+              uiPath: newUrl
+            };
+            window.history.pushState(state, '', newUrl);
             this.fileRenderer.showFile(path);
           }
         });
@@ -175,6 +228,7 @@ export class PwFilesBrowser extends LitElement {
 
     // If selectedFilePath changed, show the new file
     if (changedProperties.has('selectedFilePath') && this.selectedFilePath && this.fileRenderer) {
+      console.log('Showing file due to selectedFilePath change:', this.selectedFilePath);
       this.fileRenderer.showFile(this.selectedFilePath);
     }
   }
