@@ -201,6 +201,7 @@ The application uses the following roles:
 * `public`: All visitors (regardless of login status) are assigned this role. Provides access to the user interface and public albums/documents.
 * `protected`: Authenticated users are assigned both `public` and `protected` roles by default.
 * `private`: Must be explicitly assigned by administrators. Provides access to private albums and documents.
+* `editor`: Full (read/write) access by editor.${ROOT-DOMAIN} to files in ${FILES} folder.
 * `admin`: Allows viewing/editing users (especially roles) and reloading the photos database.
 * Additional roles specify document access as explained below.
 
@@ -213,24 +214,6 @@ Document access is based on folder names in the `${FILES}` directory. Users can 
 
 > [!TIP]
 > Create a `family` folder in `${FILES}` for family-only content. Add the `family` role to appropriate users. To edit users and roles, log in with an `admin` account (e.g., `SUPER_USER_EMAIL` from `.env`), click the three dots left of your avatar, and select `Users...`.
-
-##### Analytics Collection & API
-
-The auth service collects comprehensive analytics data during every authorization request and provides API endpoints for accessing usage statistics. This dual functionality enables real-time data collection and administrative reporting.
-
-**Data Collection**: During each [`/authorize`](auth/app/main.py:285) request, the auth service automatically collects:
-- User identification and roles
-- Resource access patterns (albums, photos, files)
-- Request timing and performance metrics
-- Geographic and device information
-- Success/failure rates and error tracking
-
-**Analytics API Endpoints** (Admin access required):
-- [`GET /auth/api/analytics/usage-summary`](auth/app/main.py:571) - Comprehensive usage statistics for specified time periods
-- [`GET /auth/api/analytics/album-stats`](auth/app/main.py:660) - Detailed album access analytics and popularity metrics
-- [`GET /auth/api/analytics/user-activity`](auth/app/main.py:780) - User behavior analysis and engagement patterns
-
-The collected data is stored in [`/app/analytics`](auth/app/analytics.py:22) and processed by the separate analytics service for advanced reporting and trend analysis.
 
 #### Nginx
 
@@ -261,35 +244,66 @@ The service doesn't copy the photo library but scales images and converts HEIC t
 
 The `files` service provides read-only access to the `${FILES}` folder. Built with [FastAPI](https://fastapi.tiangolo.com/), endpoint documentation is available at `https://${ROOT_DOMAIN}/files/openapi.json` or formatted at `https://${ROOT_DOMAIN}/files/redoc` and `https://${ROOT_DOMAIN}/files/docs`.
 
+#### Editor
+
+Vscode available at <https://editor.${ROOT-DOMAIN}>. Mounts `${FILES}` folder read-write. Required role `editor` for access.
+
+> [!WARNING]
+> Role `editor` gives full read/write access to all content in the `${FILES}` folder. Use with caution!
+
 #### Analytics
 
 The `analytics` service is an internal log processing and reporting system that analyzes Traefik access logs and auth service analytics data to generate comprehensive usage reports. Built with Python and pandas for data processing.
 
 **Key Features:**
-- **Log Processing**: Continuously processes Traefik access logs in JSON format
-- **Data Aggregation**: Combines Traefik logs with auth service analytics data
-- **Automated Reporting**: Generates daily and weekly analytics reports
-- **Data Retention**: Automatic cleanup of old analytics data (90-day default retention)
-- **Performance Metrics**: Response time analysis and system performance tracking
+
+* **Log Processing**: Continuously processes Traefik access logs in JSON format
+* **Data Aggregation**: Combines Traefik logs with auth service analytics data
+* **Automated Reporting**: Generates daily and weekly analytics reports
+* **Data Retention**: Automatic cleanup of old analytics data (90-day default retention)
+* **Performance Metrics**: Response time analysis and system performance tracking
 
 **Architecture**: The service runs as a background container that:
+
 1. Reads Traefik access logs from shared volume [`/logs/traefik`](docker-compose.yml:194)
 2. Processes auth service analytics data from [`/app/analytics`](docker-compose.yml:105)
 3. Generates structured reports stored in [`/app/data`](docker-compose.yml:195)
 4. Provides processed data for consumption by auth service API endpoints
 
 **Data Flow:**
-```
+
+```text
 Traefik Access Logs → Analytics Processor → Daily/Weekly Reports
 Auth Service Analytics → Analytics Processor → Usage Statistics
 ```
 
 **Generated Reports:**
-- **Daily Reports**: Total requests, unique visitors, popular albums/files, response times
-- **Weekly Summaries**: Aggregated statistics, trending content, user engagement patterns
-- **Long-term Trends**: Performance analysis and capacity planning data
+
+* **Daily Reports**: Total requests, unique visitors, popular albums/files, response times
+* **Weekly Summaries**: Aggregated statistics, trending content, user engagement patterns
+* **Long-term Trends**: Performance analysis and capacity planning data
 
 The service operates autonomously with hourly processing cycles and daily summary generation. All analytics data is accessible through the auth service's admin-only API endpoints.
+
+##### Analytics Collection & API
+
+The auth service collects comprehensive analytics data during every authorization request and provides API endpoints for accessing usage statistics. This dual functionality enables real-time data collection and administrative reporting.
+
+**Data Collection**: During each [`/authorize`](auth/app/main.py:285) request, the auth service automatically collects:
+
+* User identification and roles
+* Resource access patterns (albums, photos, files)
+* Request timing and performance metrics
+* Geographic and device information
+* Success/failure rates and error tracking
+
+**Analytics API Endpoints** (Admin access required):
+
+* [`GET /auth/api/analytics/usage-summary`](auth/app/main.py:571) - Comprehensive usage statistics for specified time periods
+* [`GET /auth/api/analytics/album-stats`](auth/app/main.py:660) - Detailed album access analytics and popularity metrics
+* [`GET /auth/api/analytics/user-activity`](auth/app/main.py:780) - User behavior analysis and engagement patterns
+
+The collected data is stored in [`/app/analytics`](auth/app/analytics.py:22) and processed by the separate analytics service for advanced reporting and trend analysis.
 
 #### Cloudflare Tunnel
 

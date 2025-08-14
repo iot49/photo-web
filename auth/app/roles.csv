@@ -4,16 +4,16 @@ allow, /static/*, public, Static assets
 allow, /favicon.ico, public, make browser happy
 
 allow, /photos/api/albums, public, Public album list
-allow, /photos/api/photos/srcset, public, Srcset for images
 allow, /photos/api/albums/*, !photos:8000, Delegate album access to photos service
+allow, /photos/api/photos/srcset, public, Srcset for images
 allow, /photos/api/photos/*, !photos:8000, Delegate photo access to photos service
 allow, /photos/api/reload-db, admin, Reload photos database
 allow, /photos/api/*nginx-cache, admin, Image cache operations
 
 allow, /files/api/root, public, List of folders user is permitted to view
 allow, /files/api/folder/*, !files:8000, Delegate folder listing to files service
-allow, /files/api/folders, admin, List all top-level folders
 allow, /files/api/file/*, !files:8000, Delegate file access to files service
+allow, /files/api/folders, admin, List all top-level folders in $FILES (roles)
 
 allow, /auth/firebase-config, public
 allow, /auth/login*, public, Login page
@@ -31,6 +31,6 @@ allow, */docs, public, Swagger docs for all services
 allow, */redoc, public, openapi docs for all services
 allow, *openapi.json, public, OpenAPI schema for all services
 
-allow, traefik:*, admin, Traefik dashboard
-allow, editor:*, editor, Editor
+allow, traefik:*, admin, Traefik dashboard (subdomain)
+allow, editor:*, editor, Editor (subdomain)
 
