@@ -108,6 +108,7 @@ export class PwFilesBrowser extends LitElement {
     sl-tree-item sl-icon {
       font-size: 0.7rem;
       margin-right: 0.25rem;
+      color: var(--sl-color-primary-500);
     }
 
   `;
