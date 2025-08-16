@@ -78,10 +78,38 @@ export class PwFilesBrowser extends LitElement {
     }
 
     sl-tree-item {
+      --indent-size: 0.4rem;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      line-height: 1.2;
     }
+
+    sl-tree-item::part(base) {
+      padding: 0.125rem 0.25rem 0.125rem 0.3125rem;
+      min-height: 1.25rem;
+    }
+
+    sl-tree-item::part(item) {
+      padding: 0;
+    }
+
+    sl-tree-item::part(label) {
+      padding: 0;
+      font-size: 0.8rem;
+    }
+
+    sl-tree-item::part(expand-button) {
+      padding: 0.125rem;
+      width: 0.875rem;
+      height: 0.875rem;
+    }
+
+    sl-tree-item sl-icon {
+      font-size: 0.7rem;
+      margin-right: 0.25rem;
+    }
+
   `;
 
   @state() root!: FolderModel;
