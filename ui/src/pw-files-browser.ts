@@ -171,53 +171,81 @@ export class PwFilesBrowser extends LitElement {
       const target = event.target as SlTreeItem;
       const path = target.getAttribute('data-path');
       const name = target.getAttribute('data-folder');
-      const folder = await get_json(`/files/api/folder/${path}/${name}`);
-      for (const folderName of folder.folders) {
-        const treeItem = document.createElement('sl-tree-item') as SlTreeItem;
-        treeItem.innerText = folderName;
-        treeItem.className = 'folder-item';
-        treeItem.lazy = true;
-        treeItem.setAttribute('data-path', `${path}/${name}`);
-        treeItem.setAttribute('data-folder', `${folderName}`);
-        target.append(treeItem);
-      }
-      for (const fileName of folder.files) {
-        const treeItem = document.createElement('sl-tree-item') as SlTreeItem;
-        const dataPath = `/files/api/file/${path}/${name}/${fileName}`;
-        // Create icon element
-        const icon = document.createElement('sl-icon');
-        icon.setAttribute('name', iconForFilename(fileName));
-
-        // Add icon and filename to tree item
-        treeItem.appendChild(icon);
-        treeItem.appendChild(document.createTextNode(fileName));
-
-        treeItem.className = 'file-item';
-        treeItem.setAttribute('data-path', dataPath);
-        treeItem.addEventListener('click', (event) => {
-          const target = event.target as HTMLElement;
-          const path = target?.getAttribute('data-path');
-          if (path) {
-            // Extract the file path from the API path (remove /files/api/file prefix)
-            const filePath = path.replace('/files/api/file', '');
-            // Update the URL to use the UI route format with path parameter
-            const newUrl = `/ui/files${filePath}`;
-            
-            // Push state with proper history entry
-            const state = {
-              filePath: path,
-              uiPath: newUrl
-            };
-            window.history.pushState(state, '', newUrl);
-            this.fileRenderer.showFile(path);
-          }
-        });
-        target.append(treeItem);
-        if (fileName === 'index.md') {
-          this.fileRenderer.showFile(dataPath);
+      
+      try {
+        // Construct the folder path properly - handle empty root path
+        const folderPath = path && path !== '' ? `${path}/${name}` : name;
+        
+        // For API calls, encode each path segment separately to avoid double-encoding
+        const pathSegments = folderPath ? folderPath.split('/').map((segment: string) => encodeURIComponent(segment)) : [];
+        const encodedApiPath = pathSegments.join('/');
+        const folder = await get_json(`/files/api/folder/${encodedApiPath}`);
+        
+        // Check if folder data is valid
+        if (!folder || !folder.folders) {
+          console.error('Invalid folder data received:', folder);
+          return;
         }
+        
+        for (const folderName of folder.folders) {
+          const treeItem = document.createElement('sl-tree-item') as SlTreeItem;
+          treeItem.innerText = folderName;
+          treeItem.className = 'folder-item';
+          treeItem.lazy = true;
+          // Store the full path without encoding for data attributes
+          treeItem.setAttribute('data-path', folderPath || '');
+          treeItem.setAttribute('data-folder', folderName);
+          target.append(treeItem);
+        }
+        
+        for (const fileName of folder.files) {
+          const treeItem = document.createElement('sl-tree-item') as SlTreeItem;
+          // Construct the file path properly - encode each segment separately
+          const filePath = folderPath ? `${folderPath}/${fileName}` : fileName;
+          const filePathSegments = filePath.split('/').map((segment: string) => encodeURIComponent(segment));
+          const encodedFilePath = filePathSegments.join('/');
+          const dataPath = `/files/api/file/${encodedFilePath}`;
+          console.log(`pw-files-browser: adding file ${dataPath}`);
+          
+          // Create icon element
+          const icon = document.createElement('sl-icon');
+          icon.setAttribute('name', iconForFilename(fileName));
+
+          // Add icon and filename to tree item
+          treeItem.appendChild(icon);
+          treeItem.appendChild(document.createTextNode(fileName));
+
+          treeItem.className = 'file-item';
+          treeItem.setAttribute('data-path', dataPath);
+          treeItem.addEventListener('click', (event) => {
+            const target = event.target as HTMLElement;
+            const path = target?.getAttribute('data-path');
+            if (path) {
+              // Extract the file path from the API path (remove /files/api/file prefix)
+              const filePath = path.replace('/files/api/file', '');
+              // Update the URL to use the UI route format with path parameter
+              const newUrl = `/ui/files${filePath}`;
+              
+              // Push state with proper history entry
+              const state = {
+                filePath: path,
+                uiPath: newUrl
+              };
+              window.history.pushState(state, '', newUrl);
+              this.fileRenderer.showFile(path);
+            }
+          });
+          target.append(treeItem);
+          if (fileName === 'index.md') {
+            this.fileRenderer.showFile(dataPath);
+          }
+        }
+        target.lazy = false;
+      } catch (error) {
+        console.error('Error loading folder contents:', error);
+        // Optionally show user-friendly error message
+        target.lazy = false;
       }
-      target.lazy = false;
     });
 
     this.fileRenderer.showFile(`/files/api/file/public/index.md`);
@@ -254,10 +282,13 @@ export class PwFilesBrowser extends LitElement {
   }
 
   private treeTemplate(folder: FolderModel) {
+    // Normalize the root path - remove leading dots and slashes
+    const normalizedPath = folder.path === '.' || folder.path === './' ? '' : folder.path;
+    
     return html` <sl-tree>
       ${folder.folders.map(
         (folderName: string) =>
-          html` <sl-tree-item class="folder-item" data-path=${folder.path} data-folder=${folderName} lazy> ${folderName} </sl-tree-item>`
+          html` <sl-tree-item class="folder-item" data-path=${normalizedPath} data-folder=${folderName} lazy> ${folderName} </sl-tree-item>`
       )}
     </sl-tree>`;
   }
